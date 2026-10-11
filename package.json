@@ -1,5 +1,5 @@
 {
-  "name": "codex-hackathon-starter",
+  "name": "glory-map",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -236,7 +236,7 @@ lies: `gh api repos/…/commits/<sha>/status` goes green on the **Preview** depl
 for the environment by name, and force it when it has not fired:
 
 ```bash
-gh api "repos/walklikeaman/codex-hackathon-starter/deployments?environment=Production&per_page=5" --jq "[.[] | select(.sha==\"$(git rev-parse origin/main)\")] | length"
+gh api "repos/walklikeaman/glory-map/deployments?environment=Production&per_page=5" --jq "[.[] | select(.sha==\"$(git rev-parse origin/main)\")] | length"
 ```
 
 ```bash

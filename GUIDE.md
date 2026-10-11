@@ -24,13 +24,13 @@ The database and deploy are already set up — no keys to fill in, no Vercel to 
 
 | Item                          | Link / status                                               |
 | ----------------------------- | ------------------------------------------------------------ |
-| Shared repository (code)      | https://github.com/walklikeaman/codex-hackathon-starter      |
+| Shared repository (code)      | https://github.com/walklikeaman/glory-map      |
 | Live app (deploy)             | https://codex-hackathon-starter.vercel.app — already live   |
 | Supabase (database + auth)    | shared team project, connected in prod ✅                    |
 | Vercel (publishing)           | linked to the repo: **any push = auto-deploy to the web**   |
 | Supabase keys                 | baked into the repo, nothing to fill in                     |
 
-Full onboarding page with screenshots: **https://walklikeaman.github.io/codex-hackathon-starter/**
+Full onboarding page with screenshots: **https://walklikeaman.github.io/glory-map/**
 
 ---
 
@@ -70,7 +70,7 @@ codex
 ```
 You are my environment-setup agent. Do everything autonomously and report back at the end.
 
-1. Clone the repository https://github.com/walklikeaman/codex-hackathon-starter.git and cd into its folder.
+1. Clone the repository https://github.com/walklikeaman/glory-map.git and cd into its folder.
 2. Run ./setup.sh — it installs CodeGraph, connects it to Codex, and drops the skills
    (/ship, /autopilot, /loop-*, /pitch, /ui-polish, /schema) into ~/.codex/prompts.
 3. Run ./scaffold.sh — it installs the app's dependencies and creates .env.local with the shared Supabase keys.

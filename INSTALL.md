@@ -56,8 +56,8 @@ bet on the idea; it's decided in 5 minutes at the kickoff.
 ## 2. Grab the code
 
 ```bash
-git clone https://github.com/walklikeaman/codex-hackathon-starter.git
-cd codex-hackathon-starter
+git clone https://github.com/walklikeaman/glory-map.git
+cd glory-map
 ```
 
 This is the shared team repository — the owner adds participants as
