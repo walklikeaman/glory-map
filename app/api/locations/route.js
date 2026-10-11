@@ -28,6 +28,7 @@ import {
   labelIsTitle,
   typedMatchesFromSearch,
   workMatchesTypeGraph,
+  nearbyQueryCell,
 } from "../../lib/location-search.mjs";
 import {
   addSceneMatchTokens,
@@ -634,10 +635,12 @@ export async function GET(request) {
     }
 
     const sourceLimit = Math.min(60, limit);
+    // Asked for the cell, cut to the exact circle below: see nearbyQueryCell.
+    const cell = nearbyQueryCell({ lat, lng, radius });
     const query = buildLocationsSparql({
-      lat,
-      lng,
-      radius,
+      lat: cell.lat,
+      lng: cell.lng,
+      radius: cell.radius,
       sourceLimit,
       kind,
       workIds: [],
