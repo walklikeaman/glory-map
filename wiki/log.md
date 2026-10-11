@@ -7,6 +7,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-11] update | ShotSync: the film frame over the live camera
+**Object**: `app/components/ShotSync.jsx`, `app/lib/shot-sync.mjs`, the Recreate dialog.
+**Scenario**: feature
+**Outcome**: ✅ success, checked with Chromium's fake camera; a real phone is still to try
+**What happened**: #50. "Recreate this shot" opens on a live rear camera with the frame as a ghost (opacity slider, one finger drags, two pinch and twist, wheel zooms on desktop), then "Take photo" composes the picture on the device. Upload stays one tap away, and "Compare then / now" hands the clean shot to the old side-by-side view. The camera code is lazy-loaded and the camera stops when the dialog closes.
+
+Worth keeping: the photo is drawn at the camera's own resolution for the part the screen showed (`snapshotLayout`), so what was lined up on screen is where it lands in the file. A frame from a host without CORS would taint the canvas; then the photo is saved without the ghost and the UI says so. `facingMode` is `ideal`, not `exact`, or laptops fail with OverconstrainedError.
+**Updated**: as listed, plus `app/globals.css` and `test/shot-sync.test.mjs`.
+
 ## [2026-10-04] update | The map gets sections, visits, Glory — and "Add" stays on the device on purpose
 **Object**: `app/components/AppSections.jsx`, `app/lib/place-marks.mjs`, `app/lib/suggestions.mjs`, the place card.
 **Scenario**: feature

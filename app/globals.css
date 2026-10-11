@@ -2130,10 +2130,127 @@ figcaption a {
 
 .recreate-privacy {
   margin: 0;
+  padding: 0 16px 16px;
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.4;
   text-align: center;
+}
+
+.recreate-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.recreate-mode-switch .ghost-button {
+  min-height: 44px;
+}
+
+.recreate-mode-switch .ghost-button[aria-pressed="true"] {
+  border-color: rgba(247, 183, 51, 0.66);
+  background: rgba(247, 183, 51, 0.14);
+  color: var(--gold-strong);
+}
+
+/* ShotSync (#50): the film frame as a ghost over the live camera. */
+.shotsync {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.shotsync-intro,
+.shotsync-fallback {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.shotsync-intro strong,
+.shotsync-fallback strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.shotsync-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.shotsync-live {
+  padding: 12px 0 0;
+}
+
+.shotsync-stage {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  max-height: 62dvh;
+  width: 100%;
+  overflow: hidden;
+  background: #050606;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.shotsync-stage:active {
+  cursor: grabbing;
+}
+
+.shotsync-stage video,
+.shotsync-ghost {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.shotsync-stage video {
+  object-fit: cover;
+}
+
+.shotsync-ghost {
+  object-fit: contain;
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.shotsync-controls {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px;
+}
+
+.shotsync-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.shotsync-actions > * {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.shotsync-result img {
+  width: 100%;
+  max-height: 62dvh;
+  object-fit: contain;
+  background: #050606;
+  border-radius: 8px;
+}
+
+@media (min-width: 761px) {
+  .shotsync-stage {
+    aspect-ratio: 16 / 10;
+  }
 }
 
 .recreate-dialog button:focus-visible,
