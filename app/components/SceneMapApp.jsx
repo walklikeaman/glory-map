@@ -4643,6 +4643,7 @@ export default function SceneMapApp() {
         marks={placeMarks}
         onMarks={updateMarks}
         accountUser={accountUser}
+        supabase={supabase}
         suggestions={suggestions}
         onSuggestions={(next) => { setSuggestions(next); saveSuggestions(window.localStorage, next); }}
         mapCenter={mapCenter}

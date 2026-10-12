@@ -7,6 +7,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-12] decision | "Add a place" goes to review for signed-in readers, hidden until checked
+**Object**: `reader_place_suggestions` (migration `20261012000000_suggestions_from_signed_in_readers.sql`), `app/lib/suggestions.mjs`, the Add view.
+**Scenario**: feature
+**Outcome**: ⚠️ code ready; the migration still has to be applied to production
+**What happened**: The owner chose: sign-in required, nothing public until verified. A signed-in reader's suggestion is inserted from the browser under their own token into `reader_place_suggestions`, which is its own table on purpose: `location_submissions` is read by the map, the work card, the directory and title search with `status <> 'rejected'`, so a pending row there would be public within minutes. RLS: insert only as yourself and only `pending`; select only your own; no update/delete; anon has no grants. A trigger caps 20 per reader per 24 h. Without an account a suggestion stays on the device, and the Add view says to sign in. Checked against Postgres 16 with stubbed `auth.uid()`: cross-user insert, self-verify, anon read/write, update/delete all refused; the 21st row in a day is refused.
+
+Still open: the review step (promote a verified row into `location_submissions` and set `submission_id`) runs under the service role and has no UI yet.
+**Updated**: as listed, plus `app/components/AppSections.jsx` and `test/suggestions.test.mjs`.
+
 ## [2026-10-11] update | ShotSync: the film frame over the live camera
 **Object**: `app/components/ShotSync.jsx`, `app/lib/shot-sync.mjs`, the Recreate dialog.
 **Scenario**: feature
