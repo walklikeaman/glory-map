@@ -7,6 +7,13 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | Readers' suggestions get a review page: /review
+**Object**: `app/review/page.jsx`, `app/components/SuggestionReview.jsx`, `app/api/review/suggestions/route.js`, `app/lib/suggestion-review.mjs`, migrations `20261013000000_reader_is_a_source.sql` and `20261013000100_reader_suggestions_reviewed.sql`.
+**Scenario**: feature
+**Outcome**: ⚠️ code ready; both migrations (after 20261012000000) and `MODERATOR_EMAILS` still have to reach production
+**What happened**: The review step the previous entry left open. A moderator is a signed-in account whose confirmed email is in `MODERATOR_EMAILS`; unset means the route answers 503, not that it opens. The route reads and writes under the service role, because RLS lets only the author see a suggestion. Verify needs a work from the graph (picked through `/api/search`) and a web page that backs the claim; it inserts a `location_submissions` row with the new source kind `reader`, status `verified`, and links the suggestion to it (`submission_id`, `reviewed_by`, `reviewed_at`). A place the queue already holds for that work is linked, not duplicated, because (work_id, place_key) is unique. Reject needs a reason, and the reader's Add list now shows it ("Not accepted · …") or "Checked · it is on the map". Only a still-pending row is updated, so two moderators cannot both decide one. Checked on Postgres 16 with stubbed `auth.uid()`: a reader still cannot set `reviewed_by` or update anything; a `reader` queue row without `source_record_id` is refused.
+**Updated**: as listed, plus `app/components/AppSections.jsx`, `app/lib/submission-places.mjs` (label for the new kind), `.env.example`, `test/suggestion-review.test.mjs`.
+
 ## [2026-10-12] decision | "Add a place" goes to review for signed-in readers, hidden until checked
 **Object**: `reader_place_suggestions` (migration `20261012000000_suggestions_from_signed_in_readers.sql`), `app/lib/suggestions.mjs`, the Add view.
 **Scenario**: feature

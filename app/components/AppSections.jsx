@@ -12,11 +12,12 @@
 // beside the panel, clear of the walk control at the bottom and the "Only my films" chip
 // at the top.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Award, Check, Heart, Map as MapIcon, MapPin, PlusCircle, Route, Trash2, User, X } from "lucide-react";
 
 import { achievementsOf, collectionOf, gloryOf, levelOf, toggleWant } from "../lib/place-marks.mjs";
-import { sendSuggestion, suggestionStatusLabel, unsentSuggestions, validateSuggestion } from "../lib/suggestions.mjs";
+import { readReviewOutcomes } from "../lib/suggestion-review.mjs";
+import { SUGGESTION_STATUS, sendSuggestion, suggestionStatusLabel, unsentSuggestions, validateSuggestion } from "../lib/suggestions.mjs";
 
 export const SECTIONS = Object.freeze([
   { id: "map", label: "Map", Icon: MapIcon },
@@ -225,6 +226,15 @@ function AddView({ suggestions, onSuggestions, mapCenter, userPosition, userIsDe
   // Review is open to signed-in readers only (owner's decision, 12.10.2026).
   const canSend = Boolean(accountUser && supabase);
   const unsent = canSend ? unsentSuggestions(suggestions) : [];
+  // What a moderator decided, once they have: "checked" or "not accepted, because…".
+  const [outcomes, setOutcomes] = useState(() => new Map());
+  const inReview = suggestions.some((entry) => entry.status === SUGGESTION_STATUS.inReview);
+  useEffect(() => {
+    if (!canSend || !inReview) return undefined;
+    let live = true;
+    readReviewOutcomes(supabase).then((map) => { if (live) setOutcomes(map); });
+    return () => { live = false; };
+  }, [canSend, inReview, supabase]);
 
   async function submit(event) {
     event.preventDefault();
@@ -293,7 +303,7 @@ function AddView({ suggestions, onSuggestions, mapCenter, userPosition, userIsDe
           <ul className="section-list">
             {suggestions.map((entry) => (
               <li key={entry.id} className="section-row is-static">
-                <span><strong>{entry.place}</strong> · {entry.work}<br /><small>{suggestionStatusLabel(entry.status)}</small></span>
+                <span><strong>{entry.place}</strong> · {entry.work}<br /><small>{outcomes.get(entry.id) ?? suggestionStatusLabel(entry.status)}</small></span>
               </li>
             ))}
           </ul>

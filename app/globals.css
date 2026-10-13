@@ -5176,3 +5176,26 @@ figcaption a {
   .deck-card img, .deck-card-blank { width: 140px; height: 210px; }
   .deck-card { width: 160px; }
 }
+
+/* The moderator's queue of readers' suggestions (#48), at /review. */
+.review-page { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 16px; }
+.review-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.review-head h1 { margin: 0; font-size: 1.4rem; }
+.review-list { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.review-card { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-solid); }
+.review-card label { display: grid; gap: 4px; font-size: 0.82rem; }
+.review-card em { color: var(--muted); font-style: normal; font-size: 0.75rem; }
+.review-card input:not([type="radio"]) {
+  width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); color: var(--text); font: inherit;
+}
+.review-card small { color: #e2725b; font-size: 0.75rem; }
+.review-card small.section-note { color: var(--muted); }
+.review-scene { margin: 0; font-style: italic; }
+.review-links { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; font-size: 0.85rem; }
+.review-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); }
+.review-works { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; }
+.review-works legend { margin-bottom: 4px; font-size: 0.82rem; }
+.review-work { display: flex !important; align-items: center; gap: 8px; min-height: 36px; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.review-actions .wide-button { flex: 1 1 220px; }
