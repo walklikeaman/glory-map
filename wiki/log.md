@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | A story trail can be shared as a link, and taken away as GeoJSON
+**Object**: `app/lib/trail-share.mjs`, the trail controls over the map.
+**Scenario**: feature (#77)
+**Outcome**: ✅ success
+**What happened**: two buttons under the trail's order switch. "Share trail" uses the phone's share sheet or copies the link. The link is the page's own address (it already names the work and the map) plus `trail=walk` when walking order is on, and a link opened with it starts in that order. "GeoJSON" downloads the stops in story order with the dashed story line, for Google My Maps, uMap or a GPS app.
+
+Decision worth keeping: **the spoiler switch is never in the link.** The sender may be looking at the whole plot; the person who opens it starts spoiler-safe and decides. The file holds what the sender's screen holds. An OG preview image for a trail is still open in #77.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-share.test.mjs`.
+
 ## [2026-10-04] update | The map gets sections, visits, Glory — and "Add" stays on the device on purpose
 **Object**: `app/components/AppSections.jsx`, `app/lib/place-marks.mjs`, `app/lib/suggestions.mjs`, the place card.
 **Scenario**: feature
