@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | The story trail gets a timeline
+**Object**: `app/lib/trail-scrubber.mjs`, the trail controls over the map.
+**Scenario**: feature (#75)
+**Outcome**: ✅ success
+**What happened**: a slider under the trail's order switch runs through its stops in story order. Moving it (by drag, arrow keys or touch) centres the map on that scene's place, marks that stop, and the caption reads "3 of 4 · scene 3 · Westbourne Park Road" plus the graph's sentence for the place.
+
+Decision worth keeping: **the slider cannot pass the reader's progress, and no code enforces it.** An unreached scene comes from `/api/scenes` with no place and no coordinates, so it never becomes a stop and never reaches the slider. A second check would only be something to keep in sync. Still open in #75: the scene's frame and audio moment, which need a verified frame (#107) and narration.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-scrubber.test.mjs`.
+
 ## [2026-10-13] update | A story trail can be shared as a link, and taken away as GeoJSON
 **Object**: `app/lib/trail-share.mjs`, the trail controls over the map.
 **Scenario**: feature (#77)
