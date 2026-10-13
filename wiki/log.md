@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | Sign in by email link, and a way in on phones
+**Object**: `app/lib/email-sign-in.mjs`, the account panel, Profile.
+**Scenario**: feature (#108)
+**Outcome**: ✅ success
+**What happened**: the account panel takes an email address under the Google and Facebook buttons and Supabase sends a sign-in link (`signInWithOtp`, redirect back to the page's origin). No OAuth client is needed for it. Profile has a neutral "Sign in" button that opens the same panel.
+
+Gotcha worth keeping: on phones the header has no account button at all, so before this there was **no way to sign in on a phone**. Production needs the Email provider on in Supabase Auth (on by default) and the site origin in its redirect allow-list, which Google sign-in already relies on. Apple stays open in #108 (it needs a paid developer account).
+**Updated**: `app/components/SceneMapApp.jsx`, `app/components/AppSections.jsx`, `app/globals.css`, `test/email-sign-in.test.mjs`.
+
 ## [2026-10-13] update | Goodreads joins the library, and books are matched only against books
 **Object**: `app/lib/media-sources.mjs`, `app/lib/media-library.mjs`, `app/lib/library-match.mjs`, `app/lib/cloud-library.mjs`.
 **Scenario**: feature (#92, connector slice)

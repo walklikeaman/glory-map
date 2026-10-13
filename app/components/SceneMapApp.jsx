@@ -37,6 +37,7 @@ import {
   Layers,
   List,
   LogIn,
+  Mail,
 } from "lucide-react";
 import {
   DEMO_LOCATION,
@@ -76,6 +77,7 @@ import { ALL_CITIES } from "../lib/city-gazetteer.mjs";
 import { normalizePlaceName } from "../lib/place-dedup.mjs";
 import { parseLetterboxdArchive } from "../lib/letterboxd-archive.mjs";
 import { libraryImportSummary, libraryNoun, matchLibrary } from "../lib/library-match.mjs";
+import { emailLinkMessage, signInEmail } from "../lib/email-sign-in.mjs";
 import {
   DEFAULT_LAYER_ID, MAP_LAYERS, layerById, mapLayers, readStoredLayerId, writeStoredLayerId,
 } from "../lib/map-layers.mjs";
@@ -1122,6 +1124,7 @@ export default function SceneMapApp() {
   const [libraryStorageKey, setLibraryStorageKey] = useState(GUEST_LIBRARY_KEY);
   const [pendingConnector, setPendingConnector] = useState(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [signInAddress, setSignInAddress] = useState("");
   const [library, setLibrary] = useState(() => readStoredLibrary(GUEST_LIBRARY_KEY));
   const [libraryQuery, setLibraryQuery] = useState("");
   const [importMessage, setImportMessage] = useState("");
@@ -2201,6 +2204,30 @@ export default function SceneMapApp() {
       setAccountStatus("signed_out");
       setCloudStatus("Sign-in could not be started. Please try again.");
     }
+  }
+
+  // The second way in (#108): a link by email, which needs no OAuth client of its own.
+  async function sendEmailLink(event) {
+    event.preventDefault();
+    if (!supabase) {
+      setCloudStatus("Supabase Auth is not configured.");
+      return;
+    }
+    const email = signInEmail(signInAddress);
+    if (!email) {
+      setCloudStatus("Enter the email address the link should go to.");
+      return;
+    }
+
+    setAccountStatus("authorizing");
+    setCloudStatus(`Sending a sign-in link to ${email}…`);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    // Nobody is signed in until the link is opened, so the panel goes back to waiting.
+    setAccountStatus("signed_out");
+    setCloudStatus(emailLinkMessage(email, error));
   }
 
   async function signOut() {
@@ -4490,6 +4517,20 @@ export default function SceneMapApp() {
                     <span className="oauth-logo is-facebook">f</span>
                     Login with Facebook
                   </button>
+                  <form className="email-sign-in" onSubmit={sendEmailLink}>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      aria-label="Email address"
+                      placeholder="you@example.com"
+                      value={signInAddress}
+                      onChange={(event) => setSignInAddress(event.target.value)}
+                    />
+                    <button type="submit" disabled={accountStatus === "authorizing" || accountStatus === "loading"}>
+                      <Mail size={16} />
+                      Email me a link
+                    </button>
+                  </form>
                 </div>
               )}
               <p className={accountUser && cloudReady ? "cloud-status is-synced" : "cloud-status"} role="status">
@@ -4610,6 +4651,7 @@ export default function SceneMapApp() {
         userPosition={userPosition}
         userIsDemo={userIsDemo}
         onOpenInterests={() => setOnboardingOpen("deck")}
+        onOpenAccount={() => setAccountOpen(true)}
       />
       <AppNav section={section} onSection={setSection} />
       {onboardingOpen && (
