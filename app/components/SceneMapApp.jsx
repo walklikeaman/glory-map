@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Award,
   Check,
@@ -146,11 +147,15 @@ import { ImageAttribution } from "./ImageAttribution";
 import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
 
+
 // The ground under the vector style while it loads, and the map itself if WebGL fails.
 // OSM's own raster, dimmed by CSS rather than inverted — it is a stand-in for a second or
 // two, not a theme.
 const VECTOR_FALLBACK_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 import { RATING_LABELS } from "../lib/work-ratings.mjs";
+
+// The camera code loads only when someone opens "Recreate this shot" (#50).
+const ShotSync = dynamic(() => import("./ShotSync.jsx"), { ssr: false });
 
 // A new `() => {}` every render is a changed prop, and a changed prop re-renders the whole
 // marker layer — which is the work this whole component is trying not to do. Clicking a pin
@@ -694,6 +699,8 @@ function RecreateShot({ location, onClose }) {
   const [photoUrl, setPhotoUrl] = useState("");
   const [view, setView] = useState("overlay");
   const [opacity, setOpacity] = useState(55);
+  // Live camera first (#50); uploading a photo taken earlier stays one tap away.
+  const [mode, setMode] = useState("live");
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -723,6 +730,15 @@ function RecreateShot({ location, onClose }) {
     photoUrlRef.current = nextUrl;
     setPhotoUrl(nextUrl);
     setView("overlay");
+  }
+
+  function usePhoto(blob) {
+    if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
+    const nextUrl = URL.createObjectURL(blob);
+    photoUrlRef.current = nextUrl;
+    setPhotoUrl(nextUrl);
+    setView("compare");
+    setMode("upload");
   }
 
   function resetPhoto() {
@@ -759,6 +775,29 @@ function RecreateShot({ location, onClose }) {
           </button>
         </header>
 
+        <div className="recreate-mode-switch" aria-label="How to recreate">
+          <button
+            aria-pressed={mode === "live"}
+            className="ghost-button"
+            onClick={() => setMode("live")}
+            type="button"
+          >
+            Live camera
+          </button>
+          <button
+            aria-pressed={mode === "upload"}
+            className="ghost-button"
+            onClick={() => setMode("upload")}
+            type="button"
+          >
+            Upload a photo
+          </button>
+        </div>
+
+        {mode === "live" ? (
+          <ShotSync location={location} onUpload={() => setMode("upload")} onUsePhoto={usePhoto} />
+        ) : (
+        <>
         <div className="recreate-stage">
           {view === "overlay" ? (
             <div className="recreate-canvas">
@@ -847,8 +886,10 @@ function RecreateShot({ location, onClose }) {
             </>
           )}
 
-          <p className="recreate-privacy">Your photo stays in this browser tab and is never uploaded.</p>
         </div>
+        </>
+        )}
+        <p className="recreate-privacy">Your photo stays in this browser tab and is never uploaded.</p>
       </section>
     </div>
   );
@@ -4602,6 +4643,7 @@ export default function SceneMapApp() {
         marks={placeMarks}
         onMarks={updateMarks}
         accountUser={accountUser}
+        supabase={supabase}
         suggestions={suggestions}
         onSuggestions={(next) => { setSuggestions(next); saveSuggestions(window.localStorage, next); }}
         mapCenter={mapCenter}

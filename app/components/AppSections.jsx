@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Award, Check, Heart, Map as MapIcon, MapPin, PlusCircle, Route, Trash2, User, X } from "lucide-react";
 
 import { achievementsOf, collectionOf, gloryOf, levelOf, toggleWant } from "../lib/place-marks.mjs";
-import { suggestionStatusLabel, validateSuggestion } from "../lib/suggestions.mjs";
+import { sendSuggestion, suggestionStatusLabel, unsentSuggestions, validateSuggestion } from "../lib/suggestions.mjs";
 
 export const SECTIONS = Object.freeze([
   { id: "map", label: "Map", Icon: MapIcon },
@@ -214,22 +214,46 @@ function ProfileView({ marks, accountUser, onOpenInterests }) {
   );
 }
 
-function AddView({ suggestions, onSuggestions, mapCenter, userPosition, userIsDemo }) {
+function AddView({ suggestions, onSuggestions, mapCenter, userPosition, userIsDemo, accountUser, supabase }) {
   const [form, setForm] = useState({ place: "", work: "", scene: "", sourceUrl: "", where: "map" });
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(null);
+  const [sending, setSending] = useState(false);
   const ownPosition = userPosition && !userIsDemo ? userPosition : null;
   const position = form.where === "me" && ownPosition ? ownPosition : mapCenter;
   const field = (name) => ({ value: form[name], onChange: (event) => setForm({ ...form, [name]: event.target.value }) });
+  // Review is open to signed-in readers only (owner's decision, 12.10.2026).
+  const canSend = Boolean(accountUser && supabase);
+  const unsent = canSend ? unsentSuggestions(suggestions) : [];
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
+    if (sending) return;
     const result = validateSuggestion({ ...form, lat: position?.[0], lng: position?.[1] });
     if (result.errors) { setErrors(result.errors); setSaved(null); return; }
-    onSuggestions([result.suggestion, ...suggestions]);
     setErrors({});
-    setSaved(result.suggestion);
+    let suggestion = result.suggestion;
+    if (canSend) {
+      setSending(true);
+      suggestion = await sendSuggestion(supabase, suggestion);
+      setSending(false);
+    }
+    onSuggestions([suggestion, ...suggestions]);
+    setSaved(suggestion);
     setForm({ place: "", work: "", scene: "", sourceUrl: "", where: form.where });
+  }
+
+  // Suggestions kept here before signing in (or when sending failed) go when asked, not
+  // behind the reader's back: they were saved under "kept on this device".
+  async function sendSaved() {
+    if (sending || !unsent.length) return;
+    setSending(true);
+    const sent = new Map();
+    for (const entry of unsent) {
+      sent.set(entry.id, await sendSuggestion(supabase, entry));
+    }
+    setSending(false);
+    onSuggestions(suggestions.map((entry) => sent.get(entry.id) ?? entry));
   }
 
   return (
@@ -247,12 +271,25 @@ function AddView({ suggestions, onSuggestions, mapCenter, userPosition, userIsDe
           {errors.position && <small>{errors.position}</small>}
         </fieldset>
         <label>Source <em>optional</em><input {...field("sourceUrl")} inputMode="url" placeholder="https://" aria-invalid={Boolean(errors.sourceUrl)} />{errors.sourceUrl && <small>{errors.sourceUrl}</small>}</label>
-        <button type="submit" className="wide-button"><MapPin size={18} aria-hidden="true" />Save suggestion</button>
+        <button type="submit" className="wide-button" disabled={sending}>
+          <MapPin size={18} aria-hidden="true" />
+          {canSend ? (sending ? "Sending…" : "Send for review") : "Save suggestion"}
+        </button>
+        <p className="section-note">
+          {canSend
+            ? "Nobody else sees it until it has been checked."
+            : "Without an account it stays on this device. Sign in to send it for review."}
+        </p>
         {saved && <p className="section-note" role="status">&ldquo;{saved.place}&rdquo; saved. {suggestionStatusLabel(saved.status)}.</p>}
       </form>
       {suggestions.length > 0 && (
         <section className="section-block">
           <h3>Your suggestions · {suggestions.length}</h3>
+          {unsent.length > 0 && (
+            <button type="button" className="ghost-button" disabled={sending} onClick={sendSaved}>
+              Send {unsent.length} saved {unsent.length === 1 ? "suggestion" : "suggestions"} for review
+            </button>
+          )}
           <ul className="section-list">
             {suggestions.map((entry) => (
               <li key={entry.id} className="section-row is-static">
