@@ -32,7 +32,7 @@ logger = logging.getLogger('scraperai.moviemaps')
 
 BASE = 'https://moviemaps.org'
 USER_AGENT = (
-    'GloryMapBot/0.1 (+https://github.com/walklikeaman/codex-hackathon-starter; '
+    'GloryMapBot/0.1 (+https://github.com/walklikeaman/glory-map; '
     'contact via repo issues) python-requests'
 )
 CACHE_DIR = Path(__file__).parent / '.cache'

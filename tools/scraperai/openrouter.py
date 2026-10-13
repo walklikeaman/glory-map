@@ -49,7 +49,7 @@ DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it:free'
 
 # OpenRouter uses these for attribution on its model-usage leaderboards.
 ATTRIBUTION_HEADERS = {
-    'HTTP-Referer': 'https://github.com/walklikeaman/codex-hackathon-starter',
+    'HTTP-Referer': 'https://github.com/walklikeaman/glory-map',
     'X-Title': 'GloryMap',
 }
 

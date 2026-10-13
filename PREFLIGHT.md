@@ -26,8 +26,8 @@ preview deploy); send the team the Supabase keys (URL and anon key); on your own
 
 ```bash
 # the team's shared repository
-git clone https://github.com/walklikeaman/codex-hackathon-starter.git
-cd codex-hackathon-starter
+git clone https://github.com/walklikeaman/glory-map.git
+cd glory-map
 
 ./setup.sh      # installs CodeGraph, connects it to Codex, drops in the skills (enough for a participant)
 ./scaffold.sh   # working Next.js app in ./app (packages download now, not on stage)

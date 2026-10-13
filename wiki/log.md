@@ -1,7 +1,16 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+Format: `## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
+**Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
+**Scenario**: tooling
+**Outcome**: ✅ success
+**What happened**: `CLAUDE.md` imports `AGENTS.md` and adds commands, a code map and the cloud-session differences. A SessionStart hook (cloud only) runs `npm ci` and seeds `.env.local` from `.env.example`. Verified in a fresh container: hook from scratch, then `npm test` 1830/1830 and `npm run build` green.
+
+Gotcha worth keeping: the default cloud network reaches only package registries. Supabase, Wikidata, Wikipedia, TMDB and OpenAI are refused by the proxy, so `/api/map/works` returns 502 there while the page itself serves 200. The fix is the environment's network allowlist, not code.
+**Updated**: `CLAUDE.md`, `.claude/`.
+
+## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
 
 Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
