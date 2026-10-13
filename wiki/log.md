@@ -7,6 +7,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] decision | A model pre-checks readers' suggestions; nobody reviews by hand for now
+**Object**: `app/lib/suggestion-ai-review.mjs`, `app/api/review/suggestions/ai/route.js`, columns `ai_reviewed_at` / `ai_note` in `20261013000100_reader_suggestions_reviewed.sql`.
+**Scenario**: feature
+**Outcome**: ⚠️ ready, not switched on: no schedule calls the route, the migrations are not applied
+**What happened**: The owner chose: no manual moderation and no mail about it; an AI checks first, a person maybe later. `/review` stays built and unused. `POST /api/review/suggestions/ai` (ENRICH_TOKEN, careful tier) takes the oldest unseen pending suggestions. Obvious junk (a link in the name, no letters, a character repeated) is rejected without a model. Otherwise the model sees the suggestion and up to five candidate works from `search_works`, and answers pass / reject / unsure with a confidence. Code decides what that may become: a pass needs confidence ≥ 0.85, a candidate work_id and the reader's source link, and enters `location_submissions` as **`pending`**, so the map shows it as an unchecked candidate. A model's judgement is a filter, not a check, so it never writes `verified` into the queue. A reject needs confidence ≥ 0.8 and gives the reader its reason. Anything else is stamped `ai_reviewed_at` and waits. A failed call stamps nothing, so the next run retries it.
+
+Open choice for later: a suggestion without a source link can never pass, because the queue's `source_url` is NOT NULL and every fact must cite something.
+**Updated**: as listed, plus `app/lib/suggestion-review.mjs` (`promoteSuggestion`, queue status as a parameter) and `test/suggestion-ai-review.test.mjs`.
+
 ## [2026-10-13] update | Readers' suggestions get a review page: /review
 **Object**: `app/review/page.jsx`, `app/components/SuggestionReview.jsx`, `app/api/review/suggestions/route.js`, `app/lib/suggestion-review.mjs`, migrations `20261013000000_reader_is_a_source.sql` and `20261013000100_reader_suggestions_reviewed.sql`.
 **Scenario**: feature
