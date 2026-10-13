@@ -1680,6 +1680,29 @@ figcaption a {
   opacity: 0.55;
 }
 
+/* Email link (#108): one row under the two providers, the input taking the width. */
+.email-sign-in {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.email-sign-in input {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  font: inherit;
+}
+
+.email-sign-in input:focus {
+  outline: none;
+  border-color: rgba(247, 183, 51, 0.55);
+}
+
 .oauth-logo,
 .account-user-mark {
   width: 23px;
@@ -1750,6 +1773,10 @@ figcaption a {
 
 @media (max-width: 560px) {
   .oauth-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .email-sign-in {
     grid-template-columns: 1fr;
   }
 
@@ -3352,6 +3379,34 @@ figcaption a {
 
 .trail-spoilers small { display: block; color: var(--muted); font-size: 0.68rem; }
 .trail-spoilers input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+/* Share the trail (#77): a link and a file, quieter than the order switch above. */
+.trail-share {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.trail-share button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trail-share button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.trail-share small { flex-basis: 100%; text-align: center; color: var(--muted); font-size: 0.7rem; }
 
 /* A stop of the walking order: square and solid, so it cannot be read as the story's
    round, numbered scenes — the number here is the walk, not the plot. */

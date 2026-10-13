@@ -13,7 +13,7 @@
 // at the top.
 
 import { useState } from "react";
-import { Award, Check, Heart, Map as MapIcon, MapPin, PlusCircle, Route, Trash2, User, X } from "lucide-react";
+import { Award, Check, Heart, LogIn, Map as MapIcon, MapPin, PlusCircle, Route, Trash2, User, X } from "lucide-react";
 
 import { achievementsOf, collectionOf, gloryOf, levelOf, toggleWant } from "../lib/place-marks.mjs";
 import { suggestionStatusLabel, validateSuggestion } from "../lib/suggestions.mjs";
@@ -173,7 +173,7 @@ function CollectionView({ marks, onMarks, onShow, onBack }) {
   );
 }
 
-function ProfileView({ marks, accountUser, onOpenInterests }) {
+function ProfileView({ marks, accountUser, onOpenInterests, onOpenAccount }) {
   const glory = gloryOf(marks);
   const { level, toNext } = levelOf(glory);
   const { visited } = collectionOf(marks);
@@ -188,6 +188,12 @@ function ProfileView({ marks, accountUser, onOpenInterests }) {
           <p className="section-note">Level {level} · {glory} Glory · {toNext} to level {level + 1}</p>
         </div>
       </section>
+      {/* The one way in on a phone, where the header has no room for the account button
+          (#108). Neutral: which provider is chosen in the panel it opens. */}
+      <button type="button" className="ghost-button" onClick={onOpenAccount}>
+        {accountUser ? <User size={16} aria-hidden="true" /> : <LogIn size={16} aria-hidden="true" />}
+        {accountUser ? "Account and library" : "Sign in"}
+      </button>
       <section className="section-block">
         <h3>Places visited · {visited.length}</h3>
         {visited.length === 0 ? (
