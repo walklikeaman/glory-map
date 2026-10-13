@@ -16,6 +16,24 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | A story trail can be shared as a link, and taken away as GeoJSON
+**Object**: `app/lib/trail-share.mjs`, the trail controls over the map.
+**Scenario**: feature (#77)
+**Outcome**: ✅ success
+**What happened**: two buttons under the trail's order switch. "Share trail" uses the phone's share sheet or copies the link. The link is the page's own address (it already names the work and the map) plus `trail=walk` when walking order is on, and a link opened with it starts in that order. "GeoJSON" downloads the stops in story order with the dashed story line, for Google My Maps, uMap or a GPS app.
+
+Decision worth keeping: **the spoiler switch is never in the link.** The sender may be looking at the whole plot; the person who opens it starts spoiler-safe and decides. The file holds what the sender's screen holds. An OG preview image for a trail is still open in #77.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-share.test.mjs`.
+
+## [2026-10-13] update | Sign in by email link, and a way in on phones
+**Object**: `app/lib/email-sign-in.mjs`, the account panel, Profile.
+**Scenario**: feature (#108)
+**Outcome**: ✅ success
+**What happened**: the account panel takes an email address under the Google and Facebook buttons and Supabase sends a sign-in link (`signInWithOtp`, redirect back to the page's origin). No OAuth client is needed for it. Profile has a neutral "Sign in" button that opens the same panel.
+
+Gotcha worth keeping: on phones the header has no account button at all, so before this there was **no way to sign in on a phone**. Production needs the Email provider on in Supabase Auth (on by default) and the site origin in its redirect allow-list, which Google sign-in already relies on. Apple stays open in #108 (it needs a paid developer account).
+**Updated**: `app/components/SceneMapApp.jsx`, `app/components/AppSections.jsx`, `app/globals.css`, `test/email-sign-in.test.mjs`.
+
 ## [2026-10-13] update | Goodreads joins the library, and books are matched only against books
 **Object**: `app/lib/media-sources.mjs`, `app/lib/media-library.mjs`, `app/lib/library-match.mjs`, `app/lib/cloud-library.mjs`.
 **Scenario**: feature (#92, connector slice)
