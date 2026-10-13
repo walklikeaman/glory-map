@@ -1802,6 +1802,14 @@ figcaption a {
   font-weight: 900;
 }
 
+.connector-logo.is-goodreads {
+  color: #382110;
+  background: #f4f1ea;
+  font-family: Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
 .import-message,
 .account-privacy {
   display: flex;
