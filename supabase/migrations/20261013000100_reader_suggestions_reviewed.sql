@@ -1,14 +1,27 @@
 -- The review step for readers' suggestions (#48): what a checked suggestion must carry
 -- when it enters the queue the map reads, and who checked it.
 --
--- A moderator verifies under the service role (`/api/review/suggestions`). The verified
--- suggestion becomes a `location_submissions` row with source_kind 'reader', status
--- 'verified', and the suggestion row records the moderator, the time and the new row.
+-- Two reviewers, both under the service role. The AI pre-check
+-- (`/api/review/suggestions/ai`) passes a suggestion into `location_submissions` as a
+-- 'reader' row with status 'pending', an unchecked candidate. A moderator
+-- (`/api/review/suggestions`, built but not in use) enters it as 'verified'. Either way the
+-- suggestion row records the time and the new row, and a moderator also their id.
 
--- 1. Who checked it. Readers still cannot set it: the insert policy below refuses any
---    reviewed_by, and there is still no update policy at all.
+-- 1. Who checked it, and what the AI pre-check said. Readers can set none of it: the
+--    insert policy below refuses them, and there is still no update policy at all.
 alter table public.reader_place_suggestions
   add column if not exists reviewed_by uuid references auth.users (id) on delete set null;
+
+-- What the AI pre-check made of it (owner's decision, 13.10.2026: a model looks first,
+-- nobody reviews by hand for now). Set on every row the model has seen, so a suggestion it
+-- left "unsure" is not paid for again on the next run.
+alter table public.reader_place_suggestions
+  add column if not exists ai_reviewed_at timestamptz,
+  add column if not exists ai_note text;
+
+create index if not exists reader_place_suggestions_ai_queue_idx
+  on public.reader_place_suggestions (created_at)
+  where status = 'pending' and ai_reviewed_at is null;
 
 drop policy if exists "readers suggest as themselves, for review" on public.reader_place_suggestions;
 create policy "readers suggest as themselves, for review"
@@ -20,6 +33,8 @@ create policy "readers suggest as themselves, for review"
     and status_reason is null
     and reviewed_at is null
     and reviewed_by is null
+    and ai_reviewed_at is null
+    and ai_note is null
     and submission_id is null
   );
 

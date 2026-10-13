@@ -16,8 +16,8 @@ import {
   isModerator,
   moderatorEmails,
   parseReviewDecision,
+  promoteSuggestion,
   REVIEW_ACTIONS,
-  submissionFromSuggestion,
   suggestionAfterReview,
 } from "../../../lib/suggestion-review.mjs";
 
@@ -31,7 +31,8 @@ function jsonError(message, status) {
   return Response.json({ error: message }, { status, headers: noStoreHeaders });
 }
 
-function defaultServices(env) {
+// Also the store of the AI pre-check (./ai/route.js).
+export function defaultReviewServices(env) {
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) return null;
@@ -76,7 +77,23 @@ function defaultServices(env) {
       if (error) throw new Error(`queue insert failed: ${error.message}`);
       return data.id;
     },
-    // Only a still-pending row is changed, so two moderators cannot both decide it.
+    // The oldest pending suggestions the AI pre-check has not seen yet.
+    async listForAi(limit) {
+      const { data, error } = await admin
+        .from("reader_place_suggestions")
+        .select(SUGGESTION_COLUMNS)
+        .eq("status", "pending").is("ai_reviewed_at", null)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      if (error) throw new Error(`AI queue read failed: ${error.message}`);
+      return data ?? [];
+    },
+    async searchWorks(query, limit = 5) {
+      const { data, error } = await admin.rpc("search_works", { p_query: query, p_limit: limit });
+      if (error) throw new Error(`search_works failed: ${error.message}`);
+      return data ?? [];
+    },
+    // Only a still-pending row is changed, so two reviewers cannot both decide it.
     async updateSuggestion(id, patch) {
       const { data, error } = await admin
         .from("reader_place_suggestions").update(patch)
@@ -93,7 +110,7 @@ export function createReviewHandlers({
   services,
   logError = (...args) => console.error(...args),
 } = {}) {
-  const makeServices = services ?? (() => defaultServices(env));
+  const makeServices = services ?? (() => defaultReviewServices(env));
 
   // Returns { svc, user } or { response }.
   async function moderatorOf(request) {
@@ -151,18 +168,9 @@ export function createReviewHandlers({
       if (decision.action === REVIEW_ACTIONS.verify) {
         const work = await svc.getWork(decision.workId);
         if (!work) return jsonError("That work is not in the graph", 404);
-        // The same place for the same work is one queue row: (work_id, place_key) is unique.
-        // A suggestion that names a place we already hold links to it.
-        submissionId = await svc.findSubmission(work.id, suggestion.place_name);
-        linked = Boolean(submissionId);
-        if (!submissionId) {
-          submissionId = await svc.insertSubmission(submissionFromSuggestion(suggestion, {
-            workId: work.id,
-            workTitle: work.title,
-            sourceUrl: decision.sourceUrl,
-            reason: decision.reason,
-          }));
-        }
+        ({ submissionId, linked } = await promoteSuggestion(svc, suggestion, {
+          work, sourceUrl: decision.sourceUrl, reason: decision.reason,
+        }));
       }
 
       const patch = suggestionAfterReview(decision, { moderatorId: user.id, submissionId });
