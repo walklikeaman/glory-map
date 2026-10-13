@@ -867,6 +867,28 @@ h2 {
   background: var(--gold-strong);
 }
 
+.guide-language {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.guide-language select {
+  min-height: 34px;
+  min-width: 0;
+  max-width: 62%;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  background: #101414;
+  font: inherit;
+}
+
 .budget-options button:disabled,
 .timed-tour-button:disabled {
   cursor: wait;

@@ -248,26 +248,47 @@ export async function pickRouteThatFitsBudget(candidates, budgetMinutes, { reque
 
 // The written guide for the chosen stops. The model must return every stop, in the given
 // order; anything else — a refusal, a reordering, a dropped stop — is the scripted guide.
-export async function fetchTimedTourGuide(stops, { city, budgetMinutes, fetchImpl = fetch }) {
+//
+// A guide asked for in another language that fails is asked for once more in English
+// before falling back to the scripted one (#67): English is what our data is written in,
+// so it is the request most likely to succeed.
+async function requestGuide(stops, { city, budgetMinutes, language, fetchImpl }) {
+  const response = await fetchImpl("/api/tour", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      city,
+      durationMinutes: budgetMinutes,
+      preserveOrder: true,
+      ...(language && language !== "en" ? { language } : {}),
+      locations: stops.map(({ id, place, scene, description, film }) => ({ id, place, scene, description, film })),
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  const expectedIds = stops.map((stop) => stop.id);
+  const returnedIds = payload?.stops?.map((stop) => stop.locationId);
+  if (!response.ok || !Array.isArray(returnedIds) || returnedIds.some((id, index) => id !== expectedIds[index])) {
+    throw new Error(payload.error || "The AI guide returned an invalid route.");
+  }
+  return { ...payload, language: payload.language ?? language ?? "en" };
+}
+
+export async function fetchTimedTourGuide(stops, { city, budgetMinutes, language = "en", fetchImpl = fetch }) {
+  const options = { city, budgetMinutes, fetchImpl };
   try {
-    const response = await fetchImpl("/api/tour", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        city,
-        durationMinutes: budgetMinutes,
-        preserveOrder: true,
-        locations: stops.map(({ id, place, scene, description, film }) => ({ id, place, scene, description, film })),
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    const expectedIds = stops.map((stop) => stop.id);
-    const returnedIds = payload?.stops?.map((stop) => stop.locationId);
-    if (!response.ok || !Array.isArray(returnedIds) || returnedIds.some((id, index) => id !== expectedIds[index])) {
-      throw new Error(payload.error || "The AI guide returned an invalid route.");
-    }
-    return { guide: payload, usedAiFallback: false };
+    const guide = await requestGuide(stops, { ...options, language });
+    return { guide, usedAiFallback: false, usedLanguageFallback: false };
   } catch {
-    return { guide: createFallbackGuide({ city, budgetMinutes, stops }), usedAiFallback: true };
+    if (language !== "en") {
+      try {
+        const guide = await requestGuide(stops, { ...options, language: "en" });
+        return { guide, usedAiFallback: false, usedLanguageFallback: true };
+      } catch { /* the scripted guide below */ }
+    }
+    return {
+      guide: { ...createFallbackGuide({ city, budgetMinutes, stops }), language: "en" },
+      usedAiFallback: true,
+      usedLanguageFallback: language !== "en",
+    };
   }
 }

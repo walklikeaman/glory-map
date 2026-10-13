@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Pause, Play, Square, Volume2 } from "lucide-react";
 import { NARRATOR_PROFILES, narrationText } from "../lib/voice-guide.mjs";
 
-export default function VoiceGuide({ location, story }) {
+export default function VoiceGuide({ location, story, storyLanguage }) {
   const audioRef = useRef(null);
   const audioUrlRef = useRef("");
   const abortRef = useRef(null);
@@ -18,6 +18,10 @@ export default function VoiceGuide({ location, story }) {
     () => narrationText({ location, story, spoilerFree }),
     [location, spoilerFree, story],
   );
+  // Only the tour's own story is in the tour's language; the spoiler-free line and the
+  // place description are our English data, and an English text read "in French" is
+  // English with an accent.
+  const language = story?.trim() && text === story.trim() ? storyLanguage ?? "en" : "en";
 
   function releaseAudio() {
     const audio = audioRef.current;
@@ -77,7 +81,7 @@ export default function VoiceGuide({ location, story }) {
       const response = await fetch("/api/narration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, profileId }),
+        body: JSON.stringify({ text, profileId, language }),
         signal: controller.signal,
       });
 
