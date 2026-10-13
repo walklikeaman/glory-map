@@ -1672,6 +1672,29 @@ figcaption a {
   opacity: 0.55;
 }
 
+/* Email link (#108): one row under the two providers, the input taking the width. */
+.email-sign-in {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.email-sign-in input {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  font: inherit;
+}
+
+.email-sign-in input:focus {
+  outline: none;
+  border-color: rgba(247, 183, 51, 0.55);
+}
+
 .oauth-logo,
 .account-user-mark {
   width: 23px;
@@ -1745,6 +1768,10 @@ figcaption a {
     grid-template-columns: 1fr;
   }
 
+  .email-sign-in {
+    grid-template-columns: 1fr;
+  }
+
   .account-session {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -1800,6 +1827,14 @@ figcaption a {
   background: #f5c518;
   font-size: 0.72rem;
   font-weight: 900;
+}
+
+.connector-logo.is-goodreads {
+  color: #382110;
+  background: #f4f1ea;
+  font-family: Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .import-message,

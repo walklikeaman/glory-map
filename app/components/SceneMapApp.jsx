@@ -37,6 +37,7 @@ import {
   Layers,
   List,
   LogIn,
+  Mail,
   Share2,
 } from "lucide-react";
 import {
@@ -77,7 +78,8 @@ import { defaultChapter, trailChapters } from "../lib/trail-chapters.mjs";
 import { ALL_CITIES } from "../lib/city-gazetteer.mjs";
 import { normalizePlaceName } from "../lib/place-dedup.mjs";
 import { parseLetterboxdArchive } from "../lib/letterboxd-archive.mjs";
-import { libraryImportSummary, matchLibrary } from "../lib/library-match.mjs";
+import { libraryImportSummary, libraryNoun, matchLibrary } from "../lib/library-match.mjs";
+import { emailLinkMessage, signInEmail } from "../lib/email-sign-in.mjs";
 import {
   DEFAULT_LAYER_ID, MAP_LAYERS, layerById, mapLayers, readStoredLayerId, writeStoredLayerId,
 } from "../lib/map-layers.mjs";
@@ -1124,6 +1126,7 @@ export default function SceneMapApp() {
   const [libraryStorageKey, setLibraryStorageKey] = useState(GUEST_LIBRARY_KEY);
   const [pendingConnector, setPendingConnector] = useState(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [signInAddress, setSignInAddress] = useState("");
   const [library, setLibrary] = useState(() => readStoredLibrary(GUEST_LIBRARY_KEY));
   const [libraryQuery, setLibraryQuery] = useState("");
   const [importMessage, setImportMessage] = useState("");
@@ -2239,6 +2242,30 @@ export default function SceneMapApp() {
     }
   }
 
+  // The second way in (#108): a link by email, which needs no OAuth client of its own.
+  async function sendEmailLink(event) {
+    event.preventDefault();
+    if (!supabase) {
+      setCloudStatus("Supabase Auth is not configured.");
+      return;
+    }
+    const email = signInEmail(signInAddress);
+    if (!email) {
+      setCloudStatus("Enter the email address the link should go to.");
+      return;
+    }
+
+    setAccountStatus("authorizing");
+    setCloudStatus(`Sending a sign-in link to ${email}…`);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    // Nobody is signed in until the link is opened, so the panel goes back to waiting.
+    setAccountStatus("signed_out");
+    setCloudStatus(emailLinkMessage(email, error));
+  }
+
   async function signOut() {
     if (!supabase) return;
     setCloudStatus("Signing out…");
@@ -2270,7 +2297,8 @@ export default function SceneMapApp() {
       //
       // The catalogue is fetched rather than the library posted, because the panel below
       // promises the file never leaves the browser and it must stay true.
-      setImportMessage(`${nextLibrary.length} films imported. Checking them against the catalogue…`);
+      const noun = libraryNoun(nextLibrary);
+      setImportMessage(`${nextLibrary.length} ${noun} imported. Checking them against the catalogue…`);
       try {
         const response = await fetch("/api/catalogue");
         if (!response.ok) throw new Error(`catalogue ${response.status}`);
@@ -2282,11 +2310,12 @@ export default function SceneMapApp() {
           places: held.places,
           cityName,
           inCity,
+          noun,
         }));
       } catch {
         // The import itself succeeded; only the count against the catalogue did not. Say
         // that, rather than reporting a zero we did not measure.
-        setImportMessage(`${nextLibrary.length} films imported. The catalogue could not be reached, so we cannot say yet how many of them we hold. ${inCity} of them are on the map in ${cityName}.`);
+        setImportMessage(`${nextLibrary.length} ${noun} imported. The catalogue could not be reached, so we cannot say yet how many of them we hold. ${inCity} of them are on the map in ${cityName}.`);
       }
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : "The file could not be imported.");
@@ -4529,6 +4558,20 @@ export default function SceneMapApp() {
                     <span className="oauth-logo is-facebook">f</span>
                     Login with Facebook
                   </button>
+                  <form className="email-sign-in" onSubmit={sendEmailLink}>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      aria-label="Email address"
+                      placeholder="you@example.com"
+                      value={signInAddress}
+                      onChange={(event) => setSignInAddress(event.target.value)}
+                    />
+                    <button type="submit" disabled={accountStatus === "authorizing" || accountStatus === "loading"}>
+                      <Mail size={16} />
+                      Email me a link
+                    </button>
+                  </form>
                 </div>
               )}
               <p className={accountUser && cloudReady ? "cloud-status is-synced" : "cloud-status"} role="status">
@@ -4573,7 +4616,7 @@ export default function SceneMapApp() {
             </div>
 
             <div className="library-summary">
-              <span>{library.length} movies</span>
+              <span>{library.length} {libraryNoun(library)}</span>
               <span>{library.filter((movie) => movie.rating !== null).length} rated</span>
               <button
                 type="button"
@@ -4649,6 +4692,7 @@ export default function SceneMapApp() {
         userPosition={userPosition}
         userIsDemo={userIsDemo}
         onOpenInterests={() => setOnboardingOpen("deck")}
+        onOpenAccount={() => setAccountOpen(true)}
       />
       <AppNav section={section} onSection={setSection} />
       {onboardingOpen && (

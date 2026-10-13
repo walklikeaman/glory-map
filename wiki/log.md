@@ -25,6 +25,24 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 Decision worth keeping: **the spoiler switch is never in the link.** The sender may be looking at the whole plot; the person who opens it starts spoiler-safe and decides. The file holds what the sender's screen holds. An OG preview image for a trail is still open in #77.
 **Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-share.test.mjs`.
 
+## [2026-10-13] update | Sign in by email link, and a way in on phones
+**Object**: `app/lib/email-sign-in.mjs`, the account panel, Profile.
+**Scenario**: feature (#108)
+**Outcome**: ✅ success
+**What happened**: the account panel takes an email address under the Google and Facebook buttons and Supabase sends a sign-in link (`signInWithOtp`, redirect back to the page's origin). No OAuth client is needed for it. Profile has a neutral "Sign in" button that opens the same panel.
+
+Gotcha worth keeping: on phones the header has no account button at all, so before this there was **no way to sign in on a phone**. Production needs the Email provider on in Supabase Auth (on by default) and the site origin in its redirect allow-list, which Google sign-in already relies on. Apple stays open in #108 (it needs a paid developer account).
+**Updated**: `app/components/SceneMapApp.jsx`, `app/components/AppSections.jsx`, `app/globals.css`, `test/email-sign-in.test.mjs`.
+
+## [2026-10-13] update | Goodreads joins the library, and books are matched only against books
+**Object**: `app/lib/media-sources.mjs`, `app/lib/media-library.mjs`, `app/lib/library-match.mjs`, `app/lib/cloud-library.mjs`.
+**Scenario**: feature (#92, connector slice)
+**Outcome**: ✅ success
+**What happened**: a third card in "My library" takes the Goodreads "Export Library" CSV, processed in the browser like the other two. Rows on the `to-read` shelf are skipped (the library is what you have read). The year is "Original Publication Year", not the edition. "My Rating" 0 means unrated and stays null. The series suffix Goodreads appends, "(Harry Potter, #1)", is dropped so the title meets the catalogue's.
+
+Gotcha worth keeping: a library row now carries `kind: "book"` when it is a book, and every matcher (`matchOne`, `libraryEntryFor`, the merge key) keeps books and everything else apart. Without that, "Dune" the novel lit up "Dune" the film whenever one side had no year. Rows with no `kind` are films, which is every library saved before this. Trakt and Last.fm need API keys, Kinopoisk has no export, so they stay open in #92.
+**Updated**: the files above, `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/goodreads-import.test.mjs`.
+
 ## [2026-10-04] update | The map gets sections, visits, Glory — and "Add" stays on the device on purpose
 **Object**: `app/components/AppSections.jsx`, `app/lib/place-marks.mjs`, `app/lib/suggestions.mjs`, the place card.
 **Scenario**: feature
