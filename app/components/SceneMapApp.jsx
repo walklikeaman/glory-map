@@ -38,6 +38,7 @@ import {
   List,
   LogIn,
   Mail,
+  Share2,
 } from "lucide-react";
 import {
   DEMO_LOCATION,
@@ -68,6 +69,7 @@ import {
 import WorkProfile from "./WorkProfile.jsx";
 import { isWalkableStop, trailStops } from "../lib/story-trail.mjs";
 import { onFootNote, orderTrail, TRAIL_ORDER, trailOrderNote, walkRuns } from "../lib/trail-order.mjs";
+import { trailFileName, trailGeoJson, trailOrderFromParams, trailShareUrl } from "../lib/trail-share.mjs";
 import {
   achievementsOf, checkIn, checkInMessage, demoCheckIn, distanceFromYou, emptyMarks, gloryOf, isWanted, loadMarks,
   progressOf, saveMarks, toggleWant, visitOf,
@@ -1677,7 +1679,11 @@ export default function SceneMapApp() {
   // The same stops in the plot's order or in the order a walker would take them (#73). The
   // story is the default: it is what the trail is for, and the switch beside it says what
   // walking it that way costs.
-  const [trailOrder, setTrailOrder] = useState(TRAIL_ORDER.story);
+  // A shared trail link may ask for walking order (#77); read once, like the filters.
+  const [trailOrder, setTrailOrder] = useState(() => (typeof window === "undefined"
+    ? TRAIL_ORDER.story
+    : trailOrderFromParams(new URLSearchParams(window.location.search))));
+  const [trailShareNote, setTrailShareNote] = useState("");
   const [trailWalk, setTrailWalk] = useState({ routes: [], rides: [] });
   // Which city chapter is walked (#74); null until the reader picks one, so each new
   // trail opens on its own best chapter.
@@ -1992,6 +1998,36 @@ export default function SceneMapApp() {
         sentence: place.sentence ?? null,
       }));
   }, [walkStopsAreStory, walkableTrail, trailOrderable, trailOrder, trailPlaces]);
+
+  // Share the trail (#77). The link is the page's own address, which already names the
+  // work and the map, plus the order; the spoiler switch is never in it.
+  const trailTitle = graphWorks.find((work) => work.work_id === graphWorkId)?.title ?? null;
+  async function shareTrail() {
+    const url = trailShareUrl(window.location.href, { order: trailOrderable ? trailOrder : TRAIL_ORDER.story });
+    const title = trailTitle ? `${trailTitle} · story trail` : "Story trail";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        setTrailShareNote("");
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setTrailShareNote("Link copied. It opens without spoilers.");
+    } catch (error) {
+      // Closing the share sheet is a choice, not a failure.
+      if (error?.name !== "AbortError") setTrailShareNote("The link could not be copied.");
+    }
+  }
+
+  function downloadTrail() {
+    const blob = new Blob([JSON.stringify(trailGeoJson({ title: trailTitle, stops: trailStopList }), null, 2)], { type: "application/geo+json" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = trailFileName(trailTitle);
+    link.click();
+    URL.revokeObjectURL(href);
+  }
 
   // The walking order on the streets: each stretch a person walks is asked of the same
   // router every other walk uses, and the legs between stretches are rides, drawn as such.
@@ -3095,6 +3131,11 @@ export default function SceneMapApp() {
                 />
                 <span>Show the whole story trail <small>reveals plot order</small></span>
               </label>
+              <div className="trail-share">
+                <button type="button" onClick={shareTrail}><Share2 size={14} aria-hidden="true" />Share trail</button>
+                <button type="button" onClick={downloadTrail} title="For Google My Maps, uMap or a GPS app"><Download size={14} aria-hidden="true" />GeoJSON</button>
+                {trailShareNote && <small role="status">{trailShareNote}</small>}
+              </div>
             </div>
           )}
         </WalkControls>
