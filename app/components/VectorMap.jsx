@@ -19,7 +19,8 @@ import { viewportQuery } from "../lib/map-layer.mjs";
 import MapCanvas from "./map/MapCanvas.jsx";
 import { AreaLayer, PinLayer, RouteLine } from "./map/layers.jsx";
 
-const LOS_ANGELES = [-118.3269, 34.1016];
+// `[lat, lng]`, the order MapCanvas takes.
+const LOS_ANGELES = [34.1016, -118.3269];
 
 // Long enough that a drag does not fire a request per frame, short enough that letting go of
 // the mouse feels like it answered. The Leaflet layer settled on the same number.
