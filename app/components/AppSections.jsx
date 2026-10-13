@@ -45,6 +45,17 @@ export function AppNav({ section, onSection }) {
   );
 }
 
+// An empty section is a dead end on a phone: the way out was the small cross in the
+// corner. The empty state hands over the next step instead.
+function BackToMap({ onBack }) {
+  return (
+    <button type="button" className="ghost-button section-empty-action" onClick={onBack}>
+      <MapIcon size={18} aria-hidden="true" />
+      Find places on the map
+    </button>
+  );
+}
+
 const day = (at) => new Date(at).toLocaleDateString();
 
 function PlaceRow({ entry, onShow, children }) {
@@ -58,14 +69,17 @@ function PlaceRow({ entry, onShow, children }) {
   );
 }
 
-function RoutesView({ routeStops, routeResult, routeStatus, onBuildRoute, timedTour, onStartTimedTour, restoredWalk, onShow }) {
+function RoutesView({ routeStops, routeResult, routeStatus, onBuildRoute, timedTour, onStartTimedTour, restoredWalk, onShow, onBack }) {
   const nothing = routeStops.length === 0 && !timedTour && !restoredWalk;
   return (
     <>
       {nothing && (
-        <p className="section-empty">
-          No route yet. Open a place and add it from its Route tab, or generate a timed tour from the map&rsquo;s panel.
-        </p>
+        <div className="section-empty-state">
+          <p className="section-empty">
+            No route yet. Open a place and add it from its Route tab, or generate a timed tour from the map&rsquo;s panel.
+          </p>
+          <BackToMap onBack={onBack} />
+        </div>
       )}
       {routeStops.length > 0 && (
         <section className="section-block">
@@ -106,13 +120,16 @@ function RoutesView({ routeStops, routeResult, routeStatus, onBuildRoute, timedT
   );
 }
 
-function CollectionView({ marks, onMarks, onShow }) {
+function CollectionView({ marks, onMarks, onShow, onBack }) {
   const { want, visited, works } = collectionOf(marks);
   if (want.length === 0 && visited.length === 0) {
     return (
-      <p className="section-empty">
-        Nothing collected yet. On a place&rsquo;s card, &ldquo;Want to visit&rdquo; saves it here, and &ldquo;I&rsquo;m here&rdquo; records the visit.
-      </p>
+      <div className="section-empty-state">
+        <p className="section-empty">
+          Nothing collected yet. On a place&rsquo;s card, &ldquo;Want to visit&rdquo; saves it here, and &ldquo;I&rsquo;m here&rdquo; records the visit.
+        </p>
+        <BackToMap onBack={onBack} />
+      </div>
     );
   }
   return (
@@ -279,8 +296,8 @@ export function SectionSheet({ section, onClose, ...props }) {
         </button>
       </header>
       <div className="section-body">
-        {section === "routes" && <RoutesView {...props} />}
-        {section === "collection" && <CollectionView {...props} />}
+        {section === "routes" && <RoutesView {...props} onBack={onClose} />}
+        {section === "collection" && <CollectionView {...props} onBack={onClose} />}
         {section === "profile" && <ProfileView {...props} />}
         {section === "add" && <AddView {...props} />}
       </div>

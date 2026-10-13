@@ -1147,6 +1147,14 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+/* The kind mark is a span too, and the rule above stood it on a line of its own above
+   the film's name, with a gap in the icon where its own colours went. */
+.location-row span.work-kind {
+  display: inline-flex;
+  margin-top: 0;
+  color: #19130a;
+}
+
 .source-link {
   display: inline-flex;
   align-items: center;
@@ -2849,6 +2857,10 @@ figcaption a {
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  /* The panel pulled up over an open place: the card steps out of the way and comes
+     back, where it was, when the panel goes down. */
+  .scene-shell:has(.command-panel.is-open) .location-sheet { display: none; }
+
   /* Cover art and suggestions were sized for a desktop column. */
   .work-posters { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
   .search-suggestions { max-height: 48vh; }
@@ -3408,6 +3420,14 @@ figcaption a {
 /* A control at its limit says so. Half-opacity plus `cursor: default` is the difference
    between a button that is finished and a map that looks broken. */
 .map-control:disabled { opacity: 0.32; cursor: default; }
+
+.map-control.map-furniture-group {
+  /* "My location" is a group of one, so it carries both classes — and `.map-control`,
+     declared later, wiped the group's background and border: the button floated as a
+     bare icon over the map (mobile review, 2026-10-13). */
+  background: rgba(12, 12, 16, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+}
 
 .map-furniture-group .map-control + .map-control {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -4682,6 +4702,9 @@ figcaption a {
     min-height: 44px;
   }
 
+  /* The column has to grow with the button, or the 44 px button hangs 10 px out of
+     a 34 px track and the panel clips it. */
+  .location-row { grid-template-columns: minmax(0, 1fr) 44px; }
   .location-row .icon-button { min-width: 44px; }
 }
 
@@ -4826,10 +4849,12 @@ figcaption a {
 .section-block h3 { margin: 0; font-size: 0.9rem; }
 .section-note { margin: 0; color: var(--muted); font-size: 0.8rem; }
 .section-empty { margin: 0; color: var(--muted); line-height: 1.5; }
+.section-empty-state { display: grid; gap: 14px; justify-items: start; }
+.section-empty-action { min-height: 44px; gap: 8px; }
 
 .section-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
-.section-row {
+.section-list > .section-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4838,8 +4863,8 @@ figcaption a {
   border-radius: 8px;
 }
 
-.section-row.is-static { padding: 8px 12px; }
-.section-row.is-static svg { flex: none; color: var(--accent); }
+.section-list > .section-row.is-static { padding: 8px 12px; }
+.section-list > .section-row.is-static svg { flex: none; color: var(--accent); }
 
 .section-row-main {
   flex: 1;
@@ -4856,7 +4881,7 @@ figcaption a {
 }
 
 .section-row-main span { color: var(--muted); font-size: 0.78rem; overflow-wrap: anywhere; }
-.section-row .icon-button { margin-right: 4px; }
+.section-list > .section-row .icon-button { margin-right: 4px; }
 
 .profile-head { grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
 
@@ -4887,13 +4912,14 @@ figcaption a {
 .suggest-form small { color: #e2725b; font-size: 0.75rem; }
 .suggest-form small.section-note { color: var(--muted); }
 .suggest-form fieldset { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; }
-.suggest-form legend { margin-bottom: 4px; font-size: 0.82rem; }
+.suggest-form legend { margin-bottom: 4px; padding: 0; font-size: 0.82rem; }
+.suggest-form input[type="radio"] { accent-color: var(--accent); }
 .suggest-form .suggest-where { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 
 /* Phone: the bar along the bottom, where a thumb is; a section is a full screen over the
    map, above the bar, and the map's own overlays step aside while it is open. */
 @media (max-width: 860px) {
-  :root { --app-nav-height: calc(58px + env(safe-area-inset-bottom)); }
+  :root { --app-nav-height: calc(62px + env(safe-area-inset-bottom)); }
 
   .app-nav {
     position: fixed;
@@ -4905,13 +4931,14 @@ figcaption a {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
     height: var(--app-nav-height);
-    padding: 0 4px env(safe-area-inset-bottom);
+    /* The 4 px keep the active pill off the bar's top edge and the screen's sides. */
+    padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
     border-width: 1px 0 0;
     border-radius: 0;
     background: var(--panel-solid);
   }
 
-  .app-nav button { min-width: 0; min-height: 58px; }
+  .app-nav button { min-width: 0; min-height: 50px; border-radius: 12px; }
 
   .section-sheet {
     position: fixed;
@@ -4928,6 +4955,36 @@ figcaption a {
 
   .scene-shell.is-in-section .walk-controls,
   .scene-shell.is-in-section .command-panel { visibility: hidden; }
+}
+
+/* The film strip on a phone (mobile review, 2026-10-13): one row that scrolls sideways,
+   every card the same width. `repeat(5, minmax(72px, 1fr))` gave the sixth film a second
+   row and let a long title break mid-word; a title now gets two lines and an ellipsis. */
+@media (max-width: 860px) {
+  .film-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 112px;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+  }
+
+  .film-chip { min-width: 0; scroll-snap-align: start; }
+
+  /* Poster on top, title under it (the same fix is in PR #326; either can land first). */
+  .film-chip-toggle { flex-direction: column; align-items: stretch; gap: 6px; }
+
+  .film-chip strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: normal;
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+
+  .film-chip small { margin-bottom: 0; font-size: 0.7rem; }
 }
 
 /* --- The first run (#15): four screens, then the deck ------------------------------- */
