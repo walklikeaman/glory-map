@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | The walk opens in Google Maps and leaves as GPX
+**Object**: `app/lib/route-export.mjs`, the route card.
+**Scenario**: feature (#191, item 2)
+**Outcome**: ✅ success
+**What happened**: under the route card, once there are two stops: "Open in Google Maps" (walking directions, stops in route order as origin, waypoints, destination) and "GPX" (numbered waypoints plus the drawn track, for Komoot, OsmAnd, Organic Maps). Both read only what is already on screen, so they work on a restored offline walk too.
+
+Gotcha worth keeping: **Google's directions URL takes at most 9 waypoints** (11 stops in all). Past that the link is not offered rather than silently dropping stops; GPX has no limit. The route itself is capped at 5 stops today, so this only matters if that cap moves.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/route-export.test.mjs`.
+
 ## [2026-10-13] update | A story trail can be shared as a link, and taken away as GeoJSON
 **Object**: `app/lib/trail-share.mjs`, the trail controls over the map.
 **Scenario**: feature (#77)
