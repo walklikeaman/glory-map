@@ -67,7 +67,7 @@ async function loadWorks({ url, key }) {
   const works = [];
   for (let offset = 0; ; offset += 1000) {
     const response = await fetch(
-      `${url}/rest/v1/works?select=id,title,title_norm,kind&order=id.asc&limit=1000&offset=${offset}`,
+      `${url}/rest/v1/works?select=id,title,title_norm,kind,year&order=id.asc&limit=1000&offset=${offset}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     if (!response.ok) throw new Error(`works responded ${response.status}`);

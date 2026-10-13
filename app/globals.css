@@ -2469,6 +2469,7 @@ figcaption a {
 .graph-badge { font-weight: 600; }
 .graph-badge.badge-exact { color: #b8860b; }
 .graph-badge.badge-approximate { color: #b8860b; }
+.graph-badge.badge-unconfirmed { color: #b8860b; }
 .graph-badge.badge-studio { color: #6b3fa0; }
 .graph-badge.badge-narrative { color: #1f7a70; }
 

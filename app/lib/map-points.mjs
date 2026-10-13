@@ -8,6 +8,7 @@
 
 import { studioLotAt } from "./studio-lots.mjs";
 import { hasValidCoordinate, MAP_THRESHOLD } from "./grounding.mjs";
+import { isPinnable } from "./place-grade.mjs";
 
 // Below this zoom the database returns grid clusters instead of individual places.
 export const CLUSTER_BELOW_ZOOM = 12;
@@ -116,6 +117,11 @@ export function pointBadge(row) {
   if (row.shot_on_set) return "studio";
   if (row.place_class === "narrative_real") return "narrative";
   if (row.geocode_precision === "country" || row.geocode_precision === "city") return "approximate";
+  // `none` is the 860 places whose spot nobody has confirmed — the coordinate is whatever
+  // the source's geocoder gave, and eight different Vienna locations share one point in
+  // the Prater. They used to fall through to `exact` and read "Filmed here" with a raw
+  // "none" under it. Same rule the trip planner and the trails apply.
+  if (!isPinnable(row.geocode_precision)) return "unconfirmed";
   return "exact";
 }
 

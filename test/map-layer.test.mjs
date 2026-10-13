@@ -17,9 +17,9 @@ const feature = (badge, properties = {}) => ({
   properties: { badge, work_count: 2, ...properties },
 });
 
-test("every badge has a distinct look, so four different claims never read alike", () => {
+test("every badge has a distinct look, so five different claims never read alike", () => {
   const keys = Object.keys(BADGE_STYLES);
-  assert.deepEqual(keys.sort(), ["approximate", "exact", "narrative", "studio"]);
+  assert.deepEqual(keys.sort(), ["approximate", "exact", "narrative", "studio", "unconfirmed"]);
   // Colour alone isn't enough (exact and approximate share the amber), so the pair
   // must differ in something else a viewer can see.
   const exact = BADGE_STYLES.exact;
@@ -30,6 +30,13 @@ test("every badge has a distinct look, so four different claims never read alike
   // Studio and narrative are distinguished by colour.
   assert.notEqual(BADGE_STYLES.studio.color, BADGE_STYLES.exact.color);
   assert.notEqual(BADGE_STYLES.narrative.color, BADGE_STYLES.exact.color);
+  // An unconfirmed spot is pin-sized like exact but dashed and dimmer, so it never reads
+  // as a confirmed doorway.
+  const unconfirmed = BADGE_STYLES.unconfirmed;
+  assert.ok(unconfirmed.dashArray);
+  assert.notEqual(unconfirmed.dashArray, approx.dashArray);
+  assert.ok(unconfirmed.fillOpacity < exact.fillOpacity);
+  assert.ok(unconfirmed.radius < approx.radius);
 });
 
 test("an approximate point is drawn as a region, never as a doorstep", () => {
@@ -121,6 +128,14 @@ test("pointSummary reads as a plain sentence about the claim", () => {
   assert.equal(pointSummary(null), "");
 });
 
+test("an unconfirmed spot says so in the popup instead of a raw precision", async () => {
+  const { pointHint } = await import("../app/lib/map-layer.mjs");
+  assert.equal(pointSummary({ badge: "unconfirmed", work_count: 1 }), "Spot unconfirmed · 1 work");
+  assert.match(pointHint({ badge: "unconfirmed" }), /not confirmed/);
+  assert.doesNotMatch(pointHint({ badge: "exact" }), /Wikidata/, "most exact pins never came from Wikidata");
+  assert.equal(pointHint(null), "");
+});
+
 // ---------- the queue's own visual vocabulary ----------
 
 test("a candidate is hollow and a place is filled", async () => {
@@ -129,7 +144,7 @@ test("a candidate is hollow and a place is filled", async () => {
   // candidate drawn as a dimmer verified pin would read as a WEAKER version of something
   // we checked, and it is not weaker — it is unexamined, which is a different axis.
   assert.equal(CANDIDATE_STYLE.fillOpacity, 0);
-  for (const badge of ["exact", "approximate", "studio", "narrative"]) {
+  for (const badge of ["exact", "approximate", "unconfirmed", "studio", "narrative"]) {
     assert.ok(badgeStyle(badge).fillOpacity > 0, `${badge} is filled`);
   }
   assert.equal(candidateStyle({ properties: {} }).fillOpacity, 0);

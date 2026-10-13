@@ -12,7 +12,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { workPath } from "../lib/work-url.mjs";
-import { candidateSummary, pointFilmLine, pointSummary, viewportQuery } from "../lib/map-layer.mjs";
+import { candidateSummary, pointFilmLine, pointHint, pointSummary, viewportQuery } from "../lib/map-layer.mjs";
 import { describedFilms, listingLine, sourceLabel } from "../lib/place-note.mjs";
 import { useGeoJsonLayer, useMapCanvas, claimClick } from "./map/MapCanvas.jsx";
 import { MapPopup, PinLayer } from "./map/layers.jsx";
@@ -387,7 +387,7 @@ function GraphLayer({
             <>
               <span className={`graph-badge badge-${openProps.badge}`}>{pointSummary(openProps)}</span>
               <br />
-              <small>{openProps.geocode_precision} · confidence {openProps.confidence}</small>
+              <small>{pointHint(openProps)}</small>
             </>
           )}
         </MapPopup>

@@ -16,6 +16,18 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | Sixteen cities checked against the live graph: unconfirmed pins and plaques on the wrong film
+**Object**: `app/lib/map-points.mjs`, `app/lib/map-layer.mjs`, `app/lib/plaque-source.mjs`.
+**Scenario**: content audit + bugfix
+**Outcome**: ⚠️ partial — code fixed; the wrong links already in production are listed, not deleted
+**What happened**: the cloud reaches no Supabase/Wikidata/TMDB, but the Supabase MCP reads production, so the map RPCs (`map_points_in_view`, `map_candidate_points_in_view`) were called directly for Edinburgh, Prague, Rome, Tokyo, Reykjavik, Dubrovnik, Marrakech, Sydney, Budapest, Wellington, Istanbul, Havana, Mumbai, Berlin, Oxford and Seville (≈12×9 km box, z14). Graph pins: Berlin 16, Prague 11, Rome 9, Oxford 9, Edinburgh 8, Seville 7; Dubrovnik, Wellington, Havana and Mumbai 0 (queue rows only).
+
+Found:
+1. `pointBadge` called every `none` place `exact`, so 860 unconfirmed places read "Filmed here" with a raw "none" under them. Eight different Vienna places (Votivkirche, Zollamtssteg…) share one coordinate in the Prater; Parliament Square and Trafalgar Square share one too. New `unconfirmed` badge, same rule as `isPinnable`.
+2. `matchPlaque` ignored the plaque's years and verb, which `chooseWork` already used: The Wicked Lady 1983 on Gainsborough Studios 1924–1949 (#8600), The Saint 1997 film for Roger Moore's 1962–9 TV series (#2361), the film You Only Live Twice for Fleming writing the novel (#3288).
+3. Not fixed: 643 pairs of places at an identical coordinate; 156 share a name head ("Casa de Pilatos" + "Casa de Pilatos, Plaza de Pilatos, Seville"), so one film shows two pins. Books: only 4 have narrative links.
+**Updated**: as listed, plus tests.
+
 ## [2026-10-13] update | Sign in by email link, and a way in on phones
 **Object**: `app/lib/email-sign-in.mjs`, the account panel, Profile.
 **Scenario**: feature (#108)
