@@ -1,5 +1,5 @@
 import { normalizeWorkTitle } from "./content-graph.mjs";
-import { RATING_SCALE, isMediaSource, storedScale, toTenPoint } from "./media-sources.mjs";
+import { RATING_SCALE, isMediaSource, mediaSourceKind, storedScale, toTenPoint } from "./media-sources.mjs";
 
 // Re-exported so callers that already think in terms of the library keep one import for
 // it. The definitions live in [[media-sources]], which is the only place that knows what
@@ -59,7 +59,22 @@ function numberValue(value) {
 }
 
 function libraryKey(movie) {
-  return movie.imdbId || `${movie.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}:${movie.year ?? ""}`;
+  const key = movie.imdbId || `${movie.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}:${movie.year ?? ""}`;
+  // A book and a film can share a title and a year. Films keep the key they always had, so
+  // a library saved before books existed still merges with a fresh import.
+  return isBook(movie) ? `book:${key}` : key;
+}
+
+// Books are matched only against books and everything else only against everything else.
+// A row with no kind is from a film service, which is every row saved before books existed.
+export function isBook(item) {
+  return item?.kind === "book";
+}
+
+// Goodreads appends the series to the title: "The Fellowship of the Ring (The Lord of the
+// Rings, #1)". The catalogue holds the title alone, so the suffix is dropped before matching.
+function bookTitle(title) {
+  return title.replace(/\s*\([^()]*#\s*[\d.]+\)\s*$/, "").trim() || title;
 }
 
 // The SAME normaliser the catalogue's `title_norm` is built with, imported rather than
@@ -110,7 +125,8 @@ export function libraryEntryFor(work, library) {
   const title = normalizedTitle(work?.title);
   if (!title) return null;
   return (Array.isArray(library) ? library : []).find((movie) =>
-    normalizedTitle(movie?.title) === title
+    isBook(movie) === isBook(work)
+      && normalizedTitle(movie?.title) === title
       && (!work?.year || !movie?.year || Math.abs(work.year - movie.year) <= YEAR_TOLERANCE),
   ) ?? null;
 }
@@ -171,21 +187,26 @@ export function parseMediaCsv(text, source) {
   if (!headerRow) throw new Error("The CSV file is empty");
 
   const headers = headerRow.map(cleanHeader);
+  const kind = mediaSourceKind(source);
   const movies = dataRows.flatMap((row) => {
     const record = Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""]));
-    const title = firstValue(record, ["name", "title", "original title"]);
-    if (!title) return [];
+    const rawTitle = firstValue(record, ["name", "title", "original title"]);
+    if (!rawTitle) return [];
+    // Goodreads exports the want-to-read shelf too. The library is what you have read.
+    if (firstValue(record, ["exclusive shelf"]) === "to-read") return [];
+    const title = kind === "book" ? bookTitle(rawTitle) : rawTitle;
 
     const imdbId = firstValue(record, ["const", "imdb id"]);
     // Converted to ten points here and nowhere else, so no caller ever has to ask which
     // service a number came from.
-    const rating = toTenPoint(numberValue(firstValue(record, ["rating", "your rating"])), source);
-    const year = numberValue(firstValue(record, ["year", "release year"]));
-    const watchedDate = firstValue(record, ["watched date", "date rated", "date"]);
+    const rating = toTenPoint(numberValue(firstValue(record, ["rating", "your rating", "my rating"])), source);
+    // For a book, the year the work first came out, not the year of the edition on the shelf.
+    const year = numberValue(firstValue(record, ["year", "release year", "original publication year", "year published"]));
+    const watchedDate = firstValue(record, ["watched date", "date rated", "date read", "date"]);
     const url = firstValue(record, ["letterboxd uri", "url"]);
 
     return [{
-      id: imdbId || `${source}:${libraryKey({ title, year })}`,
+      id: imdbId || `${source}:${libraryKey({ title, year, kind })}`,
       title,
       year,
       rating,
@@ -194,10 +215,11 @@ export function parseMediaCsv(text, source) {
       url,
       imdbId: imdbId && /^tt\d+$/.test(imdbId) ? imdbId : null,
       sources: [source],
+      ...(kind ? { kind } : {}),
     }];
   });
 
-  if (!movies.length) throw new Error("No movie titles were found in this CSV");
+  if (!movies.length) throw new Error(kind === "book" ? "No read books were found in this CSV" : "No movie titles were found in this CSV");
   return movies;
 }
 

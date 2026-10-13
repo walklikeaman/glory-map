@@ -76,7 +76,7 @@ import { defaultChapter, trailChapters } from "../lib/trail-chapters.mjs";
 import { ALL_CITIES } from "../lib/city-gazetteer.mjs";
 import { normalizePlaceName } from "../lib/place-dedup.mjs";
 import { parseLetterboxdArchive } from "../lib/letterboxd-archive.mjs";
-import { libraryImportSummary, matchLibrary } from "../lib/library-match.mjs";
+import { libraryImportSummary, libraryNoun, matchLibrary } from "../lib/library-match.mjs";
 import { emailLinkMessage, signInEmail } from "../lib/email-sign-in.mjs";
 import {
   DEFAULT_LAYER_ID, MAP_LAYERS, layerById, mapLayers, readStoredLayerId, writeStoredLayerId,
@@ -2261,7 +2261,8 @@ export default function SceneMapApp() {
       //
       // The catalogue is fetched rather than the library posted, because the panel below
       // promises the file never leaves the browser and it must stay true.
-      setImportMessage(`${nextLibrary.length} films imported. Checking them against the catalogue…`);
+      const noun = libraryNoun(nextLibrary);
+      setImportMessage(`${nextLibrary.length} ${noun} imported. Checking them against the catalogue…`);
       try {
         const response = await fetch("/api/catalogue");
         if (!response.ok) throw new Error(`catalogue ${response.status}`);
@@ -2273,11 +2274,12 @@ export default function SceneMapApp() {
           places: held.places,
           cityName,
           inCity,
+          noun,
         }));
       } catch {
         // The import itself succeeded; only the count against the catalogue did not. Say
         // that, rather than reporting a zero we did not measure.
-        setImportMessage(`${nextLibrary.length} films imported. The catalogue could not be reached, so we cannot say yet how many of them we hold. ${inCity} of them are on the map in ${cityName}.`);
+        setImportMessage(`${nextLibrary.length} ${noun} imported. The catalogue could not be reached, so we cannot say yet how many of them we hold. ${inCity} of them are on the map in ${cityName}.`);
       }
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : "The file could not be imported.");
@@ -4573,7 +4575,7 @@ export default function SceneMapApp() {
             </div>
 
             <div className="library-summary">
-              <span>{library.length} movies</span>
+              <span>{library.length} {libraryNoun(library)}</span>
               <span>{library.filter((movie) => movie.rating !== null).length} rated</span>
               <button
                 type="button"
