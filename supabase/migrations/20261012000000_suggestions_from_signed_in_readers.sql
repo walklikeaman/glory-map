@@ -61,6 +61,9 @@ create policy "readers suggest as themselves, for review"
 
 -- No update or delete policy: a reader cannot mark their own suggestion verified.
 revoke all on public.reader_place_suggestions from anon;
+-- Supabase's default privileges grant everything to `authenticated`; RLS would refuse an
+-- update anyway, but the grant should say what the policies say.
+revoke update, delete, truncate, references, trigger on public.reader_place_suggestions from authenticated;
 grant select, insert on public.reader_place_suggestions to authenticated;
 
 create or replace function public.reader_place_suggestions_daily_cap()
@@ -83,7 +86,9 @@ begin
 end;
 $$;
 
-revoke all on function public.reader_place_suggestions_daily_cap() from public;
+-- Supabase grants EXECUTE to anon and authenticated directly, so revoking from public is
+-- not enough: the security advisor flagged it as callable over /rest/v1/rpc.
+revoke all on function public.reader_place_suggestions_daily_cap() from public, anon, authenticated;
 
 drop trigger if exists reader_place_suggestions_daily_cap on public.reader_place_suggestions;
 create trigger reader_place_suggestions_daily_cap
