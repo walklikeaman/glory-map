@@ -3397,6 +3397,17 @@ figcaption a {
 .trail-spoilers small { display: block; color: var(--muted); font-size: 0.68rem; }
 .trail-spoilers input { width: 16px; height: 16px; accent-color: var(--accent); }
 
+/* The story as a timeline (#75): one slider, its caption under it. */
+.trail-scrubber {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 0 6px;
+}
+
+.trail-scrubber input { width: 100%; min-height: 32px; accent-color: var(--accent); }
+.trail-scrubber small { color: var(--muted); font-size: 0.72rem; text-align: center; }
+
 /* Share the trail (#77): a link and a file, quieter than the order switch above. */
 .trail-share {
   display: flex;
