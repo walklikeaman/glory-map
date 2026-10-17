@@ -109,14 +109,26 @@ export function createModelClient(env = process.env, { tier = TIERS.CHEAP, OpenA
     };
   }
 
+  const model = env.OPENAI_MODEL || env.MODEL || DEFAULT_OPENAI_MODEL;
   return {
     provider,
     tier,
     downgraded: false,
-    model: env.OPENAI_MODEL || env.MODEL || DEFAULT_OPENAI_MODEL,
+    model,
     client: new OpenAIImpl({ apiKey: env.OPENAI_API_KEY }),
-    extraBody: {},
+    extraBody: cheapReasoning(model, tier),
   };
+}
+
+// The gpt-5 family reasons before it answers, and the reasoning is billed against the
+// same `max_completion_tokens` as the answer. Measured live 18.10 on /api/tour with
+// gpt-5-nano at the default effort: three Rome stops, 3,000 of 3,000 tokens spent on
+// reasoning, finish_reason "length", and the tour came back 422 "truncated" every time.
+// At "low" the same request used 320 reasoning tokens of 470 and kept to the supplied
+// facts; at "minimal" it started attributing Trevi to the wrong film. A cheap task is
+// checked afterwards, so it does not need the long think — a careful one keeps it.
+function cheapReasoning(model, tier) {
+  return tier === TIERS.CHEAP && /^gpt-5/.test(model) ? { reasoning_effort: "low" } : {};
 }
 
 // Free endpoints honour the schema's SHAPE but not always its packaging: measured
