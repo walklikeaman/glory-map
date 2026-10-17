@@ -997,6 +997,13 @@ export default function SceneMapApp() {
   // Nothing open until the reader opens something. It used to start on the demo pin, and
   // the sheet it opened was the first thing a new visitor saw instead of the map.
   const [activeLocation, setActiveLocation] = useState(null);
+  // On a phone the panel and a place's card are both sheets rising from the bottom, and
+  // stacked they left the card a 380 px slot with the panel's credits printed over it
+  // (mobile review, 2026-10-13). Opening a place puts the panel away; the CSS does the
+  // reverse, hiding the card while the panel is pulled up again.
+  useEffect(() => {
+    if (activeLocation && window.matchMedia("(max-width: 860px)").matches) setPanelOpen(false);
+  }, [activeLocation?.id]);
   const [filmImageState, setFilmImageState] = useState({
     locationId: fallbackLocations[0].id,
     url: null,

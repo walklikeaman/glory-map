@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | Mobile design review at 360–430 px
+**Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
+**Scenario**: design review (phone)
+**Outcome**: ✅ success
+**What happened**: drove every phone screen in Playwright at 360, 390 and 430 px and fixed what was broken. The film strip is one sideways row of equal 112 px cards with a two-line title. The "+" beside each place no longer hangs out of the panel (its 34 px column now grows to the 44 px touch size). The "Locations" header lost the border it borrowed from the sections. "My location" got back its background. Opening a place puts the panel away, and pulling the panel up hides the place card until it goes down again, so two bottom sheets never stack. The section bar's active pill sits inside the bar. Empty Routes and Collection offer "Find places on the map". Radios are gold.
+
+Gotcha worth keeping: `.section-row` was two different things. The panel's header row (flex, space-between) and the sections' bordered list row (#22) shared the class, so the later rule boxed the "Locations" header. The list row is now `.section-list > .section-row`. Pick a new class name before reusing one in `globals.css`; it is 5k lines and one cascade.
+**Updated**: `wiki/log.md`.
+
 ## [2026-10-13] update | The voice guide takes the tone of the work's genre
 **Object**: `app/lib/voice-guide.mjs`, `app/api/genres/route.js`, `VoiceGuide.jsx`.
 **Scenario**: feature (#68)
