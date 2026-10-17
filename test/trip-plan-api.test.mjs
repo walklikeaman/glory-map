@@ -308,3 +308,92 @@ test("an unfiltered plan says it was filtered by nothing", async () => {
   const body = await (await handler(request({ bbox: HOLLYWOOD_BBOX }))).json();
   assert.equal(body.filtered_by, null);
 });
+
+// --- verified places name their films --------------------------------------------------
+
+// The live Rome viewport, 18.10: three graph places from two films, and the queue rows
+// around them. `map_points_in_view` answers a graph place with no titles at all.
+const ROME_BBOX = { west: 12.46, south: 41.885, east: 12.50, north: 41.915 };
+const ROME_PLACES = [
+  { point_kind: "place", place_id: "steps", wikidata_id: "Q848072", name: "Spanish Steps",
+    lat: 41.90599, lng: 12.482775, geocode_precision: "point", confidence_band: "verified", work_count: 2 },
+  { point_kind: "place", place_id: "trevi", wikidata_id: "Q185382", name: "Fontana di Trevi",
+    lat: 41.900933, lng: 12.483318, geocode_precision: "point", confidence_band: "verified", work_count: 3 },
+  { point_kind: "place", place_id: "popolo", wikidata_id: "Q824997", name: "Piazza del Popolo",
+    lat: 41.910541, lng: 12.476381, geocode_precision: "point", confidence_band: "verified", work_count: 1 },
+];
+const ROME_LINKS = [
+  { place_id: "steps", works: { id: "w-love", title: "To Rome with Love", year: 2012, kind: "film" } },
+  { place_id: "steps", works: { id: "w-holiday", title: "Roman Holiday", year: 1953, kind: "film" } },
+  { place_id: "trevi", works: { id: "w-love", title: "To Rome with Love", year: 2012, kind: "film" } },
+  { place_id: "trevi", works: { id: "w-gypsies", title: "Time of the Gypsies", year: 1988, kind: "film" } },
+  { place_id: "popolo", works: { id: "w-love", title: "To Rome with Love", year: 2012, kind: "film" } },
+];
+
+function romeHandler({ placeWorks = async () => ROME_LINKS } = {}) {
+  const asked = [];
+  const handler = createTripPlanHandler({
+    env: { NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon" },
+    createReader: () => ({
+      points: async () => ROME_PLACES,
+      candidatePoints: async () => [],
+      placeWorks: async (ids) => { asked.push(ids); return placeWorks(ids); },
+    }),
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => OSRM_OK }),
+    logError: () => {},
+  });
+  return { handler, asked };
+}
+
+test("a verified stop names the films filmed there, oldest first", async () => {
+  const { handler, asked } = romeHandler();
+  const body = await (await handler(request({ bbox: ROME_BBOX, includeCandidates: false }))).json();
+
+  assert.deepEqual(asked, [["steps", "trevi", "popolo"]], "one read for every graph place in view");
+  const steps = body.stops.find((stop) => stop.name === "Spanish Steps");
+  assert.equal(steps.grounding.verified, true);
+  assert.equal(steps.work.title, "Roman Holiday");
+  assert.deepEqual(steps.works.sort(), ["Roman Holiday", "To Rome with Love"]);
+});
+
+test("a library keeps the verified places of its own films instead of refusing them", async () => {
+  // Live before the fix: every graph place was "not_in_library" and the plan was three
+  // unchecked queue rows.
+  const { handler } = romeHandler();
+  const body = await (await handler(request({
+    bbox: ROME_BBOX,
+    library: [{ title: "Roman Holiday", year: 1953 }, { title: "To Rome with Love", year: 2012 }],
+  }))).json();
+
+  assert.deepEqual(body.stops.map((stop) => stop.name).sort(),
+    ["Fontana di Trevi", "Piazza del Popolo", "Spanish Steps"]);
+  assert.ok(body.stops.every((stop) => stop.grounding.verified));
+  assert.equal(body.excluded.filter((row) => row.reason === "not_in_library").length, 0);
+});
+
+test("a film that is not the stop's lead still makes it the traveller's stop", async () => {
+  const { handler } = romeHandler();
+  const body = await (await handler(request({
+    bbox: ROME_BBOX, library: [{ title: "To Rome with Love", year: 2012 }],
+  }))).json();
+  // Roman Holiday (1953) leads the Spanish Steps; To Rome with Love is second there.
+  const steps = body.stops.find((stop) => stop.name === "Spanish Steps");
+  assert.ok(steps, "the second film at a stop counts as much as the first");
+  assert.equal(steps.work.title, "Roman Holiday");
+});
+
+test("a stop with none of the traveller's films is still refused", async () => {
+  const { handler } = romeHandler();
+  const body = await (await handler(request({
+    bbox: ROME_BBOX, library: [{ title: "Time of the Gypsies", year: 1988 }],
+  }))).json();
+  assert.ok(body.excluded.some((row) => row.name === "Spanish Steps" && row.reason === "not_in_library"));
+  assert.ok(!body.excluded.some((row) => row.name === "Fontana di Trevi"));
+});
+
+test("titles that cannot be read cost the stops their names, never the plan", async () => {
+  const { handler } = romeHandler({ placeWorks: async () => { throw new Error("db down"); } });
+  const response = await handler(request({ bbox: ROME_BBOX }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).stops.length, 3);
+});
