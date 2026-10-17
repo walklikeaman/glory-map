@@ -5,6 +5,7 @@ import {
   createTourSchema,
   tourRequestSchema,
 } from "../../lib/tour-schema.mjs";
+import { guideLanguage, guideWritingInstruction } from "../../lib/guide-language.mjs";
 
 export const runtime = "nodejs";
 
@@ -40,6 +41,8 @@ export function createTourHandler({
       locations: filmLocations,
       preserveOrder,
     } = parsedBody.data;
+    // An unknown code is English rather than a 400: the tour is still worth having.
+    const language = guideLanguage(parsedBody.data.language).code;
 
     const locationIds = filmLocations.map((location) => location.id);
     const tourSchema = createTourSchema(locationIds);
@@ -60,7 +63,8 @@ export function createTourHandler({
         // schema in the repo; a small model needs room to satisfy it.
         maxTokens: 3000,
         instructions: [
-          "You are a concise and engaging English-language guide to screen and story locations.",
+          "You are a concise and engaging guide to screen and story locations.",
+          guideWritingInstruction(language),
           film
             ? "Create a coherent short walking tour for the specified film, series, or book."
             : "Create a coherent short walking tour across the supplied works.",
@@ -91,6 +95,7 @@ export function createTourHandler({
       return Response.json({
         filmId: film?.id ?? null,
         model: result.model,
+        language,
         ...tour,
       });
     } catch (error) {
