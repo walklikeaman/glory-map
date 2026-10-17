@@ -70,6 +70,8 @@ import WorkProfile from "./WorkProfile.jsx";
 import { isWalkableStop, trailStops } from "../lib/story-trail.mjs";
 import { onFootNote, orderTrail, TRAIL_ORDER, trailOrderNote, walkRuns } from "../lib/trail-order.mjs";
 import { trailFileName, trailGeoJson, trailOrderFromParams, trailShareUrl } from "../lib/trail-share.mjs";
+import { googleMapsDirectionsUrl, gpxFileName, routeGpx } from "../lib/route-export.mjs";
+import { scrubIndex, scrubLabel, scrubStops } from "../lib/trail-scrubber.mjs";
 import {
   achievementsOf, checkIn, checkInMessage, demoCheckIn, distanceFromYou, emptyMarks, gloryOf, isWanted, loadMarks,
   progressOf, saveMarks, toggleWant, visitOf,
@@ -1711,7 +1713,9 @@ export default function SceneMapApp() {
   // Which city chapter is walked (#74); null until the reader picks one, so each new
   // trail opens on its own best chapter.
   const [trailChapterIndex, setTrailChapterIndex] = useState(null);
-  useEffect(() => { setTrailChapterIndex(null); }, [graphWorkId]);
+  // The timeline's position (#75); null until the reader moves it.
+  const [trailScrub, setTrailScrub] = useState(null);
+  useEffect(() => { setTrailChapterIndex(null); setTrailScrub(null); }, [graphWorkId]);
 
   // "My films only", decided here and nowhere else. The library is in localStorage and
   // never reaches the server ([[personal-library]]), so the server cannot filter by it —
@@ -2021,6 +2025,14 @@ export default function SceneMapApp() {
         sentence: place.sentence ?? null,
       }));
   }, [walkStopsAreStory, walkableTrail, trailOrderable, trailOrder, trailPlaces]);
+
+  const scrubList = useMemo(() => scrubStops(trailStopList), [trailStopList]);
+  const scrubbedStop = trailScrub === null ? null : scrubList[scrubIndex(trailScrub, scrubList.length)] ?? null;
+  function scrubTo(value) {
+    const index = scrubIndex(value, scrubList.length);
+    setTrailScrub(index);
+    if (scrubList[index]) setMapCenter(scrubList[index].position);
+  }
 
   // Share the trail (#77). The link is the page's own address, which already names the
   // work and the map, plus the order; the spoiler switch is never in it.
@@ -2405,6 +2417,22 @@ export default function SceneMapApp() {
       // A prefetch that fails costs nothing that was not already lost: the walk asks for
       // those tiles on the day, exactly as it did before this existed.
       .catch(() => setKeptTiles({ kept: 0, failed: 0, reason: "unavailable" }));
+  }
+
+  // Hand the walk to the reader's own maps app (#191): a GPX file for anything that
+  // navigates offline. The Google Maps link is a plain anchor in the panel.
+  function downloadRouteGpx() {
+    const gpx = routeGpx({
+      name: cityName ? `GloryMap walk · ${cityName}` : "GloryMap walk",
+      stops: routeStops,
+      track: routeResult?.positions ?? [],
+    });
+    const href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = gpxFileName(cityName);
+    link.click();
+    URL.revokeObjectURL(href);
   }
 
   async function buildRoute(stops = routeStops) {
@@ -3094,7 +3122,7 @@ export default function SceneMapApp() {
             chapters={trailChapterList}
             walkOrder={walkingTrail}
             walk={trailWalk}
-            nextStopId={nextStopId}
+            nextStopId={scrubbedStop?.id ?? nextStopId}
             onSelect={(stop) => setMapCenter(stop.position)}
           />
         </MapCanvas>
@@ -3158,6 +3186,25 @@ export default function SceneMapApp() {
                 />
                 <span>Show the whole story trail <small>reveals plot order</small></span>
               </label>
+              {scrubList.length >= 2 && (
+                <label className="trail-scrubber">
+                  <input
+                    type="range"
+                    min="0"
+                    max={scrubList.length - 1}
+                    step="1"
+                    value={scrubIndex(trailScrub ?? 0, scrubList.length)}
+                    aria-label="Move through the story"
+                    aria-valuetext={scrubLabel(scrubList[scrubIndex(trailScrub ?? 0, scrubList.length)], scrubIndex(trailScrub ?? 0, scrubList.length), scrubList.length)}
+                    onChange={(event) => scrubTo(event.target.value)}
+                  />
+                  <small>
+                    {scrubbedStop
+                      ? `${scrubLabel(scrubbedStop, scrubIndex(trailScrub, scrubList.length), scrubList.length)}${scrubbedStop.sentence ? `. ${scrubbedStop.sentence}` : ""}`
+                      : `Drag through the story, ${scrubList.length} scenes`}
+                  </small>
+                </label>
+              )}
               <div className="trail-share">
                 <button type="button" onClick={shareTrail}><Share2 size={14} aria-hidden="true" />Share trail</button>
                 <button type="button" onClick={downloadTrail} title="For Google My Maps, uMap or a GPS app"><Download size={14} aria-hidden="true" />GeoJSON</button>
@@ -3795,6 +3842,17 @@ export default function SceneMapApp() {
                 : "Build route"}
           </button>
         </div>
+
+        {routeStops.length >= 2 && (
+          <div className="route-export">
+            <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
+            </a>
+            <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
+              <Download size={14} aria-hidden="true" />GPX
+            </button>
+          </div>
+        )}
 
         {aiTour && (
           <section className="ai-tour-result" aria-live="polite">

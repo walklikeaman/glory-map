@@ -25,6 +25,24 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 Decisions worth keeping: **place names, street names and titles stay as the data spells them**, because a translated street name is one nobody on the street will recognise. **English clips keep their old cache keys**, because the language joins the TTS key only when it is not English. **Only the tour's own story is spoken in the tour's language**: the spoiler-free line and place descriptions are our English data, so they are spoken in English.
 **Updated**: `app/api/tour/route.js`, `app/api/narration/route.js`, `app/lib/{tour-schema,timed-tour,voice-guide,tts-cache}.mjs`, `app/components/{SceneMapApp,VoiceGuide}.jsx`, `app/globals.css`, tests.
 
+## [2026-10-13] update | The walk opens in Google Maps and leaves as GPX
+**Object**: `app/lib/route-export.mjs`, the route card.
+**Scenario**: feature (#191, item 2)
+**Outcome**: ✅ success
+**What happened**: under the route card, once there are two stops: "Open in Google Maps" (walking directions, stops in route order as origin, waypoints, destination) and "GPX" (numbered waypoints plus the drawn track, for Komoot, OsmAnd, Organic Maps). Both read only what is already on screen, so they work on a restored offline walk too.
+
+Gotcha worth keeping: **Google's directions URL takes at most 9 waypoints** (11 stops in all). Past that the link is not offered rather than silently dropping stops; GPX has no limit. The route itself is capped at 5 stops today, so this only matters if that cap moves.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/route-export.test.mjs`.
+
+## [2026-10-13] update | The story trail gets a timeline
+**Object**: `app/lib/trail-scrubber.mjs`, the trail controls over the map.
+**Scenario**: feature (#75)
+**Outcome**: ✅ success
+**What happened**: a slider under the trail's order switch runs through its stops in story order. Moving it (by drag, arrow keys or touch) centres the map on that scene's place, marks that stop, and the caption reads "3 of 4 · scene 3 · Westbourne Park Road" plus the graph's sentence for the place.
+
+Decision worth keeping: **the slider cannot pass the reader's progress, and no code enforces it.** An unreached scene comes from `/api/scenes` with no place and no coordinates, so it never becomes a stop and never reaches the slider. A second check would only be something to keep in sync. Still open in #75: the scene's frame and audio moment, which need a verified frame (#107) and narration.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-scrubber.test.mjs`.
+
 ## [2026-10-13] update | A story trail can be shared as a link, and taken away as GeoJSON
 **Object**: `app/lib/trail-share.mjs`, the trail controls over the map.
 **Scenario**: feature (#77)
@@ -2603,7 +2621,6 @@ separates it from reelstreets, whose terms exist and forbid); we take **facts** 
 name and a coordinate — not their prose or their images; every row is labelled unverified
 and links back; the project is not commercial.
 
-
 ## [2026-08-05] update | The juror scenario: 24 favourite films, three empty maps, zero after the fix
 
 **Object**: `app/lib/location-search.mjs`, `app/api/locations/route.js`
@@ -2637,7 +2654,6 @@ never a doorway.
 
 **After: empty for 0 of 24.** 824 tests green.
 
-
 ## [2026-08-05] rule-change | Not a commercial project — which changes some refusals and not others
 
 **Object**: `wiki/sources/source-evaluation.md`, issue #127
@@ -2666,7 +2682,6 @@ you may at all.** The first depends on commerce, the second does not.
 The practical gain is modest — ALIKED + LightGlue under Apache/BSD already cover what
 SuperPoint/SuperGlue do. The real gain is elsewhere: Fandom's stop lists open up as DATA
 rather than only as a recall benchmark.
-
 
 ## [2026-08-05] decision | Four directions the owner set: photo verification, music, facts, plaques
 
@@ -2707,7 +2722,6 @@ quietly becomes "places connected to anything Rowling ever touched".
 
 **Updated**: `wiki/sources/commemorative-plaques.md` (#125 recorded separately)
 
-
 ## [2026-08-05] ingest | Plaques on facades: the quote is already written on the wall
 
 **Object**: `wiki/sources/commemorative-plaques.md`, issue #125
@@ -2741,7 +2755,6 @@ world dump returns a hundred Texas markers about Jim Bowie and Bowie County.
 **Open question for the owner:** music is a new kind of work. `work_kind` knows
 film/series/book, musicians are the largest group of plaque subjects, and "this album was
 recorded here" is neither a filming location nor a narrative one.
-
 
 ## [2026-08-05] decision | Shipped, and a merge turns out to be a release
 
