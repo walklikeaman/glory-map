@@ -1,3 +1,5 @@
+import { guideSpeakingInstruction } from "./guide-language.mjs";
+
 export const NARRATOR_PROFILES = {
   neutral: {
     label: "Warm guide",
@@ -86,7 +88,7 @@ export function narrationText({ location, story, spoilerFree }) {
     `${location.place} is a screen or story location connected to ${location.film}.`;
 }
 
-export function createSpeechRequest({ text, profileId, model }) {
+export function createSpeechRequest({ text, profileId, model, language }) {
   const profile = NARRATOR_PROFILES[profileId];
 
   if (!profile || typeof text !== "string" || !text.trim() || text.length > 600) {
@@ -97,7 +99,9 @@ export function createSpeechRequest({ text, profileId, model }) {
     model: model || "gpt-4o-mini-tts",
     voice: profile.voice,
     input: text.trim(),
-    instructions: profile.instructions,
+    // The narrator's manner, then the language: the profile is how it sounds, the
+    // language line only says what it speaks.
+    instructions: [profile.instructions, guideSpeakingInstruction(language)].filter(Boolean).join(" "),
     response_format: "mp3",
   };
 }

@@ -7,7 +7,7 @@ import { NARRATOR_PROFILES, narrationText, resolveNarrator } from "../lib/voice-
 // Genres by work, for the visit: the tone of a film does not change while it is open.
 const genresByWork = new Map();
 
-export default function VoiceGuide({ location, story }) {
+export default function VoiceGuide({ location, story, storyLanguage }) {
   const audioRef = useRef(null);
   const audioUrlRef = useRef("");
   const abortRef = useRef(null);
@@ -27,6 +27,10 @@ export default function VoiceGuide({ location, story }) {
     () => narrationText({ location, story, spoilerFree }),
     [location, spoilerFree, story],
   );
+  // Only the tour's own story is in the tour's language; the spoiler-free line and the
+  // place description are our English data, and an English text read "in French" is
+  // English with an accent.
+  const language = story?.trim() && text === story.trim() ? storyLanguage ?? "en" : "en";
 
   function releaseAudio() {
     const audio = audioRef.current;
@@ -110,7 +114,7 @@ export default function VoiceGuide({ location, story }) {
       const response = await fetch("/api/narration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, profileId: narratorId }),
+        body: JSON.stringify({ text, profileId: narratorId, language }),
         signal: controller.signal,
       });
 
