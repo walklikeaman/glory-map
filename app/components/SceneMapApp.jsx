@@ -140,6 +140,13 @@ import {
   fetchTimedTourGuide,
   pickRouteThatFitsBudget,
 } from "../lib/timed-tour.mjs";
+import {
+  GUIDE_LANGUAGE_KEY,
+  GUIDE_LANGUAGES,
+  guideLanguage,
+  guideLanguageCode,
+  guideLanguageFromLocales,
+} from "../lib/guide-language.mjs";
 import { ACCESS, accessNote, isRoutable, MAX_PLACES_PER_QUERY } from "../lib/place-access.mjs";
 import VoiceGuide from "./VoiceGuide";
 import GraphLayer from "./GraphLayer";
@@ -1122,6 +1129,9 @@ export default function SceneMapApp() {
   const [timedTour, setTimedTour] = useState(null);
   const [timedTourStatus, setTimedTourStatus] = useState("idle");
   const [timedTourMessage, setTimedTourMessage] = useState("");
+  // The language the tour guide writes and speaks in (#67). English until the browser
+  // is read on mount, so the server render and the first client render agree.
+  const [tourLanguage, setTourLanguage] = useState("en");
   // What OSM knows about getting into the places around here, keyed by place id. Kept
   // beside the tour rather than inside it so the location card can say the same thing
   // the tour says about a stop.
@@ -1632,6 +1642,19 @@ export default function SceneMapApp() {
       setTourFilmId(mapFilms[0]?.id ?? "");
     }
   }, [mapFilms, tourFilmId]);
+
+  // A language chosen once is kept; otherwise the phone's own preference decides.
+  useEffect(() => {
+    let saved = null;
+    try { saved = guideLanguageCode(window.localStorage.getItem(GUIDE_LANGUAGE_KEY)); } catch { /* private mode */ }
+    setTourLanguage(saved ?? guideLanguageFromLocales(navigator.languages ?? [navigator.language]));
+  }, []);
+
+  function chooseTourLanguage(code) {
+    setTourLanguage(code);
+    resetTimedTour();
+    try { window.localStorage.setItem(GUIDE_LANGUAGE_KEY, code); } catch { /* still applies for this visit */ }
+  }
 
   // Posters arrive AFTER the pins, never with them: artwork is decoration and the map
   // is the product, so nothing here is allowed to delay a location.
@@ -2523,9 +2546,10 @@ export default function SceneMapApp() {
     const { plan: selectedPlan, route: plannedRoute, usedRouteFallback } = picked;
 
     setTimedTourMessage("Writing short stories for the selected stops...");
-    const { guide, usedAiFallback } = await fetchTimedTourGuide(selectedPlan.stops, {
+    const { guide, usedAiFallback, usedLanguageFallback } = await fetchTimedTourGuide(selectedPlan.stops, {
       city: cityName,
       budgetMinutes: tourBudget,
+      language: tourLanguage,
     });
 
     const unconfirmed = selectedPlan.stops.filter(
@@ -2551,6 +2575,9 @@ export default function SceneMapApp() {
           ? `${unconfirmed} of ${selectedPlan.stops.length} stops: we have not confirmed you can get in. Check before you go.`
           : null,
         usedAiFallback ? "AI was unavailable, so verified location descriptions were used." : null,
+        usedLanguageFallback && !usedAiFallback
+          ? `The guide could not be written in ${guideLanguage(tourLanguage).name}, so it is in English.`
+          : null,
         usedRouteFallback ? "Walking directions were estimated because the router was unavailable." : null,
       ].filter(Boolean).join(" "),
     );
@@ -3652,6 +3679,20 @@ export default function SceneMapApp() {
               </button>
             ))}
           </div>
+          <label className="guide-language">
+            <span>Guide language</span>
+            <select
+              value={tourLanguage}
+              disabled={timedTourStatus === "loading"}
+              onChange={(event) => chooseTourLanguage(event.target.value)}
+            >
+              {GUIDE_LANGUAGES.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.nativeName === language.name ? language.name : `${language.nativeName} · ${language.name}`}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="timed-tour-button"
             type="button"
@@ -4336,7 +4377,7 @@ export default function SceneMapApp() {
               </p>
             )}
             <p>{activeLocation.description}</p>
-            <VoiceGuide location={activeLocation} story={activeNarration} />
+            <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} />
             <div className="comparison-grid">
               <figure>
                 {activeFilmImage ? (

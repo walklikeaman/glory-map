@@ -25,6 +25,24 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 Gotcha worth keeping: `.section-row` was two different things. The panel's header row (flex, space-between) and the sections' bordered list row (#22) shared the class, so the later rule boxed the "Locations" header. The list row is now `.section-list > .section-row`. Pick a new class name before reusing one in `globals.css`; it is 5k lines and one cascade.
 **Updated**: `wiki/log.md`.
 
+## [2026-10-13] update | The voice guide takes the tone of the work's genre
+**Object**: `app/lib/voice-guide.mjs`, `app/api/genres/route.js`, `VoiceGuide.jsx`.
+**Scenario**: feature (#68)
+**Outcome**: ✅ success
+**What happened**: five genre tones join the two narrators: Noir detective, Suspense, Epic storyteller, Light and playful, Tender. Each has its own voice and instructions for manner, emotion and pace. The narrator select now opens on "Match the work", which asks `/api/genres` for the work's TMDB genres and picks a tone. Any named narrator overrides it, and "Warm guide" switches the tones off.
+
+Decisions worth keeping: **the order is the tactful part.** Crime and mystery come before comedy, and horror gets suspense rather than a scream. **Drama, documentary and history match nothing** and keep the warm guide, because a documentary narrated "epically" tells the story wrong. **Genres are not stored**: there is no column, and a tone must not need a migration. The route caches TMDB's answer for a week at the edge, and any failure is "no genre", never an error. Every genre tone says it is original and imitates no actor. The TMDB credential dance moved from `/api/artwork` to `app/lib/tmdb-request.mjs` so both routes share it.
+**Updated**: `app/api/artwork/route.js`, `app/lib/tmdb-request.mjs`, `test/genre-voice.test.mjs`, `test/voice-guide.test.mjs`.
+
+## [2026-10-13] update | The tour guide writes and speaks in 57 languages
+**Object**: `app/lib/guide-language.mjs`, `/api/tour`, `/api/narration`, the "Tour by time and place" card.
+**Scenario**: feature (#67)
+**Outcome**: ✅ success
+**What happened**: a "Guide language" select on the timed-tour card. It defaults to the browser's first language we support, and a choice is kept in localStorage. `/api/tour` takes `language` and tells the model to write the title, intro and stops in it. `/api/narration` takes `language` and adds "Speak in X" to the narrator's instructions. A non-English guide that fails is asked for once more in English before the scripted guide, and the card says so.
+
+Decisions worth keeping: **place names, street names and titles stay as the data spells them**, because a translated street name is one nobody on the street will recognise. **English clips keep their old cache keys**, because the language joins the TTS key only when it is not English. **Only the tour's own story is spoken in the tour's language**: the spoiler-free line and place descriptions are our English data, so they are spoken in English.
+**Updated**: `app/api/tour/route.js`, `app/api/narration/route.js`, `app/lib/{tour-schema,timed-tour,voice-guide,tts-cache}.mjs`, `app/components/{SceneMapApp,VoiceGuide}.jsx`, `app/globals.css`, tests.
+
 ## [2026-10-13] update | The walk opens in Google Maps and leaves as GPX
 **Object**: `app/lib/route-export.mjs`, the route card.
 **Scenario**: feature (#191, item 2)
