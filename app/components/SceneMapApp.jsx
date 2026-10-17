@@ -70,6 +70,7 @@ import WorkProfile from "./WorkProfile.jsx";
 import { isWalkableStop, trailStops } from "../lib/story-trail.mjs";
 import { onFootNote, orderTrail, TRAIL_ORDER, trailOrderNote, walkRuns } from "../lib/trail-order.mjs";
 import { trailFileName, trailGeoJson, trailOrderFromParams, trailShareUrl } from "../lib/trail-share.mjs";
+import { googleMapsDirectionsUrl, gpxFileName, routeGpx } from "../lib/route-export.mjs";
 import { scrubIndex, scrubLabel, scrubStops } from "../lib/trail-scrubber.mjs";
 import {
   achievementsOf, checkIn, checkInMessage, demoCheckIn, distanceFromYou, emptyMarks, gloryOf, isWanted, loadMarks,
@@ -2395,6 +2396,22 @@ export default function SceneMapApp() {
       .catch(() => setKeptTiles({ kept: 0, failed: 0, reason: "unavailable" }));
   }
 
+  // Hand the walk to the reader's own maps app (#191): a GPX file for anything that
+  // navigates offline. The Google Maps link is a plain anchor in the panel.
+  function downloadRouteGpx() {
+    const gpx = routeGpx({
+      name: cityName ? `GloryMap walk · ${cityName}` : "GloryMap walk",
+      stops: routeStops,
+      track: routeResult?.positions ?? [],
+    });
+    const href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = gpxFileName(cityName);
+    link.click();
+    URL.revokeObjectURL(href);
+  }
+
   async function buildRoute(stops = routeStops) {
     const requestId = routeRequestId.current + 1;
     routeRequestId.current = requestId;
@@ -3784,6 +3801,17 @@ export default function SceneMapApp() {
                 : "Build route"}
           </button>
         </div>
+
+        {routeStops.length >= 2 && (
+          <div className="route-export">
+            <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
+            </a>
+            <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
+              <Download size={14} aria-hidden="true" />GPX
+            </button>
+          </div>
+        )}
 
         {aiTour && (
           <section className="ai-tour-result" aria-live="polite">
