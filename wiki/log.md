@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | The voice guide takes the tone of the work's genre
+**Object**: `app/lib/voice-guide.mjs`, `app/api/genres/route.js`, `VoiceGuide.jsx`.
+**Scenario**: feature (#68)
+**Outcome**: ✅ success
+**What happened**: five genre tones join the two narrators: Noir detective, Suspense, Epic storyteller, Light and playful, Tender. Each has its own voice and instructions for manner, emotion and pace. The narrator select now opens on "Match the work", which asks `/api/genres` for the work's TMDB genres and picks a tone. Any named narrator overrides it, and "Warm guide" switches the tones off.
+
+Decisions worth keeping: **the order is the tactful part.** Crime and mystery come before comedy, and horror gets suspense rather than a scream. **Drama, documentary and history match nothing** and keep the warm guide, because a documentary narrated "epically" tells the story wrong. **Genres are not stored**: there is no column, and a tone must not need a migration. The route caches TMDB's answer for a week at the edge, and any failure is "no genre", never an error. Every genre tone says it is original and imitates no actor. The TMDB credential dance moved from `/api/artwork` to `app/lib/tmdb-request.mjs` so both routes share it.
+**Updated**: `app/api/artwork/route.js`, `app/lib/tmdb-request.mjs`, `test/genre-voice.test.mjs`, `test/voice-guide.test.mjs`.
+
 ## [2026-10-13] update | The tour guide writes and speaks in 57 languages
 **Object**: `app/lib/guide-language.mjs`, `/api/tour`, `/api/narration`, the "Tour by time and place" card.
 **Scenario**: feature (#67)
