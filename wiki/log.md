@@ -2630,6 +2630,7 @@ separates it from reelstreets, whose terms exist and forbid); we take **facts** 
 name and a coordinate — not their prose or their images; every row is labelled unverified
 and links back; the project is not commercial.
 
+
 ## [2026-08-05] update | The juror scenario: 24 favourite films, three empty maps, zero after the fix
 
 **Object**: `app/lib/location-search.mjs`, `app/api/locations/route.js`
@@ -2663,6 +2664,7 @@ never a doorway.
 
 **After: empty for 0 of 24.** 824 tests green.
 
+
 ## [2026-08-05] rule-change | Not a commercial project — which changes some refusals and not others
 
 **Object**: `wiki/sources/source-evaluation.md`, issue #127
@@ -2691,6 +2693,7 @@ you may at all.** The first depends on commerce, the second does not.
 The practical gain is modest — ALIKED + LightGlue under Apache/BSD already cover what
 SuperPoint/SuperGlue do. The real gain is elsewhere: Fandom's stop lists open up as DATA
 rather than only as a recall benchmark.
+
 
 ## [2026-08-05] decision | Four directions the owner set: photo verification, music, facts, plaques
 
@@ -2731,6 +2734,7 @@ quietly becomes "places connected to anything Rowling ever touched".
 
 **Updated**: `wiki/sources/commemorative-plaques.md` (#125 recorded separately)
 
+
 ## [2026-08-05] ingest | Plaques on facades: the quote is already written on the wall
 
 **Object**: `wiki/sources/commemorative-plaques.md`, issue #125
@@ -2764,6 +2768,7 @@ world dump returns a hundred Texas markers about Jim Bowie and Bowie County.
 **Open question for the owner:** music is a new kind of work. `work_kind` knows
 film/series/book, musicians are the largest group of plaque subjects, and "this album was
 recorded here" is neither a filming location nor a narrative one.
+
 
 ## [2026-08-05] decision | Shipped, and a merge turns out to be a release
 
