@@ -24,6 +24,23 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
 **Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
+## [2026-10-13] update | Mobile design review at 360–430 px
+**Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
+**Scenario**: design review (phone)
+**Outcome**: ✅ success
+**What happened**: drove every phone screen in Playwright at 360, 390 and 430 px and fixed what was broken. The film strip is one sideways row of equal 112 px cards with a two-line title. The "+" beside each place no longer hangs out of the panel (its 34 px column now grows to the 44 px touch size). The "Locations" header lost the border it borrowed from the sections. "My location" got back its background. Opening a place puts the panel away, and pulling the panel up hides the place card until it goes down again, so two bottom sheets never stack. The section bar's active pill sits inside the bar. Empty Routes and Collection offer "Find places on the map". Radios are gold.
+
+Gotcha worth keeping: `.section-row` was two different things. The panel's header row (flex, space-between) and the sections' bordered list row (#22) shared the class, so the later rule boxed the "Locations" header. The list row is now `.section-list > .section-row`. Pick a new class name before reusing one in `globals.css`; it is 5k lines and one cascade.
+**Updated**: `wiki/log.md`.
+
+## [2026-10-13] update | The voice guide takes the tone of the work's genre
+**Object**: `app/lib/voice-guide.mjs`, `app/api/genres/route.js`, `VoiceGuide.jsx`.
+**Scenario**: feature (#68)
+**Outcome**: ✅ success
+**What happened**: five genre tones join the two narrators: Noir detective, Suspense, Epic storyteller, Light and playful, Tender. Each has its own voice and instructions for manner, emotion and pace. The narrator select now opens on "Match the work", which asks `/api/genres` for the work's TMDB genres and picks a tone. Any named narrator overrides it, and "Warm guide" switches the tones off.
+
+Decisions worth keeping: **the order is the tactful part.** Crime and mystery come before comedy, and horror gets suspense rather than a scream. **Drama, documentary and history match nothing** and keep the warm guide, because a documentary narrated "epically" tells the story wrong. **Genres are not stored**: there is no column, and a tone must not need a migration. The route caches TMDB's answer for a week at the edge, and any failure is "no genre", never an error. Every genre tone says it is original and imitates no actor. The TMDB credential dance moved from `/api/artwork` to `app/lib/tmdb-request.mjs` so both routes share it.
+**Updated**: `app/api/artwork/route.js`, `app/lib/tmdb-request.mjs`, `test/genre-voice.test.mjs`, `test/voice-guide.test.mjs`.
 
 ## [2026-10-13] update | The tour guide writes and speaks in 57 languages
 **Object**: `app/lib/guide-language.mjs`, `/api/tour`, `/api/narration`, the "Tour by time and place" card.
