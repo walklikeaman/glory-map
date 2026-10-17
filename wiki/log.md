@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-18] incident | Live content check: 12 works, 7 cities, against the real services
+**Object**: `/api/work`, `/api/trip/plan`, `/api/tour`, `/api/scenes`, `/api/film-image`, `/api/enrich/stills`, `/api/trail`, `/api/route`.
+**Scenario**: QA against live TMDB, Wikidata, Wikipedia, OpenAI and Supabase. Writes were blocked at the fetch layer, and trail and stills ran dry with in-memory stores.
+**Outcome**: ⚠️ four bugs fixed, data gaps listed
+**What happened**: fixed four things. (1) A verified trip-plan stop named no film, because `map_points_in_view` returns no titles. So a library filter refused every graph place: in Rome, a Roman Holiday + To Rome with Love list got 3 unchecked rows instead of the Spanish Steps, the Trevi Fountain and Piazza del Popolo. The route now reads `work_place_links` for the places in view, and the library matches any film at a stop. (2) An unknown-precision pin (`none`) was refused as "an area — none precision". It now says the pin's precision is unknown. (3) `/api/work` cached a failed graph read as `public, max-age=3600`. (4) `/api/tour` on gpt-5-nano spent 3,000 of 3,000 tokens on reasoning and always returned 422 "truncated". Cheap-tier gpt-5 calls now send `reasoning_effort: "low"`.
+
+Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
+**Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
+
 ## [2026-10-13] update | The tour guide writes and speaks in 57 languages
 **Object**: `app/lib/guide-language.mjs`, `/api/tour`, `/api/narration`, the "Tour by time and place" card.
 **Scenario**: feature (#67)
