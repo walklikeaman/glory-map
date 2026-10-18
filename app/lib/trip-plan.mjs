@@ -127,6 +127,37 @@ function normalizeRow(row) {
   return { row, films, lead: films[0] };
 }
 
+// The films behind each graph place, in the shape a grouped queue row already carries.
+//
+// `map_points_in_view` answers a graph place with `work_count` and no titles, so every
+// verified stop came back naming no film at all. Measured live 18.10 on Rome: the Spanish
+// Steps stop had `work: null` and `works: []` — and because the library filter matches on
+// titles, a traveller whose list held Roman Holiday and To Rome with Love got a plan of
+// three unchecked queue rows, with the Spanish Steps, the Trevi Fountain and Piazza del
+// Popolo — verified places from exactly those two films — refused as "not in library".
+//
+// `links` are work_place_links rows, `{ place_id, works: { id, title, year, kind } }`.
+// Oldest first, so the film a place is known for leads rather than whichever row the
+// database returned first.
+export function attachPlaceFilms(places, links) {
+  const byPlace = new Map();
+  for (const link of Array.isArray(links) ? links : []) {
+    const work = link?.works;
+    if (!link?.place_id || !work?.title) continue;
+    const films = byPlace.get(link.place_id) ?? [];
+    if (!films.some((film) => film.work_id === work.id)) {
+      films.push({ work_id: work.id ?? null, title: work.title, year: work.year ?? null, kind: work.kind ?? null });
+    }
+    byPlace.set(link.place_id, films);
+  }
+  return (Array.isArray(places) ? places : []).map((place) => {
+    const films = byPlace.get(place?.place_id);
+    if (!films || Array.isArray(place?.films)) return place;
+    films.sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || a.title.localeCompare(b.title));
+    return { ...place, films };
+  });
+}
+
 // One stop, in the vocabulary the rest of the product already uses.
 //
 // `distance` is the fact's degree of separation ([[fact-architecture]]). It defaults to
@@ -189,6 +220,18 @@ function toStop(row, { verified }) {
 //
 // A lot that is public land — Paramount Ranch is a National Park Service site — is KEPT.
 // It is the case that proves the rule is about the gate and not about the word "studio".
+// "none" is not an area. It is the grade a place gets when nobody could say how good its
+// pin is — on the live London viewport it covered 113 verified places, from Westminster
+// Abbey to The Shard (pinned on the Tower of London) and five rows sitting on the London
+// centroid at Charing Cross. Refusing them is right; telling the traveller Westminster
+// Abbey is "an area, not a spot" — "none precision" — is not.
+function notASpotNote(precision) {
+  if (String(precision ?? "").toLowerCase() === "none") {
+    return "We do not know how precisely this place is pinned, so it is not routed to.";
+  }
+  return `The source names this area, not a spot inside it — ${precision} precision.`;
+}
+
 export function splitTripStops(stops, { includeStudioLots = false } = {}) {
   const eligible = [];
   const excluded = [];
@@ -203,9 +246,7 @@ export function splitTripStops(stops, { includeStudioLots = false } = {}) {
     position: stop.position,
     work: stop.work,
     reason,
-    note: stop.note ?? (reason === TRIP_EXCLUSION.not_a_spot
-      ? `The source names this area, not a spot inside it — ${stop.geocode_precision} precision.`
-      : null),
+    note: stop.note ?? (reason === TRIP_EXCLUSION.not_a_spot ? notASpotNote(stop.geocode_precision) : null),
     access_note: stop.access?.note ?? null,
     studio_lot: stop.studio_lot ?? null,
     grounding: stop.grounding,
@@ -270,8 +311,14 @@ export function filterStopsByLibrary(stops, library) {
   const kept = [];
   const dropped = [];
   for (const stop of stops) {
-    const work = { title: stop.work?.title, year: stop.work?.year };
-    if (work.title && libraryEntryFor(work, library)) kept.push(stop);
+    // Every film at the stop, not only the one that names it: a point holding 39 films
+    // is the traveller's stop if ANY of them is theirs. The lead keeps its year; the rest
+    // travel as titles, so they match on the title alone.
+    const works = [
+      { title: stop.work?.title, year: stop.work?.year, kind: stop.work?.kind },
+      ...(stop.works ?? []).filter((title) => title !== stop.work?.title).map((title) => ({ title })),
+    ];
+    if (works.some((work) => work.title && libraryEntryFor(work, library))) kept.push(stop);
     else dropped.push({ ...stop, reason: TRIP_EXCLUSION.not_in_library });
   }
   return { kept, dropped };

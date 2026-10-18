@@ -24,7 +24,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-import { buildTripPlan, TRIP_MIN_STOPS } from "../../../lib/trip-plan.mjs";
+import { attachPlaceFilms, buildTripPlan, TRIP_MIN_STOPS } from "../../../lib/trip-plan.mjs";
 import { TOUR_BUDGETS } from "../../../lib/timed-tour.mjs";
 import { MAX_ROWS_PER_RESPONSE } from "../../../lib/map-points.mjs";
 import { buildFootRouteUrl, parseFootRoute } from "../../../lib/walking-route.mjs";
@@ -42,6 +42,8 @@ const MAX_LIBRARY_ENTRIES = 20_000;
 // The router takes 2 to 5 stops. A plan with more than 5 cannot be drawn as one walk, and
 // `timed-tour.mjs` never produces one, so this is a floor check and not a cap.
 const MAX_ROUTER_STOPS = 5;
+
+const PLACE_WORKS_BATCH = 100;
 
 function jsonError(message, status) {
   return Response.json({ error: message }, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -67,6 +69,21 @@ function defaultCreateReader(env) {
   return {
     points: (params) => call("map_points_in_view", params),
     candidatePoints: (params) => call("map_candidate_points_in_view", params),
+    // The films behind the graph places in view, which `map_points_in_view` does not
+    // return (see attachPlaceFilms). Batched so a London viewport of 221 places stays a
+    // few short requests rather than a URL PostgREST refuses.
+    async placeWorks(placeIds) {
+      const rows = [];
+      for (let start = 0; start < placeIds.length; start += PLACE_WORKS_BATCH) {
+        const { data, error } = await client
+          .from("work_place_links")
+          .select("place_id, works ( id, title, year, kind )")
+          .in("place_id", placeIds.slice(start, start + PLACE_WORKS_BATCH));
+        if (error) throw new Error(`place works failed: ${error.message}`);
+        rows.push(...(data ?? []));
+      }
+      return rows;
+    },
   };
 }
 
@@ -260,6 +277,17 @@ export function createTripPlanHandler({
     } catch (error) {
       logError("Trip plan read failed", { message: error?.message });
       return jsonError("Could not read places for this area", 502);
+    }
+
+    // Losing the titles costs the stops their names and the library its matches, not the
+    // plan — so a failed read is logged and the walk is still built.
+    if (places.length > 0 && reader.placeWorks) {
+      try {
+        const ids = [...new Set(places.map((place) => place.place_id).filter(Boolean))];
+        places = attachPlaceFilms(places, await reader.placeWorks(ids));
+      } catch (error) {
+        logError("Trip plan place works read failed", { message: error?.message });
+      }
     }
 
     let plan;
