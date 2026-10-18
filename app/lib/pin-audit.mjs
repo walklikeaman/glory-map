@@ -20,7 +20,7 @@
 // a name match, a sane distance and an unsnapped row, and anything less is a question.
 
 import { haversineMeters } from "./geo.mjs";
-import { namesMatch } from "./place-dedup.mjs";
+import { namesMatch, normalizePlaceName } from "./place-dedup.mjs";
 
 // Wikidata's P625 is the place's own coordinate; 150 m is wider than any building we
 // pin and narrower than the gap between two neighbouring landmarks.
@@ -31,6 +31,11 @@ export const NOMINATIM_TOLERANCE_M = 300;
 // A matching name this far away is a homonym, not a correction — "Trinity Square" names
 // squares in London, Hull and St Petersburg.
 export const HOMONYM_KM = 50;
+// A geocoder fix bigger than this moves a pin across a city. Measured on the first full
+// run: "The Old Mitre" 40 km and "The Bull & Butcher" 28 km — both names of many pubs,
+// both asked with no area, both answered with somebody else's pub. A move that size is
+// shown to a person, never written.
+export const NOMINATIM_REVIEW_M = 5000;
 
 // Precisions that describe an AREA. Its centroid is a convention, not a claim about a
 // spot, so comparing it to another centroid says nothing.
@@ -110,7 +115,37 @@ export function precisionForResult(result) {
 }
 
 // `results`: Nominatim jsonv2 answers to "<head>, <area>", best first.
-export function judgeAgainstNominatim(place, results) {
+// A geocoder name must be the place's name, not one word longer. `namesMatch` allows an
+// extra word on purpose — right for two rows of our own, wrong here: the first review of
+// the fixes found "Alabama Hills" matched to "Alabama Hills Trail", "Bay Station" to the
+// station "Bay" and "Henriette-Herz-Park" to a "Jelbi Henriette-Herz-Park" bike dock.
+// A leading "the" is the only difference allowed.
+export function sameName(a, b) {
+  const strip = (value) => normalizePlaceName(value).replace(/^the /, "");
+  const left = strip(a);
+  return Boolean(left) && left === strip(b);
+}
+
+// OSM objects that carry a landmark's name without being the landmark: the bus stop called
+// "Dorchester Hotel", the monorail station "Caesar's Palace", the car park of West Wycombe
+// Park, the bike-rental dock at Union Station. And linear features — a river or a trail
+// has a centroid somewhere along its length, which is not a place to move a pin to.
+const STAND_IN_TYPES = new Set([
+  "bus_stop", "platform", "stop_position", "station", "halt", "tram_stop", "subway_entrance",
+  "parking", "parking_entrance", "bicycle_rental", "mobility_hub", "taxi", "charging_station",
+  "river", "stream", "canal", "path", "footway", "cycleway", "track",
+]);
+
+function isStandIn(result, head) {
+  const type = String(result?.type ?? "").toLowerCase();
+  if (!STAND_IN_TYPES.has(type)) return false;
+  // A station IS the place when the source named a station.
+  if (["station", "halt", "platform"].includes(type) && /station|bahnhof|gare|stazione|terminal/i.test(head)) return false;
+  return true;
+}
+
+// `hinted`: the query carried an area. Without one a matching name proves nothing.
+export function judgeAgainstNominatim(place, results, { hinted = true } = {}) {
   if (!hasPin(place)) return { verdict: "unresolved", reason: "no stored coordinate" };
   const head = nameHead(place.name);
   const answers = (Array.isArray(results) ? results : [])
@@ -118,7 +153,7 @@ export function judgeAgainstNominatim(place, results) {
     .filter((result) => Number.isFinite(result.lat) && Number.isFinite(result.lng));
   if (answers.length === 0) return { verdict: "unresolved", reason: "the geocoder found nothing" };
 
-  const named = answers.filter((result) => namesMatch(head, result.name ?? ""));
+  const named = answers.filter((result) => sameName(head, result.name ?? "") && !isStandIn(result, head));
   if (named.length === 0) {
     return { verdict: "unresolved", reason: `the geocoder's best answer is "${answers[0].name ?? answers[0].display_name}"` };
   }
@@ -129,18 +164,29 @@ export function judgeAgainstNominatim(place, results) {
   // Two same-named answers far apart means the area hint did not settle which one.
   const rival = named.slice(1).find((other) => metresBetween(best, other) > NOMINATIM_TOLERANCE_M);
   if (rival) return { verdict: "ambiguous", metres, reason: `two places called "${head}" ${metresBetween(best, rival)} m apart` };
-  if (metres > HOMONYM_KM * 1000) {
-    return { verdict: "ambiguous", metres, reason: "the geocoder's place is too far from the pin — a homonym?" };
+  if (!hinted) {
+    return { verdict: "ambiguous", metres, reason: "looked up with no area — a same-named place elsewhere?" };
+  }
+  if (metres > NOMINATIM_REVIEW_M) {
+    return { verdict: "ambiguous", metres, reason: `a ${Math.round(metres / 1000)} km move — needs a person` };
   }
   const snapped = snappedReason(place);
   if (snapped) return { verdict: "ambiguous", metres, reason: snapped };
+  // A street or an area has no single right point. OSM answers with ONE segment of a
+  // street — Hollywood Boulevard is six kilometres long, and the pin 1.8 km from the
+  // segment it returned may be exactly where the scene was shot. Only a point or a
+  // building is a coordinate worth moving a pin to.
+  const precision = precisionForResult(best);
+  if (precision === "street" || precision === "city") {
+    return { verdict: "ambiguous", metres, reason: `the geocoder answered with a ${precision === "street" ? "street" : "whole area"}, which has no single point` };
+  }
 
   return {
     verdict: "fix",
     metres,
     lat: best.lat,
     lng: best.lng,
-    geocode_precision: precisionForResult(best),
+    geocode_precision: precision,
     source: `nominatim:${best.osm_type ?? "?"}/${best.osm_id ?? "?"}`,
   };
 }
@@ -148,6 +194,14 @@ export function judgeAgainstNominatim(place, results) {
 // The area a Q-less place is looked up in: the row's city, else whatever the source glued
 // after the first comma ("Whitehall, Westminster, London" → "Westminster, London"), else
 // the country. Without one, "Cockburn Street" is a street in four countries.
+// The area with its postcode taken off: "London SE1" → "London", "London WC2" → "London".
+// Nominatim matches the whole string, and an outward code it does not hold returns nothing
+// — which is how The Shard went unresolved on the first run.
+export function cityOfArea(area) {
+  const last = String(area ?? "").split(",").pop().trim();
+  return last.replace(/\s+[A-Z]{1,2}\d[A-Z\d]?(\s*\d[A-Z]{2})?$/, "").trim() || null;
+}
+
 export function areaHint(place) {
   if (place?.city) return place.city;
   const rest = String(place?.name ?? "").split(",").slice(1).join(",").trim();

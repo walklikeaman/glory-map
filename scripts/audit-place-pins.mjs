@@ -23,6 +23,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import {
   areaHint,
+  cityOfArea,
   fixUpdate,
   judgeAgainstNominatim,
   judgeAgainstWikidata,
@@ -70,9 +71,17 @@ async function wikidataEntities(ids) {
       action: "wbgetentities", ids: chunk.join("|"), props: "claims|labels|aliases",
       languages: "en", languagefallback: "1", format: "json", maxlag: "5",
     });
-    const response = await fetch(`https://www.wikidata.org/w/api.php?${query}`, { headers: { "User-Agent": USER_AGENT } });
-    if (!response.ok) throw new Error(`Wikidata responded ${response.status}`);
-    const payload = await response.json();
+    // maxlag answers 200 with `{ error: { code: "maxlag" } }` and no entities. The first
+    // full run read that as "no coordinate" for 1,589 places, the London Eye among them.
+    let payload;
+    for (let attempt = 1; ; attempt += 1) {
+      const response = await fetch(`https://www.wikidata.org/w/api.php?${query}`, { headers: { "User-Agent": USER_AGENT } });
+      if (!response.ok) throw new Error(`Wikidata responded ${response.status}`);
+      payload = await response.json();
+      if (!payload.error) break;
+      if (attempt === 12) throw new Error(`Wikidata kept answering ${payload.error.code}`);
+      await wait(Math.min(60_000, 10_000 * attempt));
+    }
     for (const id of chunk) {
       const entity = payload.entities?.[id];
       if (!entity || entity.missing !== undefined) { out.set(id, null); continue; }
@@ -118,9 +127,18 @@ const withoutQ = places.filter((place) => !place.wikidata_id);
 let asked = 0;
 for (const place of withoutQ) {
   const area = areaHint(place);
-  const query = area ? `${nameHead(place.name)}, ${area}` : nameHead(place.name);
+  const head = nameHead(place.name);
+  let query = area ? `${head}, ${area}` : head;
   try {
-    verdicts.push({ place, by: "nominatim", query, ...judgeAgainstNominatim(place, await nominatim(query)) });
+    let verdict = judgeAgainstNominatim(place, await nominatim(query), { hinted: Boolean(area) });
+    // A full street address with a postcode often finds nothing where "<name>, <city>"
+    // does — The Shard, on the first run.
+    const city = cityOfArea(area);
+    if (verdict.verdict === "unresolved" && city && city !== area) {
+      query = `${head}, ${city}`;
+      verdict = judgeAgainstNominatim(place, await nominatim(query), { hinted: true });
+    }
+    verdicts.push({ place, by: "nominatim", query, ...verdict });
   } catch (error) {
     verdicts.push({ place, by: "nominatim", query, verdict: "unresolved", reason: error.message });
   }

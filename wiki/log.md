@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-18] update | Every pin checked against Wikidata and Nominatim (read-only)
+**Object**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `data/pin-audit/`.
+**Scenario**: data quality (live content check follow-up)
+**Outcome**: ⚠️ audit done, 24 fixes waiting for a write
+**What happened**: checked all 2,908 places. 1,846 of the 1,856 places with a Q-id stand within 150 m of their Wikidata P625. Of the 1,052 without one, 377 match Nominatim within 300 m. That leaves 24 clear fixes, both Shard rows among them (about 800 m, off the Tower of London), and 157 rows for a person.
+
+Decisions worth keeping: the first unfiltered pass would have moved "Dorchester Hotel" onto a bus stop, "Caesar's Palace" onto a monorail station, "Alabama Hills" onto a trail and "The Old Mitre" 40 km to another pub. So a geocoder fix needs all of these: an exact name, no stand-in type, an area in the query, a move under 5 km, and a point or a building as the answer. A street is never moved onto one of its segments. Whitehall's pin, for one, sits on its north end and is right. Wikidata's `maxlag` answers 200 with no entities, and the first run read that as "no coordinate" for 1,589 places. The fixes are not written: the service key is not on the Mac and auto mode refuses a production-write script, so `docs/content-fixes-apply.md` is the spec for the owner's command.
+**Updated**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `test/pin-audit.test.mjs`, `docs/content-fixes-apply.md`, `data/pin-audit/{fixes,ambiguous}.csv`.
+
 ## [2026-10-18] incident | Live content check: 12 works, 7 cities, against the real services
 **Object**: `/api/work`, `/api/trip/plan`, `/api/tour`, `/api/scenes`, `/api/film-image`, `/api/enrich/stills`, `/api/trail`, `/api/route`.
 **Scenario**: QA against live TMDB, Wikidata, Wikipedia, OpenAI and Supabase. Writes were blocked at the fetch layer, and trail and stills ran dry with in-memory stores.
