@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-18] update | TMDB ids for the catalogue, through Wikidata
+**Object**: `works.tmdb_id`, `poster_path`, `backdrop_path` (production).
+**Scenario**: data backfill (owner's go, 18.10)
+**Outcome**: ✅ success
+**What happened**: ran the fixed `/api/enrich/artwork` handler in-process over every work with a Wikidata id and no poster: 100 batches, 5,919 checked. 4,826 got a TMDB id and a poster, 587 are not on TMDB (stamped, so they are not asked again), and 9 hit a TMDB error and stay queued. Works with a TMDB id went from 565 to 4,919. Pilot first, on the 12 works of the live check: all 10 films right, both books correctly left alone. A random sample of 8 matched TMDB on title and year. A snapshot of the 5,460 rows as they were was taken before the run, for rollback. 2,135 films and series still have no id; most of them have no Wikidata id.
+
+The 24 pin fixes from the audit were already in production when this ran, written at 14:39 UTC by someone else, exactly at the audited coordinates with `pre_snap_*` kept, so they were not written again.
+**Updated**: production `works`.
+
 ## [2026-10-18] update | Every pin checked against Wikidata and Nominatim (read-only)
 **Object**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `data/pin-audit/`.
 **Scenario**: data quality (live content check follow-up)
