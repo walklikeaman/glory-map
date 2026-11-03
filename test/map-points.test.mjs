@@ -93,6 +93,16 @@ test("pointBadge tells a studio from a street from an approximate centroid", () 
   assert.equal(pointBadge(placeRow()), "exact");
 });
 
+test("pointBadge never calls an unconfirmed spot exact", () => {
+  // Measured on the live graph: 860 places are `none`, and eight different Vienna
+  // locations — the Votivkirche among them — share one coordinate in the Prater. Each
+  // read "Filmed here" with "none" printed under it.
+  assert.equal(pointBadge(placeRow({ geocode_precision: "none", wikidata_id: null })), "unconfirmed");
+  assert.equal(pointBadge(placeRow({ geocode_precision: null })), "unconfirmed");
+  assert.equal(pointBadge(placeRow({ geocode_precision: "building" })), "exact");
+  assert.equal(pointBadge(placeRow({ geocode_precision: "street" })), "exact");
+});
+
 test("buildMapResponse emits GeoJSON with the grounding fields inline", () => {
   const query = parseMapQuery(params({ ...LONDON, z: "13" }));
   const body = buildMapResponse(query, [placeRow()], []);

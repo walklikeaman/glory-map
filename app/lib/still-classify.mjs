@@ -82,6 +82,17 @@ export function buildClassificationContent(imageUrls) {
   return content;
 }
 
+// The same numbered gallery in Claude's content shape: text labels and URL images.
+export function buildClaudeClassificationContent(imageUrls) {
+  const urls = (Array.isArray(imageUrls) ? imageUrls : []).slice(0, MAX_IMAGES_PER_CALL);
+  const content = [{ type: "text", text: `There are ${urls.length} images, numbered from 0.` }];
+  for (const [index, url] of urls.entries()) {
+    content.push({ type: "text", text: `Image ${index}:` });
+    content.push({ type: "image", source: { type: "url", url } });
+  }
+  return content;
+}
+
 // Which candidates survived, as a Set of indices. The gate is deliberately one-sided:
 // an image is kept only when the model positively says it is a photographic frame AND
 // denies both disqualifiers. A missing or malformed verdict drops its image, because
