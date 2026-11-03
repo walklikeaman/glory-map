@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  MAX_QUOTE_WORDS, MIN_QUOTE_WORDS, appearsAsName, findPlotSection, normalisedText, placeInPlot,
+  MAX_QUOTE_WORDS, MIN_QUOTE_WORDS, appearsAsName, findPlotSection,
+  plotSectionFromWikitext, normalisedText, placeInPlot,
   scenesFromPlacement,
 } from "../app/lib/plot-order.mjs";
 
@@ -100,4 +101,15 @@ test("one quote is one scene, kept at its most precise place, and one building i
   assert.deepEqual(distinctStops(placed, places).map((entry) => entry.location), [
     "London Heathrow Airport", "Grosvenor Chapel, Mayfair", "Selfridges",
   ]);
+});
+
+test("the plot section is cut from whole-article wikitext, subsections included", () => {
+  const source = [
+    "Intro text.", "== Plot ==", "Paddington arrives.", "=== Later ===", "He finds a home.",
+    "== Cast ==", "* Ben Whishaw",
+  ].join("\n");
+  assert.equal(plotSectionFromWikitext(source),
+    "== Plot ==\nPaddington arrives.\n=== Later ===\nHe finds a home.");
+  assert.equal(plotSectionFromWikitext("== Plot summary ==\nA.\n"), "== Plot summary ==\nA.\n");
+  assert.equal(plotSectionFromWikitext("== Cast ==\nB"), null);
 });

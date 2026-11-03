@@ -33,6 +33,23 @@ export function findPlotSection(tocdata) {
   return found ? String(found.index) : null;
 }
 
+// The same section cut from a whole article's wikitext, heading line included, as
+// action=parse&section=N returns it. Used when the action API refuses us: from a shared
+// cloud egress it answers 429 "too many requests" to every call, while the core REST
+// endpoint (rest.php/v1/page) still serves the source.
+export function plotSectionFromWikitext(source) {
+  const lines = String(source ?? "").split("\n");
+  const start = lines.findIndex((line) => {
+    const heading = line.match(/^(={2,6})\s*(.*?)\s*\1\s*$/);
+    return heading && PLOT_SECTION.test(heading[2].replace(/<[^>]+>/g, "").trim());
+  });
+  if (start === -1) return null;
+  const level = lines[start].match(/^=+/)[0].length;
+  const end = lines.findIndex((line, index) => index > start
+    && /^(={2,6})[^=].*\1\s*$/.test(line) && line.match(/^=+/)[0].length <= level);
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+
 // Quotes are short on purpose: long enough to be unambiguous in a plot of a few thousand
 // characters, short enough to be a citation rather than a copy of the article.
 export const MIN_QUOTE_WORDS = 6;
