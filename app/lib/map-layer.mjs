@@ -12,7 +12,7 @@ export const BADGE_STYLES = Object.freeze({
   exact: Object.freeze({
     color: "#f7b733", fillColor: "#f7b733", fillOpacity: 0.85,
     radius: 7, weight: 2, dashArray: null,
-    label: "Filmed here", hint: "Exact location from Wikidata",
+    label: "Filmed here", hint: "The exact spot is confirmed",
   }),
   // We only know the city/country: drawn deliberately larger and dashed so it reads
   // as a region, never as a doorstep.
@@ -20,6 +20,14 @@ export const BADGE_STYLES = Object.freeze({
     color: "#f7b733", fillColor: "#f7b733", fillOpacity: 0.18,
     radius: 12, weight: 2, dashArray: "3 4",
     label: "Approximate", hint: "Only the city or country is known",
+  }),
+  // Named by a checked source, but the spot itself is unconfirmed: the pin may sit at
+  // the street's or the district's geocode rather than the doorway. Dashed like
+  // `approximate`, at pin size, because it claims a place rather than a region.
+  unconfirmed: Object.freeze({
+    color: "#f7b733", fillColor: "#f7b733", fillOpacity: 0.35,
+    radius: 7, weight: 2, dashArray: "3 3",
+    label: "Spot unconfirmed", hint: "The source names this place; its exact spot is not confirmed yet",
   }),
   // Real, correctly located — but it depicts somewhere else.
   studio: Object.freeze({
@@ -208,4 +216,11 @@ export function pointSummary(properties) {
   const style = badgeStyle(properties.badge);
   const works = properties.work_count === 1 ? "1 work" : `${properties.work_count ?? 0} works`;
   return `${style.label} · ${works}`;
+}
+
+// The line under the label: what the badge means, in words. It replaced the raw
+// "none · confidence 0.8", which told a reader nothing they could act on.
+export function pointHint(properties) {
+  if (!properties) return "";
+  return badgeStyle(properties.badge).hint;
 }

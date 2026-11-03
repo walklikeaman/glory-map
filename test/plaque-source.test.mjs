@@ -212,3 +212,55 @@ test("the motivating plaques come through", () => {
   assert.ok(matched, "a film we already hold, with the claim on the wall");
   assert.match(matched.submission.geocode_reason, /Inscription states/);
 });
+
+// --- the same title, a different work -------------------------------------------------
+// Three links found in the live graph on 13.10.2026, each with its real inscription.
+
+test("a plaque's dates refuse a remake made after them", () => {
+  const studios = plaque({
+    id: "8600",
+    address: "Poole Street, London",
+    inscription: "The Gainsborough Film Studios 1924-1949 Alfred Hitchcock, Michael Balcon, Ivor "
+      + "Novello, Gracie Fields, 'The Lady Vanishes', 'The Wicked Lady' worked and were filmed here",
+  });
+  const remake = { id: "1983", title: "The Wicked Lady", kind: "film", year: 1983 };
+  const original = { id: "1945", title: "The Wicked Lady", kind: "film", year: 1945 };
+  assert.equal(matchPlaque(studios, [remake]), null);
+  assert.equal(matchPlaque(studios, [remake, original]).work.id, "1945");
+});
+
+test("a plaque about a 1960s television series is not the 1997 film", () => {
+  const moore = plaque({
+    id: "2361",
+    address: "Elstree Film Studios, Shenley Road",
+    inscription: "This plaque honours Sir Roger Moore KBE distinguished actor who starred in The "
+      + "Saint television series (1962-9) and feature films Crossplot (1969) and The Man Who "
+      + "Haunted Himself (1970) made at Elstree Studios",
+  });
+  assert.equal(matchPlaque(moore, [{ id: "f", title: "The Saint", kind: "film", year: 1997 }]), null);
+  assert.equal(
+    matchPlaque(moore, [{ id: "s", title: "The Saint", kind: "series", year: 1962 }]).work.id,
+    "s",
+  );
+});
+
+test("a novelist writing a book is not the film made of it", () => {
+  const fleming = plaque({
+    id: "3288",
+    address: "Duck Inn, Pett Bottom",
+    inscription: "Ian Fleming 1908-1964 novelist wrote 'You Only Live Twice' here in 1964",
+  });
+  assert.equal(
+    matchPlaque(fleming, [{ id: "f", title: "You Only Live Twice", kind: "film", year: 1967 }]),
+    null,
+  );
+  assert.equal(
+    matchPlaque(fleming, [{ id: "b", title: "You Only Live Twice", kind: "book", year: 1964 }]).work.id,
+    "b",
+  );
+});
+
+test("a work with no recorded year is not refused for lacking one", () => {
+  const filmed = plaque({ inscription: "Billy Liar the classic comedy of the Swinging Sixties was filmed here 1962" });
+  assert.ok(matchPlaque(filmed, [{ id: "w", title: "Billy Liar", kind: "film", year: null }]));
+});
