@@ -4,6 +4,7 @@ import { normalizeTrailPlace } from "../../lib/story-trail.mjs";
 import {
   distinctStops,
   findPlotSection,
+  plotSectionFromWikitext,
   placeInPlot,
   plotPositionInput,
   plotPositionInstructions,
@@ -92,17 +93,42 @@ function defaultCreateStore(env) {
     // The film's plot as Wikipedia tells it: the text the order is read from.
     async plotOf(work) {
       if (!work?.wikidata_id) return null;
-      const entities = await (await fetch(buildEntitiesUrl([work.wikidata_id], ["en"]), { headers: WIKIPEDIA })).json();
+      let entityResponse = await fetch(buildEntitiesUrl([work.wikidata_id], ["en"]), { headers: WIKIPEDIA });
+      // Same rate limit on Wikidata's action API; Special:EntityData has the same shape.
+      if (!entityResponse.ok) {
+        entityResponse = await fetch(
+          `https://www.wikidata.org/wiki/Special:EntityData/${work.wikidata_id}.json`,
+          { headers: WIKIPEDIA },
+        );
+      }
+      if (!entityResponse.ok) throw new Error(`wikidata ${entityResponse.status}`);
+      const entities = await entityResponse.json();
       const title = articleTitleFromEntity(entities?.entities?.[work.wikidata_id], "en");
       if (!title) return null;
-      const toc = await (await fetch(buildTocUrl(title, "en"), { headers: WIKIPEDIA })).json();
-      const index = findPlotSection(toc?.parse?.tocdata);
-      if (!index) return null;
-      const section = await (await fetch(buildSectionUrl(title, index, "en"), { headers: WIKIPEDIA })).json();
-      const plot = cleanWikitext(section?.parse?.wikitext ?? "");
-      // The revision, so the evidence points at the text that was read, not whatever the
-      // article says later.
-      const revid = toc?.parse?.revid ?? null;
+      const tocResponse = await fetch(buildTocUrl(title, "en"), { headers: WIKIPEDIA });
+      let wikitext;
+      let revid;
+      if (tocResponse.ok) {
+        const toc = await tocResponse.json();
+        const index = findPlotSection(toc?.parse?.tocdata);
+        if (!index) return null;
+        const section = await (await fetch(buildSectionUrl(title, index, "en"), { headers: WIKIPEDIA })).json();
+        wikitext = section?.parse?.wikitext ?? "";
+        // The revision, so the evidence points at the text that was read, not whatever the
+        // article says later.
+        revid = toc?.parse?.revid ?? null;
+      } else {
+        // The action API rate-limits shared egress (429); the REST source is the same text.
+        const page = await fetch(
+          `https://en.wikipedia.org/w/rest.php/v1/page/${encodeURIComponent(title.replace(/ /g, "_"))}`,
+          { headers: WIKIPEDIA },
+        );
+        if (!page.ok) throw new Error(`wikipedia ${tocResponse.status}, rest ${page.status}`);
+        const body = await page.json();
+        wikitext = plotSectionFromWikitext(body?.source) ?? "";
+        revid = body?.latest?.id ?? null;
+      }
+      const plot = cleanWikitext(wikitext);
       return plot ? { title, text: plot, url: revid ? permalink(title, revid, "en") : `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}` } : null;
     },
     // A scene is set ON the link that says the work was filmed at the place — never a new
