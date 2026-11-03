@@ -24,6 +24,7 @@ export const runtime = "nodejs";
 // A profile is opened deliberately and its contents barely change, so it may be
 // cached hard. Nothing in it is user-specific.
 const cacheHeaders = { "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400" };
+const noStoreHeaders = { "Cache-Control": "private, no-store" };
 
 export const TMDB_TIMEOUT_MS = 4000;
 const TMDB_PATH = Object.freeze({ film: "movie", series: "tv" });
@@ -220,6 +221,7 @@ export function createWorkProfileHandler({
     let classified = [];
     let placeFrames = [];
     let submissions = { rows: [], total: 0 };
+    let graphFailed = false;
 
     if (store) {
       try {
@@ -239,6 +241,7 @@ export function createWorkProfileHandler({
         // A profile without our own data is thin but still useful; failing the whole
         // page because one join broke would be worse than showing the stills.
         logError("work: graph load failed", error);
+        graphFailed = true;
       }
     }
 
@@ -286,6 +289,10 @@ export function createWorkProfileHandler({
         : place;
     });
 
+    // A card built around a failed read says "no places" about a work that has them.
+    // Served once that is a blip; cached publicly for an hour it is an hour of every
+    // reader being told the work has nothing — measured on the live check, a blocked
+    // read came back 200 with `places: []` under `public, max-age=3600`.
     return Response.json({
       work: {
         // Our own id, and the card page needs it: a TMDB id addresses a film on TMDB,
@@ -320,7 +327,7 @@ export function createWorkProfileHandler({
       stills_note: stillsVerified
         ? "Frames from the film, checked one by one. Not matched to any location."
         : "From the film's image gallery — includes promotional art. Not matched to any location.",
-    }, { headers: cacheHeaders });
+    }, { headers: graphFailed ? noStoreHeaders : cacheHeaders });
   };
 }
 
