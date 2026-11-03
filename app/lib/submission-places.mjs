@@ -41,6 +41,9 @@ const SOURCE_LABELS = {
   // one — and the link goes to the exact revision the claim was read from.
   fandom: { evidence: "fandom", title: "The wiki page this came from", who: "a fan wiki" },
   // The only source whose sentence a person can check by standing in front of it.
+  // A signed-in reader's suggestion that a moderator has checked (#48). It reaches the
+  // queue only as `verified`, and the link is the page the moderator checked it against.
+  reader: { evidence: "reader", title: "The page it was checked against", who: "a reader, checked by us" },
   open_plaques: {
     evidence: "open_plaques",
     title: "The plaque on the wall",
