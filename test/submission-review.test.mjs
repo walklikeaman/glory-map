@@ -53,6 +53,13 @@ test("the non-place list matches a whole name, never a fragment", () => {
   );
 });
 
+test("a kind of place is not a place", () => {
+  // "Bridge" and "Street" came in from location guides as the name of a pin.
+  assert.equal(disqualification(row({ place_name: "Bridge", place_key: "bridge" })), "vague_not_a_place");
+  assert.equal(disqualification(row({ place_name: "Library", place_key: "library" })), "vague_not_a_place");
+  assert.equal(disqualification(row({ place_name: "Van Buren Street Bridge", place_key: "van buren street bridge" })), null);
+});
+
 test("a photo credit in the name column is refused", () => {
   assert.equal(
     disqualification(row({ place_name: "Wikipedia / David Leigh Ellis", place_key: "wikipedia / david leigh ellis" })),

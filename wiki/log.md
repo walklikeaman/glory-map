@@ -16,6 +16,17 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] update | "Harvey Dent" was never a place: the trail cut stop names at the apostrophe
+**Object**: `app/lib/plot-order.mjs`, `app/lib/vague-place-name.mjs`, `submission-review.mjs`, `promote-submission.mjs`, live `scenes`.
+**Scenario**: data quality
+**Outcome**: ✅ success
+**What happened**: The Dark Knight's story trail showed stops called "Harvey Dent", "Lau" and "Bridge". The `places` table was clean; the junk was in `scenes.act_or_chapter`. `appearsAsName` used one character class for every quote mark, so `Appears as "Harvey Dent's Office"` ended at the apostrophe. 43 of 209 live scene labels were wrong (Bridget, Jenny, Juliet, Mark Darcy, Silva, "Buckingham Palace (king"…), and were rewritten from the guide line with the fixed parser (snapshot in `/mnt/project-files/glorymap-backfill/2026-11-03-junk-places/`). A guide label that is one common noun ("Bridge", "Street", "Funeral") now falls back to the real place name.
+
+The same one-word check is now an ingest refusal (`vague_not_a_place`) and `bestName` skips it. Measured on the 55k-row queue before choosing one word only: a rule over every word of a name refused "Tower Bridge", "Park Lane" and "Victory Square". One word refuses 41 pending rows and no verified ones.
+
+All 2,908 places were also read by Claude Haiku for character names, titles and vague words (~$0.8). Results are in the snapshot folder; see the PR for what, if anything, was hidden.
+**Updated**: code + tests, 43 live scene rows.
+
 ## [2026-10-13] update | Mobile design review at 360–430 px
 **Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
 **Scenario**: design review (phone)

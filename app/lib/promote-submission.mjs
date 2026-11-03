@@ -27,6 +27,7 @@ import { DEDUP_RADIUS_M, metresApart, namesMatch, normalizePlaceName } from "./p
 import { finiteOrNull } from "./numbers.mjs";
 import { studioLotAt } from "./studio-lots.mjs";
 import { statesSomething } from "./submission-review.mjs";
+import { isVaguePlaceName } from "./vague-place-name.mjs";
 
 // What the graph is told about where the point came from.
 //
@@ -64,7 +65,8 @@ export function positionOf(row) {
 export function bestName(rows) {
   const names = rows
     .map((row) => String(row?.place_name ?? "").trim())
-    .filter(Boolean)
+    // Shortest would otherwise pick "Bridge" over "Van Buren Street Bridge".
+    .filter((name) => name && !isVaguePlaceName(name))
     .sort((a, b) => a.length - b.length || a.localeCompare(b));
   return names[0] ?? null;
 }
