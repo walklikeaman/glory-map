@@ -73,7 +73,22 @@ test("the OpenAI client keeps its own base URL and takes no provider hint", () =
 
   assert.equal(runtime.provider, "openai");
   assert.equal(built[0].baseURL, undefined);
-  assert.deepEqual(runtime.extraBody, {});
+  assert.equal(runtime.extraBody.provider, undefined);
+});
+
+test("a cheap gpt-5 call reasons briefly, so the reasoning cannot eat the answer", () => {
+  // Measured live: gpt-5-nano at the default effort spent all 3,000 tokens of a tour
+  // request on reasoning and every tour came back "truncated".
+  const { OpenAIImpl } = fakeSdk({});
+  const cheap = createModelClient({ OPENAI_API_KEY: "j", OPENAI_MODEL: "gpt-5-nano" }, { OpenAIImpl });
+  assert.deepEqual(cheap.extraBody, { reasoning_effort: "low" });
+
+  const careful = createModelClient(
+    { OPENAI_API_KEY: "j", OPENAI_MODEL: "gpt-5-mini" }, { OpenAIImpl, tier: TIERS.CAREFUL });
+  assert.deepEqual(careful.extraBody, {}, "a careful task keeps the model's own effort");
+
+  const older = createModelClient({ OPENAI_API_KEY: "j", OPENAI_MODEL: "gpt-4o-mini" }, { OpenAIImpl });
+  assert.deepEqual(older.extraBody, {}, "a model without reasoning is not sent the parameter");
 });
 
 // --- the call shape ------------------------------------------------------------------
