@@ -16,6 +16,19 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] decision | Then/now wipe on the place card (#57)
+**Object**: `app/components/ThenNowWipe.jsx`, `app/lib/then-now-wipe.mjs`, place card in `SceneMapApp.jsx`.
+**Scenario**: imagery
+**Outcome**: ✅ success (tests + desktop/390 px Playwright, frame mocked)
+**What happened**: when a card has both a matched film frame and a "place today" photo, the two are shown as one 16:9 wipe with a draggable divider instead of side by side. With only one image, or with either URL known broken, the old pair stays, because a wipe over half an error icon is worse than the pair that already says what is missing.
+
+Decisions worth keeping:
+- Keyboard and screen readers drive a native `<input type=range>` under the image (it takes no pointer events); the drag lives on the wrapper. `touch-action: pan-y` keeps vertical swipes scrolling the sheet.
+- A touch never jumps the divider on touch-down, only on a sideways move: a scroll that starts on the image must not move it. A mouse click does jump.
+- Both captions (frame source, Commons credit) stay under the wipe; attribution travels with the layout.
+- No alignment step: there is no vision-verified camera alignment in the data to use. The wipe uses only frames that already passed the matcher, so it is honest but rare. Issue #57's comment still applies: matched frames with wide shots of the location are the bottleneck, not the UI.
+**Updated**: `wiki/log.md`.
+
 ## [2026-10-13] update | Mobile design review at 360–430 px
 **Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
 **Scenario**: design review (phone)

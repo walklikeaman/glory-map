@@ -1493,6 +1493,110 @@ figure img {
   object-fit: cover;
 }
 
+/* The then/now wipe (#57): the film frame over today's photo, cut at --reveal. */
+.then-now-figure {
+  margin: 14px 0;
+}
+
+.then-now-wipe {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  cursor: ew-resize;
+  /* Vertical swipes still scroll the sheet; horizontal ones move the divider. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.then-now-wipe img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.then-now-wipe .then-now-then {
+  clip-path: inset(0 calc(100% - var(--reveal, 50%)) 0 0);
+}
+
+.then-now-tag {
+  position: absolute;
+  top: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.then-now-tag.is-then { left: 8px; }
+.then-now-tag.is-now { right: 8px; }
+
+.then-now-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--reveal, 50%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--gold);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.then-now-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  background:
+    linear-gradient(90deg, transparent 9px, var(--gold) 9px 11px, transparent 11px 19px, var(--gold) 19px 21px, transparent 21px)
+    center / 28px 10px no-repeat,
+    rgba(0, 0, 0, 0.7);
+}
+
+/* Keyboard and screen-reader control. It takes no pointer events, so the drag on the
+   wrapper and the sheet's scroll are both left alone. */
+.then-now-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.then-now-range:focus-visible ~ .then-now-divider .then-now-handle {
+  outline: 3px solid var(--gold-strong);
+  outline-offset: 2px;
+}
+
+.then-now-captions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.then-now-captions > span {
+  min-width: 0;
+}
+
+.then-now-captions > span:last-child {
+  text-align: right;
+}
+
 .image-placeholder {
   /* A minimum, not a height: a studio lot says why it has no frame, in two lines. */
   min-height: 105px;

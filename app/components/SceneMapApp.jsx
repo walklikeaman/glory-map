@@ -156,6 +156,8 @@ import {
 } from "./map/layers.jsx";
 import SearchBox from "./SearchBox";
 import { ImageAttribution } from "./ImageAttribution";
+import { ThenNowWipe } from "./ThenNowWipe";
+import { wipeMode } from "../lib/then-now-wipe.mjs";
 import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
 
@@ -2139,6 +2141,52 @@ export default function SceneMapApp() {
       : activeLocation?.filmTmdbId ? "loading" : "unavailable";
   const activeFilmImageSource = activePrimaryFrame?.sourceUrl
     ?? (filmImageState.locationId === activeLocation?.id ? filmImageState.sourceUrl : null);
+  // Both captions are shown under the side-by-side pair and under the wipe (#57), so
+  // the frame's source and the photo's licence credit travel with either layout.
+  const thenCaption = activeLocation ? (
+    <>
+      <span className="scene-frame-meta">
+        {activePrimaryFrame && (
+          <span className="scene-frame-type">
+            {frameLocationLabel(activePrimaryFrame.locationType)}
+          </span>
+        )}
+        {activeFilmImage && activeFilmImageSource ? (
+          <a href={activeFilmImageSource} target="_blank" rel="noopener noreferrer">
+            AI-matched frame · TMDB
+          </a>
+        ) : "scene reference"}
+      </span>
+      {activePrimaryFrame?.description && (
+        <span className="scene-frame-description">
+          {activePrimaryFrame.description}
+        </span>
+      )}
+    </>
+  ) : null;
+  const nowCaption = activeLocation ? (
+    <>
+      the place today
+      {/* Commons files are licensed per FILE, so the credit belongs with
+          the image itself, not in a page footer. */}
+      {activeLocation.now && (
+        <ImageAttribution attribution={imageAttribution[activeLocation.now] ?? { url: activeLocation.now }} />
+      )}
+    </>
+  ) : null;
+  const dropActiveFilmImage = () => {
+    filmImageCache.current.delete(filmLocationImageKey(
+      activeLocation.filmTmdbId,
+      activeLocation.locationId ?? activeLocation.id,
+    ));
+    setFilmImageState({
+      locationId: activeLocation.id,
+      url: null,
+      sourceUrl: null,
+      frames: [],
+      status: "error",
+    });
+  };
   const activeNarration = aiTour?.stops?.find(
     (stop) => stop.locationId === activeLocation?.id,
   )?.narration;
@@ -4378,25 +4426,35 @@ export default function SceneMapApp() {
             )}
             <p>{activeLocation.description}</p>
             <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} />
+            {wipeMode({ thenUrl: activeFilmImage, nowUrl: activeLocation.now, broken: brokenImages }) === "wipe" ? (
+              <figure className="then-now-figure">
+                <ThenNowWipe
+                  key={activeLocation.id}
+                  thenSrc={activeFilmImage}
+                  thenAlt={`Matched film scene for ${activeLocation.film} at ${activeLocation.place}`}
+                  // A verified backdrop is not in filmImageState, so dropping that alone
+                  // would leave it in place; marking the URL broken is what ends the wipe.
+                  onThenError={() => { markImageBroken(activeFilmImage); dropActiveFilmImage(); }}
+                  nowSrc={activeLocation.now}
+                  nowAlt={`${activeLocation.place} today`}
+                  // The same rungs as the pair; only the box is wider, the full sheet.
+                  nowSrcSet={commonsSrcSetForSurface(activeLocation.now, "placePhoto") ?? undefined}
+                  nowSizes="(max-width: 860px) 100vw, 396px"
+                  onNowError={() => markImageBroken(activeLocation.now)}
+                />
+                <figcaption className="then-now-captions">
+                  <span>{thenCaption}</span>
+                  <span>{nowCaption}</span>
+                </figcaption>
+              </figure>
+            ) : (
             <div className="comparison-grid">
               <figure>
                 {activeFilmImage ? (
                   <img
                     src={activeFilmImage}
                     alt={`Matched film scene for ${activeLocation.film} at ${activeLocation.place}`}
-                    onError={() => {
-                      filmImageCache.current.delete(filmLocationImageKey(
-                        activeLocation.filmTmdbId,
-                        activeLocation.locationId ?? activeLocation.id,
-                      ));
-                      setFilmImageState({
-                        locationId: activeLocation.id,
-                        url: null,
-                        sourceUrl: null,
-                        frames: [],
-                        status: "error",
-                      });
-                    }}
+                    onError={dropActiveFilmImage}
                   />
                 ) : (
                   <div className="image-placeholder" role="status">
@@ -4428,28 +4486,10 @@ export default function SceneMapApp() {
                     )}
                   </div>
                 )}
-                <figcaption>
-                  <span className="scene-frame-meta">
-                    {activePrimaryFrame && (
-                      <span className="scene-frame-type">
-                        {frameLocationLabel(activePrimaryFrame.locationType)}
-                      </span>
-                    )}
-                    {activeFilmImage && activeFilmImageSource ? (
-                      <a href={activeFilmImageSource} target="_blank" rel="noopener noreferrer">
-                        AI-matched frame · TMDB
-                      </a>
-                    ) : "scene reference"}
-                  </span>
-                  {activePrimaryFrame?.description && (
-                    <span className="scene-frame-description">
-                      {activePrimaryFrame.description}
-                    </span>
-                  )}
-                </figcaption>
+                <figcaption>{thenCaption}</figcaption>
               </figure>
               <figure>
-                {activeLocation.now ? (
+                {activeLocation.now && !brokenImages.has(activeLocation.now) ? (
                   <img
                     src={activeLocation.now}
                     alt={`${activeLocation.place} today`}
@@ -4463,16 +4503,10 @@ export default function SceneMapApp() {
                 ) : (
                   <div className="image-placeholder">Place photo unavailable</div>
                 )}
-                <figcaption>
-                  the place today
-                  {/* Commons files are licensed per FILE, so the credit belongs with
-                      the image itself, not in a page footer. */}
-                  {activeLocation.now && (
-                    <ImageAttribution attribution={imageAttribution[activeLocation.now] ?? { url: activeLocation.now }} />
-                  )}
-                </figcaption>
+                <figcaption>{nowCaption}</figcaption>
               </figure>
             </div>
+            )}
             {activeFilmFrames.length > 1 && (
               <section className="scene-frame-gallery" aria-label={`More matched frames from ${activeLocation.film}`}>
                 <div className="scene-frame-gallery-heading">
