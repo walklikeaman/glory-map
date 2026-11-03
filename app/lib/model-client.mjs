@@ -19,6 +19,8 @@
 // 40% of the time and never in dev. `require_parameters` refuses an endpoint that
 // cannot do what we asked, rather than quietly downgrading.
 
+import Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 
@@ -46,6 +48,10 @@ export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 // argument for testing against the real schema rather than a toy one.
 export const DEFAULT_FREE_MODEL = "liquid/lfm-2.5-2.6b:free";
 export const DEFAULT_OPENAI_MODEL = "gpt-5-nano";
+// Claude is the paid provider the owner has a budget for (03.11). The model is set by
+// ANTHROPIC_MODEL; this default is the capable one, and a cheaper model is the owner's
+// call after the cost of a measured run is in front of them.
+export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 
 // OpenRouter attributes traffic by these and shows the app on its site. Neither is a
 // secret; both are ordinary courtesy.
@@ -73,10 +79,14 @@ export function chooseProvider(env = process.env, tier = TIERS.CHEAP) {
   if (tier === TIERS.CAREFUL) {
     // Fall back to OpenRouter rather than refusing outright — a paid key may simply
     // not be configured yet, and the caller can see `tier` did not get what it asked.
+    if (env?.ANTHROPIC_API_KEY) return "anthropic";
     if (env?.OPENAI_API_KEY) return "openai";
     return env?.OPENROUTER_API_KEY ? "openrouter" : null;
   }
+  // A cheap task stays on the free provider when there is one: a Claude key in the
+  // environment must not quietly move a catalogue-wide job onto a paid model.
   if (env?.OPENROUTER_API_KEY) return "openrouter";
+  if (env?.ANTHROPIC_API_KEY) return "anthropic";
   if (env?.OPENAI_API_KEY) return "openai";
   return null;
 }
@@ -84,9 +94,25 @@ export function chooseProvider(env = process.env, tier = TIERS.CHEAP) {
 // Build the client and everything that travels with it. Returns null when no key is
 // configured, so a caller can say which key is missing rather than throwing an SDK
 // error about an empty string.
-export function createModelClient(env = process.env, { tier = TIERS.CHEAP, OpenAIImpl = OpenAI } = {}) {
+export function createModelClient(env = process.env, {
+  tier = TIERS.CHEAP, OpenAIImpl = OpenAI, AnthropicImpl = Anthropic,
+} = {}) {
   const provider = chooseProvider(env, tier);
   if (!provider) return null;
+
+  if (provider === "anthropic") {
+    return {
+      provider,
+      tier,
+      downgraded: false,
+      model: env.ANTHROPIC_MODEL || DEFAULT_CLAUDE_MODEL,
+      client: new AnthropicImpl({ apiKey: env.ANTHROPIC_API_KEY }),
+      // Thinking cannot be switched off on the current models; effort is the lever. A
+      // cheap task is checked afterwards and does not need the long think.
+      effort: tier === TIERS.CAREFUL ? "medium" : "low",
+      extraBody: {},
+    };
+  }
 
   if (provider === "openrouter") {
     return {
@@ -142,6 +168,9 @@ export async function parseStructured({
   runtime, schema, schemaName, instructions, input, maxTokens = 4000, timeout = 120_000,
 }) {
   if (!runtime) return { ok: false, reason: "no_client" };
+  if (runtime.provider === "anthropic") {
+    return parseWithClaude({ runtime, schema, instructions, input, maxTokens, timeout });
+  }
 
   let completion;
   try {
@@ -224,6 +253,48 @@ export async function parseStructured({
     servedBy: completion.provider ?? null,
     fenced: body !== String(choice?.message?.content ?? "").trim(),
   };
+}
+
+// The same contract on Claude: structured output through `output_config.format`, the
+// same result shape, and the Zod schema still checked here rather than trusted.
+//
+// Thinking tokens count against `max_tokens`, so the floor is generous: a budget sized
+// for the answer alone would end in "max_tokens" with nothing written.
+async function parseWithClaude({ runtime, schema, instructions, input, maxTokens, timeout }) {
+  let message;
+  try {
+    message = await runtime.client.messages.parse({
+      model: runtime.model,
+      max_tokens: Math.max(maxTokens, 16_000),
+      system: instructions,
+      messages: [{ role: "user", content: input }],
+      output_config: { format: zodOutputFormat(schema), effort: runtime.effort },
+    }, { timeout });
+  } catch (failure) {
+    return {
+      ok: false,
+      reason: failure?.status === 429 ? "rate_limited" : "request_failed",
+      status: failure?.status ?? null,
+      detail: String(failure?.message ?? "").slice(0, 300),
+    };
+  }
+
+  if (message?.stop_reason === "refusal") {
+    return { ok: false, reason: "refused", detail: message.stop_details?.explanation ?? null };
+  }
+  if (message?.stop_reason === "max_tokens") return { ok: false, reason: "truncated" };
+
+  const validated = schema.safeParse(message?.parsed_output);
+  if (!validated.success) {
+    return {
+      ok: false,
+      reason: message?.parsed_output == null ? "not_json" : "schema_mismatch",
+      detail: validated.error.issues.slice(0, 3)
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+    };
+  }
+
+  return { ok: true, parsed: validated.data, model: message.model, servedBy: "anthropic", fenced: false };
 }
 
 // Free endpoints are shared and rate-limited per account, so pacing belongs to the

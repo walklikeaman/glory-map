@@ -16,6 +16,17 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] update | TMDB ids by title from the cloud, four pins moved, and Claude as a provider
+**Object**: `works.tmdb_id/poster_path`, `places` (4 rows), `app/lib/model-client.mjs`, `app/api/enrich/stills/route.js`.
+**Scenario**: data + tooling
+**Outcome**: ✅ success
+**What happened**: The cloud environment now holds `SUPABASE_SERVICE_ROLE_KEY`, `TMDB_API_READ_ACCESS_TOKEN` and `ANTHROPIC_API_KEY`, and allows Supabase, TMDB and Wikidata. The title-and-year TMDB search (PR #337's rules) re-ran from the cloud: 874 candidates. Before writing, the 68 whose year differed by one were dropped. A spot check showed most were other works with the same title (Birdman 2014 matched a 2015 Birdman, and the series Community matched a film). 806 were written, 778 of them with a poster. `tmdb_id` now covers 5,725 of 7,063 works. The snapshot and the held-back list are in `/mnt/project-files/glorymap-backfill/`. Four pins moved to Wikidata coordinates, with the old values in `pre_snap_*`: two NYPL Fifth Avenue rows, Ham House and Friedhof der Namenlosen.
+
+Claude is now a third provider. A careful task (story trails) and still classification go to Claude when its key is set. A cheap task stays on OpenRouter, so the key never silently moves a catalogue job onto a paid model. The default model is `claude-opus-5-5`, set by `ANTHROPIC_MODEL`. A cheaper one is the owner's call after a measured run. `scripts/fill-story-trails.mjs` and the new `scripts/classify-stills.mjs` end with the run's cost in dollars.
+
+Gotchas: Node's `fetch` in the cloud needs `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`. The `places.wikidata_id` column is unique, and another row already holds the NYPL Q-id, so a duplicate place exists there.
+**Updated**: `.env.example`, `wiki/log.md`.
+
 ## [2026-10-13] update | Sixteen cities checked against the live graph: unconfirmed pins and plaques on the wrong film
 **Object**: `app/lib/map-points.mjs`, `app/lib/map-layer.mjs`, `app/lib/plaque-source.mjs`.
 **Scenario**: content audit + bugfix
