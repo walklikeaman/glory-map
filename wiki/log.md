@@ -24,7 +24,7 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 The same one-word check is now an ingest refusal (`vague_not_a_place`) and `bestName` skips it. Measured on the 55k-row queue before choosing one word only: a rule over every word of a name refused "Tower Bridge", "Park Lane" and "Victory Square". One word refuses 41 pending rows and no verified ones.
 
-All 2,908 places were also read by Claude Haiku for character names, titles and vague words (~$0.8). Results are in the snapshot folder; see the PR for what, if anything, was hidden.
+Claude Haiku also read all 2,908 places, looking for character names, titles and vague words ($0.83). It flagged 6, and none was junk. Two were false alarms: "Waiting for the Interurban" is a Seattle sculpture and "Newbridge Memo" a Welsh hall. The other four are real pins with vague names, so I renamed them rather than hid them: "Railway Station, Carnforth", "Cloisters, Temple, London", "The Lake, Central Park", "Humanities Wing, University of Toronto Scarborough". Nothing was hidden. The verdicts and the before-names are in the snapshot folder.
 **Updated**: code + tests, 43 live scene rows.
 
 ## [2026-10-13] update | Mobile design review at 360–430 px
