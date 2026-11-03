@@ -36,6 +36,12 @@ test("two rows at one address under one name become one place", () => {
   assert.equal(bestName(groups[0].rows), "Millennium Biltmore");
 });
 
+test("the shortest name is never a bare kind of place", () => {
+  const rows = [{ place_name: "Bridge" }, { place_name: "Van Buren Street Bridge" }];
+  assert.equal(bestName(rows), "Van Buren Street Bridge");
+  assert.equal(bestName([{ place_name: "Road" }]), null);
+});
+
 // A wrong merge is a false claim that two films were shot in one building.
 test("a different building at the same corner stays a different place", () => {
   const groups = groupIntoPlaces([
