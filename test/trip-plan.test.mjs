@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  attachPlaceFilms,
   budgetNote,
   buildTripPlan,
   collapseSameSpot,
@@ -407,4 +408,31 @@ test("a grouped row with no films is still refused for its own reason, not silen
     budgetMinutes: 120,
   });
   assert.equal(built.excluded.some((row) => row.reason === TRIP_EXCLUSION.no_position), true);
+});
+
+test("an ungraded pin is refused for what it is, not called an area", () => {
+  // Live London, 18.10: 113 verified places graded "none" — Westminster Abbey among them —
+  // were each refused with "names this area, not a spot inside it — none precision".
+  const built = buildTripPlan({
+    places: [{ place_id: "p3", name: "Westminster Abbey", lat: 51.4993, lng: -0.1273,
+      confidence_band: "verified", geocode_precision: "none" }],
+    candidates: HOLLYWOOD, origin: ORIGIN, budgetMinutes: 120,
+  });
+  const refused = built.excluded.find((row) => row.name === "Westminster Abbey");
+  assert.equal(refused.reason, TRIP_EXCLUSION.not_a_spot);
+  assert.match(refused.note, /do not know how precisely this place is pinned/);
+});
+
+test("attachPlaceFilms leaves a place it holds no links for exactly as it was", () => {
+  const place = { place_id: "lonely", name: "Somewhere", lat: 1, lng: 1 };
+  const [out] = attachPlaceFilms([place], [{ place_id: "other", works: { id: "w", title: "X" } }]);
+  assert.equal(out, place);
+});
+
+test("attachPlaceFilms lists a film once however many links name it", () => {
+  const [out] = attachPlaceFilms([{ place_id: "p" }], [
+    { place_id: "p", works: { id: "w1", title: "Skyfall", year: 2012 } },
+    { place_id: "p", works: { id: "w1", title: "Skyfall", year: 2012 } },
+  ]);
+  assert.deepEqual(out.films.map((film) => film.title), ["Skyfall"]);
 });
