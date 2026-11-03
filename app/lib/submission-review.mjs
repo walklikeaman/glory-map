@@ -31,6 +31,7 @@
 import { STATUS, VERIFY_THRESHOLD, combineSignals } from "./place-review.mjs";
 import { isRefusedSource } from "./submission-places.mjs";
 import { finiteOrNull } from "./numbers.mjs";
+import { isVaguePlaceName } from "./vague-place-name.mjs";
 
 export { STATUS };
 
@@ -114,6 +115,7 @@ export function disqualification(row) {
   if (!/\p{L}/u.test(name)) return "name_has_no_letters";
   if (NOT_A_PLACE.has(normalisedName(row))) return "not_a_place";
   if (CREDIT_ONLY.test(name)) return "photo_credit_not_a_place";
+  if (isVaguePlaceName(name)) return "vague_not_a_place";
 
   const lat = finiteOrNull(row.lat);
   const lng = finiteOrNull(row.lng);

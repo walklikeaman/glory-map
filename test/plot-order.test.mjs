@@ -3,7 +3,7 @@ import test from "node:test";
 
 import {
   MAX_QUOTE_WORDS, MIN_QUOTE_WORDS, appearsAsName, findPlotSection,
-  plotSectionFromWikitext, normalisedText, placeInPlot,
+  plotSectionFromWikitext, normalisedText, placeInPlot, sceneName,
   scenesFromPlacement,
 } from "../app/lib/plot-order.mjs";
 
@@ -60,6 +60,22 @@ test("what a place appears as is read off the guide line, or not at all", () => 
   assert.equal(appearsAsName("Appears as \"Grand Hotel (exterior)\". The college was built in…"), "Grand Hotel (exterior)");
   assert.equal(appearsAsName("Appears as “Wayne Manor”."), "Wayne Manor");
   assert.equal(appearsAsName("Westminster Bridge was designed by Thomas Page."), null);
+});
+
+// The Dark Knight's trail named two stops "Harvey Dent" and "Lau": the old pattern closed
+// the quote at the first apostrophe.
+test("an apostrophe inside the quoted name does not end it", () => {
+  assert.equal(appearsAsName("Appears as \"Harvey Dent's Office\". Jim Gordon has a meeting…"), "Harvey Dent's Office");
+  assert.equal(appearsAsName("Appears as “Lau’s Offices”."), "Lau’s Offices");
+  assert.equal(appearsAsName("Appears as “Grand Hotel\"."), "Grand Hotel");
+  assert.equal(appearsAsName("Appears as 'Lau's Offices'. Batman kidnaps Lau."), "Lau's Offices");
+  assert.equal(appearsAsName("Appears as \"St. Paul's Cathedral (crypt)\"."), "St. Paul's Cathedral (crypt)");
+});
+
+test("a stop the guide only calls a kind of place keeps its real name", () => {
+  assert.equal(sceneName({ location: "Van Buren Street Bridge", appears_as: "Appears as \"Bridge\". Police search it." }), "Van Buren Street Bridge");
+  assert.equal(sceneName({ location: "Old Chicago Main Post Office", appears_as: "Appears as \"Gotham National Bank\"." }), "Gotham National Bank");
+  assert.equal(sceneName({ location: "Navy Pier", appears_as: null }), "Navy Pier");
 });
 
 // A film has no chapters: its spoiler tier IS its place in the story, so the trail shows
