@@ -2326,6 +2326,100 @@ figcaption a {
   min-height: 44px;
 }
 
+/* Visitors' shots on a place card, and the share step in the recreate dialog. */
+.visitor-shots {
+  margin: 12px 0 14px;
+}
+
+.visitor-shots-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.visitor-shots-heading > span {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.visitor-shots-add {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+.visitor-shots-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.visitor-shots-list {
+  display: grid;
+  grid-auto-columns: minmax(160px, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.visitor-shots-list figure {
+  min-width: 0;
+}
+
+.visitor-shots-list figure img {
+  height: 110px;
+}
+
+.visitor-shots-list figcaption {
+  display: grid;
+  gap: 4px;
+}
+
+.visitor-shot-status {
+  color: var(--gold);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.visitor-shot-recreate {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  color: var(--gold-strong);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.recreate-share {
+  display: grid;
+  gap: 6px;
+}
+
+.recreate-share-status {
+  margin: 0;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.recreate-share-status.is-done { color: var(--gold-strong); }
+.recreate-share-status.is-error { color: #ff8a7a; }
+
 .recreate-privacy {
   margin: 0;
   color: var(--muted);

@@ -157,6 +157,7 @@ import {
 import SearchBox from "./SearchBox";
 import { ImageAttribution } from "./ImageAttribution";
 import { ThenNowWipe } from "./ThenNowWipe";
+import { VisitorShots, shareResultMessage, shareShot } from "./VisitorShots";
 import { wipeMode } from "../lib/then-now-wipe.mjs";
 import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
@@ -703,9 +704,13 @@ function makeImageSearchUrl(location) {
   return `https://www.bing.com/images/search?${new URLSearchParams({ q: query })}`;
 }
 
-function RecreateShot({ location, onClose }) {
+function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onShared }) {
   const inputRef = useRef(null);
   const photoUrlRef = useRef("");
+  const photoFileRef = useRef(null);
+  const [share, setShare] = useState({ status: "idle", message: "" });
+  // No reference means "Add your shot": a plain photo of the place, nothing to line up.
+  const hasReference = Boolean(location.backdrop);
   const [photoUrl, setPhotoUrl] = useState("");
   const [view, setView] = useState("overlay");
   const [opacity, setOpacity] = useState(55);
@@ -736,13 +741,44 @@ function RecreateShot({ location, onClose }) {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     const nextUrl = URL.createObjectURL(file);
     photoUrlRef.current = nextUrl;
+    photoFileRef.current = file;
     setPhotoUrl(nextUrl);
     setView("overlay");
+    setShare({ status: "idle", message: "" });
+  }
+
+  async function sharePhoto() {
+    if (!userId) {
+      onRequestSignIn?.();
+      return;
+    }
+    if (!photoFileRef.current || share.status === "sending") return;
+    setShare({ status: "sending", message: "Sharing…" });
+    try {
+      const shot = await shareShot({
+        file: photoFileRef.current,
+        userId,
+        placeKey: String(location.locationId),
+        placeName: location.place,
+        workKey: location.filmId ? String(location.filmId) : null,
+        kind: hasReference ? "recreation" : "photo",
+        // A visitor's shot is served by a signed URL that expires; it is not stored.
+        referenceUrl: hasReference
+          ? ("referenceUrl" in location ? location.referenceUrl : location.backdrop)
+          : null,
+      });
+      setShare({ status: shot?.status === "rejected" ? "error" : "done", message: shareResultMessage(shot) });
+      onShared?.(shot);
+    } catch (error) {
+      setShare({ status: "error", message: error?.message || "The shot could not be shared." });
+    }
   }
 
   function resetPhoto() {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     photoUrlRef.current = "";
+    photoFileRef.current = null;
+    setShare({ status: "idle", message: "" });
     setPhotoUrl("");
     setView("overlay");
     setOpacity(55);
@@ -759,7 +795,9 @@ function RecreateShot({ location, onClose }) {
       >
         <header className="recreate-header">
           <div>
-            <p className="eyebrow">Recreate the shot</p>
+            <p className="eyebrow">
+              {hasReference ? `Recreate ${location.referenceLabel ?? "the shot"}` : "Add your shot"}
+            </p>
             <h2 id="recreate-title">{location.scene}</h2>
             <span>{location.film} · {location.place}</span>
           </div>
@@ -777,13 +815,13 @@ function RecreateShot({ location, onClose }) {
         <div className="recreate-stage">
           {view === "overlay" ? (
             <div className="recreate-canvas">
-              <img src={location.backdrop} alt={`Reference frame for ${location.film}`} />
+              {hasReference && <img src={location.backdrop} alt={`Reference frame for ${location.film}`} />}
               {photoUrl && (
                 <img
-                  className="recreate-user-photo"
+                  className={hasReference ? "recreate-user-photo" : undefined}
                   src={photoUrl}
                   alt="Your uploaded recreation"
-                  style={{ opacity: opacity / 100 }}
+                  style={hasReference ? { opacity: opacity / 100 } : undefined}
                 />
               )}
             </div>
@@ -801,8 +839,12 @@ function RecreateShot({ location, onClose }) {
           )}
           {!photoUrl && (
             <div className="recreate-empty">
-              <strong>Match the framing</strong>
-              <span>Upload a photo from this device to line it up with the reference.</span>
+              <strong>{hasReference ? "Match the framing" : "Show how it looks today"}</strong>
+              <span>
+                {hasReference
+                  ? "Upload a photo from this device to line it up with the reference."
+                  : "Pick a photo you took here. You can share it with the place."}
+              </span>
             </div>
           )}
         </div>
@@ -822,6 +864,7 @@ function RecreateShot({ location, onClose }) {
 
           {photoUrl && (
             <>
+              {hasReference && (
               <div className="recreate-view-switch" aria-label="Comparison mode">
                 <button
                   aria-pressed={view === "overlay"}
@@ -840,8 +883,9 @@ function RecreateShot({ location, onClose }) {
                   Then / now
                 </button>
               </div>
+              )}
 
-              {view === "overlay" && (
+              {hasReference && view === "overlay" && (
                 <label className="recreate-opacity">
                   <span>Your photo opacity</span>
                   <input
@@ -862,7 +906,26 @@ function RecreateShot({ location, onClose }) {
             </>
           )}
 
-          <p className="recreate-privacy">Your photo stays in this browser tab and is never uploaded.</p>
+          {photoUrl && location.locationId && (
+            <div className="recreate-share">
+              <button
+                className="wide-button"
+                disabled={share.status === "sending" || share.status === "done"}
+                onClick={sharePhoto}
+                type="button"
+              >
+                {userId ? "Share to this place" : "Sign in to share"}
+              </button>
+              {share.message && (
+                <p className={`recreate-share-status is-${share.status}`} role="status">{share.message}</p>
+              )}
+            </div>
+          )}
+
+          <p className="recreate-privacy">
+            Your photo stays in this browser tab unless you share it. Shared photos are
+            re-saved without location data and checked before anyone else sees them.
+          </p>
         </div>
       </section>
     </div>
@@ -1153,6 +1216,7 @@ export default function SceneMapApp() {
   const [importMessage, setImportMessage] = useState("");
 
   const [recreateLocation, setRecreateLocation] = useState(null);
+  const [shotsVersion, setShotsVersion] = useState(0);
 
   useEffect(() => {
     localStorage.setItem(libraryStorageKey, JSON.stringify(library));
@@ -4551,6 +4615,20 @@ export default function SceneMapApp() {
               <Clapperboard size={18} />
               Recreate this shot
             </button>
+            <VisitorShots
+              // Shots belong to the place, not the film, so the key is the place's own
+              // id. A pin with no stable id (a map point, an article) has no shots.
+              placeKey={activeLocation.locationId ? String(activeLocation.locationId) : null}
+              signedIn={Boolean(accountUser)}
+              refreshKey={shotsVersion}
+              onAdd={() => setRecreateLocation({ ...activeLocation, backdrop: null })}
+              onRecreate={(shot) => setRecreateLocation({
+                ...activeLocation,
+                backdrop: shot.url,
+                referenceUrl: null,
+                referenceLabel: "a visitor's shot",
+              })}
+            />
             {activeLocation.sourceUrl && (
               <a className="source-link" href={activeLocation.sourceUrl} target="_blank" rel="noopener noreferrer">
                 {activeLocation.sourceTitle ?? (activeLocation.evidenceSource === "web_search" ? "Research source" : "Wikidata source")}
@@ -4795,7 +4873,13 @@ export default function SceneMapApp() {
       )}
 
       {recreateLocation && (
-        <RecreateShot location={recreateLocation} onClose={() => setRecreateLocation(null)} />
+        <RecreateShot
+          location={recreateLocation}
+          onClose={() => setRecreateLocation(null)}
+          userId={accountUser?.id ?? null}
+          onRequestSignIn={() => { setRecreateLocation(null); setAccountOpen(true); }}
+          onShared={() => setShotsVersion((value) => value + 1)}
+        />
       )}
 
       {profileFilm && (

@@ -16,6 +16,20 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] decision | Visitors' shots on a place, and "recreate" any shot (#157)
+**Object**: `place_shots` table + private `place-shots` bucket (migration `20261103100000`, **not applied**), `app/api/shots/route.js`, `app/lib/place-shots.mjs`, `app/lib/shot-moderation.mjs`, `app/components/VisitorShots.jsx`, the recreate dialog.
+**Scenario**: imagery / community
+**Outcome**: 🟡 built and tested offline + Playwright with mocked API; waiting on the owner's yes to apply the migration
+**What happened**: Nikita asked (2026-11-03) that readers can add their own shots to a place, and recreate either the film frame or somebody else's shot. The card now has a "Visitors' shots" strip; each shot has "Recreate", and "Add your shot" opens the same dialog without a reference. Sharing needs sign-in.
+
+Decisions worth keeping:
+- A shot belongs to the **place** (`loc_wikidata_id`), not the film. A pin with no stable id has no shots.
+- Upload goes browser → private bucket under `<uid>/`, then `POST /api/shots` records it under the reader's token (RLS) as `pending`. The browser re-encodes through a canvas, which strips EXIF/GPS. Approved shots are served through 1-hour signed URLs.
+- No manual moderation (owner, 2026-10-13): Claude Haiku looks at the **image only**. approve → public, reject → row rejected and the file deleted, unsure/failed/over the limit → stays pending, visible to its author ("held back for a closer look"). Place and work names stay out of the prompt, because the browser supplies them and they could carry instructions.
+- Spend guard: 200 checks per UTC day across all users (`SHOT_MODERATION_DAILY_LIMIT`), 20 shares per account per day.
+- Not built: re-checking pending shots later, and a "delete my shot" button (the storage policy already allows it).
+**Updated**: `wiki/log.md`, `.env.example`.
+
 ## [2026-11-03] decision | Then/now wipe on the place card (#57)
 **Object**: `app/components/ThenNowWipe.jsx`, `app/lib/then-now-wipe.mjs`, place card in `SceneMapApp.jsx`.
 **Scenario**: imagery

@@ -33,6 +33,7 @@ The working rules are in `TEAMWORK.md`. Update the board yourself after `/ship`.
 
 ## Done
 
+- [x] Visitors' shots on a place + "Recreate" any shot, AI-checked (migration waits for the owner's yes) — @Claude — `claude/project-thread-li0oep`
 - [x] #57: then/now wipe on the place card (drag, touch, keyboard; falls back to the pair when there is one image) — @Claude — `claude/project-thread-li0oep`
 - [x] Refresh locations for the visible map area after user drag — @Codex — `feature/map-viewport-refresh` / PR #35
 - [x] Letterboxd ZIP import with automatic personal-library map filtering — @walklikeaman — `codex/interactive`
