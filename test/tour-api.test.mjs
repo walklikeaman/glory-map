@@ -67,6 +67,17 @@ test("the request goes out as a schema-constrained chat completion", async () =>
   assert.match(calls.body.messages[1].content, /Portobello Road Market/);
 });
 
+test("a tour can be written in another language, and an unknown one is English (#67)", async () => {
+  const { handler, calls } = handlerWith();
+  const french = await (await handler(tourRequest({ city: "Paris", language: "fr-FR", locations: LOCATIONS }))).json();
+  assert.equal(french.language, "fr");
+  assert.match(calls.body.messages[0].content, /in French\. Keep place names/);
+
+  const unknown = await (await handler(tourRequest({ city: "Paris", language: "klingon", locations: LOCATIONS }))).json();
+  assert.equal(unknown.language, "en");
+  assert.match(calls.body.messages[0].content, /in English\./);
+});
+
 // --- refusing, and saying why -------------------------------------------------------------
 
 test("no model key configured is a 503 that names the capability, not a vendor", async () => {

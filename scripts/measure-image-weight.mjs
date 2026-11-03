@@ -36,7 +36,7 @@ const ORIGIN = args.includes("--origin")
 
 // Contactable, because that is what Wikimedia asks of anything fetching originals — and
 // this script is the only thing here that still does.
-const UA = "GloryMap/1.0 (image weight measurement; https://github.com/walklikeaman/codex-hackathon-starter)";
+const UA = "GloryMap/1.0 (image weight measurement; https://github.com/walklikeaman/glory-map)";
 
 // Real files, not synthetic ones: a 2:3 poster and a 16:9 frame compress differently and
 // the difference is the whole point of keeping two tables.

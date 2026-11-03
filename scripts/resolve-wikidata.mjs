@@ -37,7 +37,7 @@ const GAP_MS = Number.parseInt(arg("gap", "2500"), 10) || 2500;
 const SOURCE_KIND = String(arg("source", "moviemaps"));
 
 const ENDPOINT = "https://query.wikidata.org/sparql";
-const AGENT = "GloryMapBot/0.1 (+https://github.com/walklikeaman/codex-hackathon-starter; contact via repo issues)";
+const AGENT = "GloryMapBot/0.1 (+https://github.com/walklikeaman/glory-map; contact via repo issues)";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function askWikidata(lat, lng, attempt = 0) {

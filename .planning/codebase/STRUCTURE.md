@@ -5,7 +5,7 @@
 ## Directory Layout
 
 ```text
-codex-hackathon-starter/
+glory-map/
 ├── app/                    # Executable Next.js App Router surface
 │   ├── layout.jsx          # Root metadata and HTML/body shell
 │   └── page.jsx            # Server-rendered `/` readiness page

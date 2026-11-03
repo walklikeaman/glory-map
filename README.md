@@ -198,8 +198,8 @@ For every meaningful slice, Codex generated or extended Node tests, ran the comp
 ### Setup
 
 ```bash
-git clone https://github.com/walklikeaman/codex-hackathon-starter.git
-cd codex-hackathon-starter
+git clone https://github.com/walklikeaman/glory-map.git
+cd glory-map
 npm ci
 cp .env.example .env.local
 npm run dev

@@ -65,7 +65,10 @@ export function matchOne(movie, index) {
 
   const title = normalizeWorkTitle(movie.title ?? "");
   if (!title) return null;
-  const candidates = index.byTitle.get(title);
+  // A book matches books and a film matches everything else: "Dune" the novel is not "Dune"
+  // the film, and with a year missing on one side nothing else would tell them apart.
+  const wantsBook = movie.kind === "book";
+  const candidates = index.byTitle.get(title)?.filter((entry) => (entry.kind === "book") === wantsBook);
   if (!candidates || candidates.length === 0) return null;
 
   const wanted = year(movie.year);
@@ -110,9 +113,17 @@ export function matchLibrary(library, catalogue) {
 // The sentence under the import button. It has to name BOTH numbers, because they answer
 // two different questions and the old message answered only the second — which is how
 // "0 mapped titles" came to mean "none of your films is on the screen right now".
-export function libraryImportSummary({ imported, works, places, cityName, inCity }) {
-  const held = `${imported} films imported · we hold ${works} of them`;
+export function libraryImportSummary({ imported, works, places, cityName, inCity, noun = "films" }) {
+  const held = `${imported} ${noun} imported · we hold ${works} of them`;
   const withPlaces = works > 0 ? `, with ${places} place${places === 1 ? "" : "s"} between them` : "";
   const here = cityName ? ` · ${inCity} on the map in ${cityName}` : "";
   return `${held}${withPlaces}.${here}`;
+}
+
+// What to call a library in a sentence: films, books, or titles when it holds both.
+export function libraryNoun(library) {
+  const rows = Array.isArray(library) ? library : [];
+  const books = rows.filter((row) => row?.kind === "book").length;
+  if (books === 0) return "films";
+  return books === rows.length ? "books" : "titles";
 }

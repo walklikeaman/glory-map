@@ -1,16 +1,97 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+Format: `## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
+**Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
+**Scenario**: tooling
+**Outcome**: ✅ success
+**What happened**: `CLAUDE.md` imports `AGENTS.md` and adds commands, a code map and the cloud-session differences. A SessionStart hook (cloud only) runs `npm ci` and seeds `.env.local` from `.env.example`. Verified in a fresh container: hook from scratch, then `npm test` 1830/1830 and `npm run build` green.
+
+Gotcha worth keeping: the default cloud network reaches only package registries. Supabase, Wikidata, Wikipedia, TMDB and OpenAI are refused by the proxy, so `/api/map/works` returns 502 there while the page itself serves 200. The fix is the environment's network allowlist, not code.
+**Updated**: `CLAUDE.md`, `.claude/`.
+
+## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
 
 Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-13] update | Mobile design review at 360–430 px
+**Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
+**Scenario**: design review (phone)
+**Outcome**: ✅ success
+**What happened**: drove every phone screen in Playwright at 360, 390 and 430 px and fixed what was broken. The film strip is one sideways row of equal 112 px cards with a two-line title. The "+" beside each place no longer hangs out of the panel (its 34 px column now grows to the 44 px touch size). The "Locations" header lost the border it borrowed from the sections. "My location" got back its background. Opening a place puts the panel away, and pulling the panel up hides the place card until it goes down again, so two bottom sheets never stack. The section bar's active pill sits inside the bar. Empty Routes and Collection offer "Find places on the map". Radios are gold.
+
+Gotcha worth keeping: `.section-row` was two different things. The panel's header row (flex, space-between) and the sections' bordered list row (#22) shared the class, so the later rule boxed the "Locations" header. The list row is now `.section-list > .section-row`. Pick a new class name before reusing one in `globals.css`; it is 5k lines and one cascade.
+**Updated**: `wiki/log.md`.
+
+## [2026-10-13] update | The voice guide takes the tone of the work's genre
+**Object**: `app/lib/voice-guide.mjs`, `app/api/genres/route.js`, `VoiceGuide.jsx`.
+**Scenario**: feature (#68)
+**Outcome**: ✅ success
+**What happened**: five genre tones join the two narrators: Noir detective, Suspense, Epic storyteller, Light and playful, Tender. Each has its own voice and instructions for manner, emotion and pace. The narrator select now opens on "Match the work", which asks `/api/genres` for the work's TMDB genres and picks a tone. Any named narrator overrides it, and "Warm guide" switches the tones off.
+
+Decisions worth keeping: **the order is the tactful part.** Crime and mystery come before comedy, and horror gets suspense rather than a scream. **Drama, documentary and history match nothing** and keep the warm guide, because a documentary narrated "epically" tells the story wrong. **Genres are not stored**: there is no column, and a tone must not need a migration. The route caches TMDB's answer for a week at the edge, and any failure is "no genre", never an error. Every genre tone says it is original and imitates no actor. The TMDB credential dance moved from `/api/artwork` to `app/lib/tmdb-request.mjs` so both routes share it.
+**Updated**: `app/api/artwork/route.js`, `app/lib/tmdb-request.mjs`, `test/genre-voice.test.mjs`, `test/voice-guide.test.mjs`.
+
+## [2026-10-13] update | The tour guide writes and speaks in 57 languages
+**Object**: `app/lib/guide-language.mjs`, `/api/tour`, `/api/narration`, the "Tour by time and place" card.
+**Scenario**: feature (#67)
+**Outcome**: ✅ success
+**What happened**: a "Guide language" select on the timed-tour card. It defaults to the browser's first language we support, and a choice is kept in localStorage. `/api/tour` takes `language` and tells the model to write the title, intro and stops in it. `/api/narration` takes `language` and adds "Speak in X" to the narrator's instructions. A non-English guide that fails is asked for once more in English before the scripted guide, and the card says so.
+
+Decisions worth keeping: **place names, street names and titles stay as the data spells them**, because a translated street name is one nobody on the street will recognise. **English clips keep their old cache keys**, because the language joins the TTS key only when it is not English. **Only the tour's own story is spoken in the tour's language**: the spoiler-free line and place descriptions are our English data, so they are spoken in English.
+**Updated**: `app/api/tour/route.js`, `app/api/narration/route.js`, `app/lib/{tour-schema,timed-tour,voice-guide,tts-cache}.mjs`, `app/components/{SceneMapApp,VoiceGuide}.jsx`, `app/globals.css`, tests.
+
+## [2026-10-13] update | The walk opens in Google Maps and leaves as GPX
+**Object**: `app/lib/route-export.mjs`, the route card.
+**Scenario**: feature (#191, item 2)
+**Outcome**: ✅ success
+**What happened**: under the route card, once there are two stops: "Open in Google Maps" (walking directions, stops in route order as origin, waypoints, destination) and "GPX" (numbered waypoints plus the drawn track, for Komoot, OsmAnd, Organic Maps). Both read only what is already on screen, so they work on a restored offline walk too.
+
+Gotcha worth keeping: **Google's directions URL takes at most 9 waypoints** (11 stops in all). Past that the link is not offered rather than silently dropping stops; GPX has no limit. The route itself is capped at 5 stops today, so this only matters if that cap moves.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/route-export.test.mjs`.
+
+## [2026-10-13] update | The story trail gets a timeline
+**Object**: `app/lib/trail-scrubber.mjs`, the trail controls over the map.
+**Scenario**: feature (#75)
+**Outcome**: ✅ success
+**What happened**: a slider under the trail's order switch runs through its stops in story order. Moving it (by drag, arrow keys or touch) centres the map on that scene's place, marks that stop, and the caption reads "3 of 4 · scene 3 · Westbourne Park Road" plus the graph's sentence for the place.
+
+Decision worth keeping: **the slider cannot pass the reader's progress, and no code enforces it.** An unreached scene comes from `/api/scenes` with no place and no coordinates, so it never becomes a stop and never reaches the slider. A second check would only be something to keep in sync. Still open in #75: the scene's frame and audio moment, which need a verified frame (#107) and narration.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-scrubber.test.mjs`.
+
+## [2026-10-13] update | A story trail can be shared as a link, and taken away as GeoJSON
+**Object**: `app/lib/trail-share.mjs`, the trail controls over the map.
+**Scenario**: feature (#77)
+**Outcome**: ✅ success
+**What happened**: two buttons under the trail's order switch. "Share trail" uses the phone's share sheet or copies the link. The link is the page's own address (it already names the work and the map) plus `trail=walk` when walking order is on, and a link opened with it starts in that order. "GeoJSON" downloads the stops in story order with the dashed story line, for Google My Maps, uMap or a GPS app.
+
+Decision worth keeping: **the spoiler switch is never in the link.** The sender may be looking at the whole plot; the person who opens it starts spoiler-safe and decides. The file holds what the sender's screen holds. An OG preview image for a trail is still open in #77.
+**Updated**: `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/trail-share.test.mjs`.
+
+## [2026-10-13] update | Sign in by email link, and a way in on phones
+**Object**: `app/lib/email-sign-in.mjs`, the account panel, Profile.
+**Scenario**: feature (#108)
+**Outcome**: ✅ success
+**What happened**: the account panel takes an email address under the Google and Facebook buttons and Supabase sends a sign-in link (`signInWithOtp`, redirect back to the page's origin). No OAuth client is needed for it. Profile has a neutral "Sign in" button that opens the same panel.
+
+Gotcha worth keeping: on phones the header has no account button at all, so before this there was **no way to sign in on a phone**. Production needs the Email provider on in Supabase Auth (on by default) and the site origin in its redirect allow-list, which Google sign-in already relies on. Apple stays open in #108 (it needs a paid developer account).
+**Updated**: `app/components/SceneMapApp.jsx`, `app/components/AppSections.jsx`, `app/globals.css`, `test/email-sign-in.test.mjs`.
+
+## [2026-10-13] update | Goodreads joins the library, and books are matched only against books
+**Object**: `app/lib/media-sources.mjs`, `app/lib/media-library.mjs`, `app/lib/library-match.mjs`, `app/lib/cloud-library.mjs`.
+**Scenario**: feature (#92, connector slice)
+**Outcome**: ✅ success
+**What happened**: a third card in "My library" takes the Goodreads "Export Library" CSV, processed in the browser like the other two. Rows on the `to-read` shelf are skipped (the library is what you have read). The year is "Original Publication Year", not the edition. "My Rating" 0 means unrated and stays null. The series suffix Goodreads appends, "(Harry Potter, #1)", is dropped so the title meets the catalogue's.
+
+Gotcha worth keeping: a library row now carries `kind: "book"` when it is a book, and every matcher (`matchOne`, `libraryEntryFor`, the merge key) keeps books and everything else apart. Without that, "Dune" the novel lit up "Dune" the film whenever one side had no year. Rows with no `kind` are films, which is every library saved before this. Trakt and Last.fm need API keys, Kinopoisk has no export, so they stay open in #92.
+**Updated**: the files above, `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/goodreads-import.test.mjs`.
+
 ## [2026-10-12] decision | "Add a place" goes to review for signed-in readers, hidden until checked
 **Object**: `reader_place_suggestions` (migration `20261012000000_suggestions_from_signed_in_readers.sql`), `app/lib/suggestions.mjs`, the Add view.
 **Scenario**: feature
-**Outcome**: ⚠️ code ready; the migration still has to be applied to production
+**Outcome**: ✅ success; the migration was applied to production on 2026-10-13
 **What happened**: The owner chose: sign-in required, nothing public until verified. A signed-in reader's suggestion is inserted from the browser under their own token into `reader_place_suggestions`, which is its own table on purpose: `location_submissions` is read by the map, the work card, the directory and title search with `status <> 'rejected'`, so a pending row there would be public within minutes. RLS: insert only as yourself and only `pending`; select only your own; no update/delete; anon has no grants. A trigger caps 20 per reader per 24 h. Without an account a suggestion stays on the device, and the Add view says to sign in. Checked against Postgres 16 with stubbed `auth.uid()`: cross-user insert, self-verify, anon read/write, update/delete all refused; the 21st row in a day is refused.
 
 Still open: the review step (promote a verified row into `location_submissions` and set `submission_id`) runs under the service role and has no UI yet.

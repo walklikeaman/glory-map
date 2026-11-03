@@ -10,12 +10,12 @@
 
 > **Where we're going and why.** This is the roadmap — themed milestones over
 > time. The concrete, pick-up-able tasks live as
-> [GitHub issues](https://github.com/walklikeaman/codex-hackathon-starter/issues),
-> grouped into [Milestones](https://github.com/walklikeaman/codex-hackathon-starter/milestones).
+> [GitHub issues](https://github.com/walklikeaman/glory-map/issues),
+> grouped into [Milestones](https://github.com/walklikeaman/glory-map/milestones).
 
 **Roadmap** = the themes and the order (this file).
 **Backlog** = the prioritized list of concrete issues, ready to take
-([open issues](https://github.com/walklikeaman/codex-hackathon-starter/issues?q=is%3Aissue+is%3Aopen)).
+([open issues](https://github.com/walklikeaman/glory-map/issues?q=is%3Aissue+is%3Aopen)).
 Everything is **ranked by importance** in [`PRIORITIES.md`](PRIORITIES.md) — start there.
 
 ## How we work the board
@@ -34,7 +34,7 @@ Everything is **ranked by importance** in [`PRIORITIES.md`](PRIORITIES.md) — s
 Live map · Letterboxd/IMDb import · vision-verified film stills · then/now
 imagery · recreate-the-shot · OSRM walking routes · timed tours (30/60/120) ·
 AI voice guide · "what's nearby" · Google sign-in + cloud libraries.
-See [Releases](https://github.com/walklikeaman/codex-hackathon-starter/releases).
+See [Releases](https://github.com/walklikeaman/glory-map/releases).
 
 ---
 
@@ -63,7 +63,7 @@ phases are the features; Phase F is the engine underneath.
 ## 🎯 Phase 1 · Precision & Trust
 **Goal:** make every pin trustworthy — city, street, or exact building, with its
 source shown. Accuracy is the foundation everything else stands on.
-**Milestone:** [Phase 1](https://github.com/walklikeaman/codex-hackathon-starter/milestone/1) · 6 issues
+**Milestone:** [Phase 1](https://github.com/walklikeaman/glory-map/milestone/1) · 6 issues
 
 - Precision badge (city/street/building + source) · OSM building-footprint snap
 - Dedup one place shared by many works · Wikipedia-prose AI enrichment (spike)
@@ -75,7 +75,7 @@ and unlocks better routes and trips.
 ## 📸 Phase 2 · Recreate the Shot 2.0
 **Goal:** turn our signature feature into the best-in-class, web-first "stand
 where the camera stood" experience.
-**Milestone:** [Phase 2](https://github.com/walklikeaman/codex-hackathon-starter/milestone/2) · 6 issues
+**Milestone:** [Phase 2](https://github.com/walklikeaman/glory-map/milestone/2) · 6 issues
 
 - Live-camera ghost overlay (ShotSync) · Edge-ghost contour alignment
 - Compass navigator to the exact spot · AI alignment coach (vision + voice)
@@ -87,7 +87,7 @@ browser, and the share cards drive organic growth.
 ## 🖼️ Phase 3 · Living Imagery
 **Goal:** fresh, legally-clean photography for every place — no Street View
 lock-in, community-fed, correctly attributed.
-**Milestone:** [Phase 3](https://github.com/walklikeaman/codex-hackathon-starter/milestone/3) · 7 issues
+**Milestone:** [Phase 3](https://github.com/walklikeaman/glory-map/milestone/3) · 7 issues
 
 - Source cascade Mapillary → Wikimedia → Street View · Before/after slider
 - Community uploads with auto-moderation · Vision auto-attach uploads
@@ -99,11 +99,11 @@ sources make before/after composites and sharing legal at scale.
 ## 🎧 Phase 4 · AI Guide on the Move
 **Goal:** narration that unlocks on location and follows you as you walk — in
 your language, grounded in sources.
-**Milestone:** [Phase 4](https://github.com/walklikeaman/codex-hackathon-starter/milestone/4) · 8 issues
+**Milestone:** [Phase 4](https://github.com/walklikeaman/glory-map/milestone/4) · 8 issues
 
 - Scene-nearby GPS-triggered narration · Walk mode (Wake Lock) — *both built*
 - **Ambient narration: triggers on what you walk past, not a route you built**
-  ([#190](https://github.com/walklikeaman/codex-hackathon-starter/issues/190))
+  ([#190](https://github.com/walklikeaman/glory-map/issues/190))
 - Streaming narration · TTS cache · Multilingual · Genre-styled voice
 - Fact-checked & sourced narration · Offline tour download
 
@@ -113,7 +113,7 @@ your language, grounded in sources.
 ## 🔌 Phase 6 · Let other software use this
 **Goal:** an outside planner, an agent, or the traveller's own maps app can act on
 what we hold — without our sources' terms being breached in our name.
-**Issue:** [#191](https://github.com/walklikeaman/codex-hackathon-starter/issues/191)
+**Issue:** [#191](https://github.com/walklikeaman/glory-map/issues/191)
 
 - Licence review per source *(first, and everything is contingent on it)*
 - "Open in Google Maps" + KML/GPX export · MCP server over the existing routes
@@ -127,7 +127,7 @@ showing them with a link.
 ## 📖 Phase 5 · Story Trails
 **Goal:** follow a film or book by its **plot** — walk the story as it unfolds,
 spoiler-safe. The most differentiated thing we can build.
-**Milestone:** [Phase 5](https://github.com/walklikeaman/codex-hackathon-starter/milestone/5) · 7 issues
+**Milestone:** [Phase 5](https://github.com/walklikeaman/glory-map/milestone/5) · 7 issues
 
 - Story-trail mode (numbered narrative path) · Spoiler shield
 - Story-order ↔ walking-order toggle · Auto city-chapters
@@ -139,7 +139,7 @@ library — and it unifies our films **and** books in one sequence.
 ## 🧭 Phase 0 · Product Polish *(parallel track)*
 **Goal:** turn the demo into a product people keep — onboarding, a real profile,
 check-ins and achievements.
-**Milestone:** [Phase 0](https://github.com/walklikeaman/codex-hackathon-starter/milestone/6) · 4 issues
+**Milestone:** [Phase 0](https://github.com/walklikeaman/glory-map/milestone/6) · 4 issues
 
 - Onboarding + interest selection · Interactive place card
 - Bottom nav + profile · Check-in, progress, first achievement

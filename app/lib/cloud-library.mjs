@@ -37,6 +37,8 @@ export function normalizeCloudLibrary(value) {
       url: optionalString(movie.url, 2000),
       imdbId: /^tt\d+$/.test(movie.imdbId || "") ? movie.imdbId : null,
       sources,
+      // Without it a synced book would come back as a film and be matched against films.
+      ...(movie.kind === "book" ? { kind: "book" } : {}),
     }];
   });
 }

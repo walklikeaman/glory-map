@@ -36,6 +36,18 @@ export const MEDIA_SOURCES = Object.freeze({
     archive: false,
     logoText: "IMDb",
   }),
+  goodreads: Object.freeze({
+    label: "Goodreads",
+    // Whole stars, 1 to 5; 0 in the export means read and not rated.
+    scale: 5,
+    blurb: "Library export CSV, the books you have read",
+    accept: ".csv,text/csv",
+    archive: false,
+    logoText: "g",
+    // The only service here that lists books. Its rows are stamped as books so they are
+    // matched against books, never against a film that happens to share the title.
+    kind: "book",
+  }),
 });
 
 export const MEDIA_SOURCE_IDS = Object.freeze(Object.keys(MEDIA_SOURCES));
@@ -50,6 +62,10 @@ export function mediaSource(source) {
 
 export function mediaSourceLabel(source) {
   return mediaSource(source)?.label ?? null;
+}
+
+export function mediaSourceKind(source) {
+  return mediaSource(source)?.kind ?? null;
 }
 
 export function mediaSourceScale(source) {

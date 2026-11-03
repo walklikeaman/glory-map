@@ -29,7 +29,7 @@ test("uses a generic verified-location recap in spoiler-free mode", () => {
 });
 
 test("offers high-quality OpenAI voices without actor imitation", () => {
-  assert.deepEqual(Object.keys(NARRATOR_PROFILES), ["neutral", "archivist"]);
+  assert.deepEqual(Object.keys(NARRATOR_PROFILES), ["neutral", "archivist", "noir", "suspense", "epic", "light", "tender"]);
   assert.equal(NARRATOR_PROFILES.neutral.label, "Warm guide");
   assert.equal(NARRATOR_PROFILES.neutral.voice, "marin");
   assert.equal(NARRATOR_PROFILES.archivist.label, "Curious archivist");

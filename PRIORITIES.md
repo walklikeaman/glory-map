@@ -10,7 +10,7 @@
 > This is a **ranking, not a flat list.** It orders every open issue by real
 > importance: what unblocks the most, what's a genuine bug, what's polish. The
 > star tier is also on every issue as a label chip (`P1 ★★★` / `P2 ★★` / `P3 ★`),
-> so you see the rating in the [issue list](https://github.com/walklikeaman/codex-hackathon-starter/issues) too.
+> so you see the rating in the [issue list](https://github.com/walklikeaman/glory-map/issues) too.
 
 **How to read it**
 
@@ -33,7 +33,7 @@ the true "now" is the backbone, not the features on top of it.
 This is the critical path. Nothing downstream is trustworthy until it exists.
 
 1. ~~**#91 · Step 0**~~ ✅ **DONE** — `content_graph` + `grounding.mjs` applied
-   ([PR #89](https://github.com/walklikeaman/codex-hackathon-starter/pull/89) is
+   ([PR #89](https://github.com/walklikeaman/glory-map/pull/89) is
    ready). *Why first: it's the schema + the "never invent a place" invariant every
    other issue relies on. Blocks all of Phase F.*
 2. **★★★★★ #92 · Step 1** — 🟡 **PARTIAL**: Letterboxd RSS core, import route and

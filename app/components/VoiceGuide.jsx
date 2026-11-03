@@ -2,15 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Pause, Play, Square, Volume2 } from "lucide-react";
-import { NARRATOR_PROFILES, narrationText } from "../lib/voice-guide.mjs";
+import { NARRATOR_PROFILES, narrationText, resolveNarrator } from "../lib/voice-guide.mjs";
 
-export default function VoiceGuide({ location, story }) {
+// Genres by work, for the visit: the tone of a film does not change while it is open.
+const genresByWork = new Map();
+
+export default function VoiceGuide({ location, story, storyLanguage }) {
   const audioRef = useRef(null);
   const audioUrlRef = useRef("");
   const abortRef = useRef(null);
   const requestIdRef = useRef(0);
   const [supported, setSupported] = useState(null);
-  const [profileId, setProfileId] = useState("neutral");
+  // "auto" follows the work's genre (#68); any named profile overrides it, and the warm
+  // guide is how somebody switches the genre tones off.
+  const [profileId, setProfileId] = useState("auto");
+  const [genres, setGenres] = useState([]);
+  const narratorId = resolveNarrator(profileId, genres);
+  const workKind = location?.kind ?? "film";
+  const workTmdbId = location?.filmTmdbId ?? null;
   const [spoilerFree, setSpoilerFree] = useState(true);
   const [speechState, setSpeechState] = useState("idle");
   const [message, setMessage] = useState("");
@@ -18,6 +27,10 @@ export default function VoiceGuide({ location, story }) {
     () => narrationText({ location, story, spoilerFree }),
     [location, spoilerFree, story],
   );
+  // Only the tour's own story is in the tour's language; the spoiler-free line and the
+  // place description are our English data, and an English text read "in French" is
+  // English with an accent.
+  const language = story?.trim() && text === story.trim() ? storyLanguage ?? "en" : "en";
 
   function releaseAudio() {
     const audio = audioRef.current;
@@ -61,7 +74,31 @@ export default function VoiceGuide({ location, story }) {
     cancelCurrentRequest();
     setSpeechState("idle");
     setMessage("");
-  }, [location?.id, profileId, spoilerFree, story]);
+  }, [location?.id, narratorId, spoilerFree, story]);
+
+  useEffect(() => {
+    if (!workTmdbId || !["film", "series"].includes(workKind)) {
+      setGenres([]);
+      return undefined;
+    }
+    const key = `${workKind}:${workTmdbId}`;
+    if (genresByWork.has(key)) {
+      setGenres(genresByWork.get(key));
+      return undefined;
+    }
+    setGenres([]);
+    let current = true;
+    fetch(`/api/genres?kind=${encodeURIComponent(workKind)}&id=${encodeURIComponent(workTmdbId)}`)
+      .then((response) => (response.ok ? response.json() : { genres: [] }))
+      .then((payload) => {
+        const found = Array.isArray(payload?.genres) ? payload.genres : [];
+        genresByWork.set(key, found);
+        if (current) setGenres(found);
+      })
+      // No genre is the warm guide, which is a fine way to hear a place.
+      .catch(() => {});
+    return () => { current = false; };
+  }, [workKind, workTmdbId]);
 
   async function play() {
     if (!supported || !text) return;
@@ -77,7 +114,7 @@ export default function VoiceGuide({ location, story }) {
       const response = await fetch("/api/narration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, profileId }),
+        body: JSON.stringify({ text, profileId: narratorId, language }),
         signal: controller.signal,
       });
 
@@ -175,6 +212,7 @@ export default function VoiceGuide({ location, story }) {
       <label className="narrator-select">
         <span>Narrator</span>
         <select value={profileId} onChange={(event) => setProfileId(event.target.value)}>
+          <option value="auto">Match the work · {NARRATOR_PROFILES[resolveNarrator("auto", genres)].label}</option>
           {Object.entries(NARRATOR_PROFILES).map(([id, profile]) => (
             <option key={id} value={id}>{profile.label}</option>
           ))}
@@ -194,7 +232,7 @@ export default function VoiceGuide({ location, story }) {
         </button>
       </div>
       <p className="voice-status" aria-live="polite">
-        {message || (speechState === "playing" ? `Playing as ${NARRATOR_PROFILES[profileId].label.toLowerCase()}.` : "Ready to stream an AI-generated original recap.")}
+        {message || (speechState === "playing" ? `Playing as ${NARRATOR_PROFILES[narratorId].label.toLowerCase()}.` : "Ready to stream an AI-generated original recap.")}
       </p>
     </section>
   );

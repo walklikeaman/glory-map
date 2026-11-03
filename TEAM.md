@@ -5,7 +5,7 @@ each of you just needs to install a couple of things and paste one prompt into t
 
 ## What's already done (don't touch it)
 
-- **Shared repository:** https://github.com/walklikeaman/codex-hackathon-starter
+- **Shared repository:** https://github.com/walklikeaman/glory-map
 - **Supabase** (database + auth) — the team's shared project, up and running.
 - **Vercel** — linked to the repository: any branch push auto-deploys to the web.
   The live app is already up: https://codex-hackathon-starter.vercel.app
@@ -21,7 +21,7 @@ each of you just needs to install a couple of things and paste one prompt into t
 ```
 You are my environment-setup agent. Do everything autonomously and report back at the end.
 
-1. Clone the repository https://github.com/walklikeaman/codex-hackathon-starter.git and cd into its folder.
+1. Clone the repository https://github.com/walklikeaman/glory-map.git and cd into its folder.
 2. Run ./setup.sh — it installs CodeGraph, connects it to Codex, and drops the skills (/ship, /loop-*, /autopilot, /pitch, /ui-polish, /schema) into ~/.codex/prompts.
 3. Run ./scaffold.sh — it installs the app's dependencies and creates .env.local with the shared Supabase keys.
 4. Run npm run dev — the app comes up at http://localhost:3000.
@@ -32,7 +32,7 @@ After CodeGraph is connected, remind me to restart Codex.
 ```
 
 Full guide (install + all commands + ideas + glossary): **[GUIDE.md](GUIDE.md)**
-Onboarding page with screenshots: **https://walklikeaman.github.io/codex-hackathon-starter/**
+Onboarding page with screenshots: **https://walklikeaman.github.io/glory-map/**
 
 ## How we work together
 
