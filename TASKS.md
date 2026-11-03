@@ -20,12 +20,38 @@ The working rules are in `TEAMWORK.md`. Update the board yourself after `/ship`.
 
 <tables, fields, the shape of the API response — agree before splitting up work>
 
-## To do (slicing the demo path into slices)
+## To do: the queue the daily feature routine works from (top first)
 
-- [ ] <slice 1> — @— — `feature/—`
-- [ ] <slice 2> — @— — `feature/—`
-- [ ] <slice 3> — @— — `feature/—`
-- [ ] <slice 4> — @— — `feature/—`
+Updated 2026-11-03 after the UX audit ([docs/ux-audit-2026-11-03.md](docs/ux-audit-2026-11-03.md)).
+Take the first unchecked line that has no open PR. One line = one PR, checked on
+1440 px and 390 px with Playwright, screenshots in the PR.
+
+**UX pass (P1), before any new feature:**
+- [ ] UX-1 Pin soup: real clustering below zoom ~14, unchecked pins as small dots or off by default
+- [ ] UX-2 Left panel / phone sheet: 12 blocks → Search, Results (Works / Places), Plan; filters behind one chip; legal text to Profile
+- [ ] UX-3 Phone: search field floating on the map; "Listen as I walk" off the top of the map
+- [ ] UX-4 One home for routes: stop list, build route and timed tour all in the Routes section
+- [ ] UX-5 Copy pass: no engineering words ("candidates", "unchecked", "gazetteer", raw coordinates)
+
+**UX pass (P2):**
+- [ ] UX-6 Place card: no empty hero, Recreate disabled without a frame, one Play/Pause, one "Open in maps" menu
+- [ ] UX-7 Work page: poster + mini-map on top, first 10 places then "Show all"
+- [ ] UX-8 City page: posters, small map, "Walk London" call to action
+- [ ] UX-9 Onboarding: 2 screens, Skip as a top link
+- [ ] UX-10 Desktop: section rail on the screen edge, sections replace the left panel
+- [ ] UX-11 Works without a poster: kind icon on a neutral tile
+
+**Features, after the UX pass (order from PRIORITIES.md):**
+- [ ] #57 + #157 then/now wipe and visitors' shots (PR #340; prod migration waits for Nikita)
+- [ ] #48 AI pre-moderation of suggestions (PR #327)
+- [ ] #97 story trail: the numbered polyline on the map
+- [ ] #96 / #190 ambient audio that reads place_class
+- [ ] #92 connectors: Trakt, Kinopoisk, Open Library, Last.fm
+- [ ] #95 growth: budgeted web search + GeoCLIP grounding
+- [ ] #47 Wikipedia-prose enrichment (spike)
+- [ ] Recreate 2.0: #51 edge-ghost, #52 compass, #53 AI coach, #54 share diptych
+- [ ] #114 rest: tablet, landscape, ≤360 px, PWA install
+- [ ] #65 streaming narration, #70 offline tours
 
 ## QA findings (routine check, 2026-11-03)
 
@@ -33,12 +59,15 @@ The working rules are in `TEAMWORK.md`. Update the board yourself after `/ship`.
 - [ ] `/work/<slug>` answers 404 when the database fails: `/api/work` swallows the load error and returns `work.title: null`. Same fix as the city/place/letter pages (#readRoute), but the route has to say 502 first.
 - [ ] Production (`codex-hackathon-starter.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
 
-## In progress
+## In progress (waiting for Nikita)
 
-- [ ] …
+- [ ] #340 then/now wipe + visitors' shots: needs the prod migration `20261103100000_visitors_shots_of_a_place`
+- [ ] #327 suggestions AI pre-check: needs the prod migrations `20261013000000` and `20261013000100`
 
 ## Done
 
+- [x] 2026-11-03: merged #326, #337, #332, #338, #339, #341, #342 after green tests (Nikita: merge on green)
+- [x] UX audit of web and phone, 2026-11-03: [docs/ux-audit-2026-11-03.md](docs/ux-audit-2026-11-03.md)
 - [x] Refresh locations for the visible map area after user drag — @Codex — `feature/map-viewport-refresh` / PR #35
 - [x] Letterboxd ZIP import with automatic personal-library map filtering — @walklikeaman — `codex/interactive`
 - [x] Restore cited web research for sparse location results — @Codex — `feature/location-discovery-hotfix` / PR #33
