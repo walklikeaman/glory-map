@@ -82,15 +82,31 @@ export function buildClassificationContent(imageUrls) {
   return content;
 }
 
-// The same numbered gallery in Claude's content shape: text labels and URL images.
-export function buildClaudeClassificationContent(imageUrls) {
-  const urls = (Array.isArray(imageUrls) ? imageUrls : []).slice(0, MAX_IMAGES_PER_CALL);
-  const content = [{ type: "text", text: `There are ${urls.length} images, numbered from 0.` }];
-  for (const [index, url] of urls.entries()) {
+// The same numbered gallery in Claude's content shape. Each image is a URL string or an
+// already-downloaded `{ media_type, data }` (base64): the API refuses URL sources from a
+// network-restricted sandbox, so the batch scripts send the bytes inline.
+export function buildClaudeClassificationContent(images) {
+  const list = (Array.isArray(images) ? images : []).slice(0, MAX_IMAGES_PER_CALL);
+  const content = [{ type: "text", text: `There are ${list.length} images, numbered from 0.` }];
+  for (const [index, image] of list.entries()) {
     content.push({ type: "text", text: `Image ${index}:` });
-    content.push({ type: "image", source: { type: "url", url } });
+    content.push({
+      type: "image",
+      source: typeof image === "string"
+        ? { type: "url", url: image }
+        : { type: "base64", media_type: image.media_type, data: image.data },
+    });
   }
   return content;
+}
+
+// Download one image for an inline (base64) Claude image block.
+export async function inlineImage(url, fetchImpl = fetch) {
+  const response = await fetchImpl(url);
+  if (!response.ok) throw new Error(`image ${response.status} for ${url}`);
+  const media_type = (response.headers?.get?.("content-type") || "image/jpeg").split(";")[0];
+  const data = Buffer.from(await response.arrayBuffer()).toString("base64");
+  return { media_type, data };
 }
 
 // Which candidates survived, as a Set of indices. The gate is deliberately one-sided:

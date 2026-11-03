@@ -6,6 +6,7 @@ import {
   acceptedStillIndexes,
   buildClassificationContent,
   buildClaudeClassificationContent,
+  inlineImage,
   classificationInstructions,
   imageBatches,
   MAX_IMAGES_PER_CALL,
@@ -310,4 +311,15 @@ test("Claude gets the same numbered gallery as URL image blocks", () => {
   assert.deepEqual(content.filter((part) => part.type === "image").map((part) => part.source),
     [{ type: "url", url: "https://a" }, { type: "url", url: "https://b" }]);
   assert.equal(content[3].text, "Image 1:");
+});
+
+test("Claude takes downloaded images as inline base64 blocks", async () => {
+  const image = await inlineImage("https://img/x.jpg", async () => ({
+    ok: true,
+    headers: { get: () => "image/jpeg" },
+    arrayBuffer: async () => new TextEncoder().encode("abc").buffer,
+  }));
+  assert.deepEqual(image, { media_type: "image/jpeg", data: "YWJj" });
+  const content = buildClaudeClassificationContent([image]);
+  assert.deepEqual(content[2].source, { type: "base64", media_type: "image/jpeg", data: "YWJj" });
 });

@@ -1,7 +1,16 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
+Format: `## [2026-11-03] experiment | Claude pilot: still classification on 10 films, Opus vs Haiku
+**Object**: `scripts/classify-stills.mjs`, `app/lib/still-classify.mjs`.
+**Scenario**: data enrichment (paid)
+**Outcome**: ✅ stills done · ⏸ story trails blocked on network
+**What happened**: Opus 5.5 judged 247 TMDB images across 9 films (1 had none) for $0.73, about $0.003 per image or $0.08 per film. Haiku 5.5 re-judged 144 of those images without writing for $0.0105 (about 40x cheaper) and agreed on 142. Both disagreements were real frames that Haiku rejected and Opus kept. About 5.7k works with a TMDB id still have no verdicts: roughly $460 on Opus, $20 on Haiku.
+
+Gotcha: from a network-restricted cloud sandbox the Claude API refuses image URL sources (400 "not allowed to use URL sources"), so the Claude classifier now downloads each image and sends it as base64. Story trails need `en.wikipedia.org` for the plot, which the cloud allowlist does not include yet (403), so that half of the pilot waits on it. `pendingWorks` claims to order by place count but has no ORDER BY, so the queue is arbitrary.
+**Updated**: `app/lib/still-classify.mjs`, `app/api/enrich/stills/route.js`, `test/still-classify.test.mjs`.
+
+## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
 **Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
 **Scenario**: tooling
 **Outcome**: ✅ success
