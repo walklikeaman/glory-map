@@ -59,16 +59,14 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] `/work/<slug>` answers 404 when the database fails: `/api/work` swallows the load error and returns `work.title: null`. Same fix as the city/place/letter pages (#readRoute), but the route has to say 502 first.
 - [ ] Production (`codex-hackathon-starter.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
 
-## In progress (open draft PRs waiting for review)
+## In progress (waiting for Nikita)
 
-- [ ] #341 QA 03.11: sitemaps, 500 on DB failure, chip title
-- [ ] #340 then/now wipe + visitors' shots
-- [ ] #339 trail stop names; #338 Claude pilot fixes; #337 trip stops keep films
-- [ ] #332 honest pins + Claude provider; #327 suggestions AI pre-check; #326 /map-next + phone bugs
-- [ ] UX audit quick fixes (place card height and position, photo fallback, copy) — `claude/project-thread-ypqmfu`
+- [ ] #340 then/now wipe + visitors' shots: needs the prod migration `20261103100000_visitors_shots_of_a_place`
+- [ ] #327 suggestions AI pre-check: needs the prod migrations `20261013000000` and `20261013000100`
 
 ## Done
 
+- [x] 2026-11-03: merged #326, #337, #332, #338, #339, #341, #342 after green tests (Nikita: merge on green)
 - [x] UX audit of web and phone, 2026-11-03: [docs/ux-audit-2026-11-03.md](docs/ux-audit-2026-11-03.md)
 - [x] Refresh locations for the visible map area after user drag — @Codex — `feature/map-viewport-refresh` / PR #35
 - [x] Letterboxd ZIP import with automatic personal-library map filtering — @walklikeaman — `codex/interactive`

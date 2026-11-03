@@ -1,13 +1,20 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [2026-11-03] audit | UX audit of web and phone; the UX pass goes first in the queue
+Format: `## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+
+Tip: `grep "^## \[" log.md | head -20` shows recent activity.
+
+---
+
+## [2026-11-03] audit | UX audit of web and phone; the UX pass goes first in the queue
 **Object**: `docs/ux-audit-2026-11-03.md`, `TASKS.md`, `ROADMAP.md`, place card CSS.
 **Scenario**: audit
 **Outcome**: ✅ success
 **What happened**: Playwright at 1440×900 and 390×844 on a local prod build, four lenses (UX flow, visual, mobile-first, newcomer). Main finding: the screen shows everything at once (pin soup, 12-block panel, search hidden on the phone, routes in two places, engineering words). Fixed now: the desktop place card ran off the top of the screen (bottom-anchored, no height cap, overflow hidden) and covered the map buttons. UX-1…UX-11 are queued at the top of `TASKS.md`; new features wait for UX-1…UX-5.
 **Updated**: `TASKS.md` became the real queue for the daily feature routine (it was still the hackathon template).
-Format: `## [2026-11-03] update | Whole catalogue's stills classified on Haiku; London trails on Opus
+
+## [2026-11-03] update | Whole catalogue's stills classified on Haiku; London trails on Opus
 **Object**: `scripts/classify-stills.mjs --all`, `scripts/fill-story-trails.mjs`, `app/api/trail/route.js`.
 **Scenario**: data enrichment (paid, Nikita chose Haiku for stills)
 **Outcome**: ✅ success
@@ -34,18 +41,13 @@ Gotcha: from a network-restricted cloud sandbox the Claude API refuses image URL
 Gotcha worth keeping: the default cloud network reaches only package registries. Supabase, Wikidata, Wikipedia, TMDB and OpenAI are refused by the proxy, so `/api/map/works` returns 502 there while the page itself serves 200. The fix is the environment's network allowlist, not code.
 **Updated**: `CLAUDE.md`, `.claude/`.
 
-## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
-
-Tip: `grep "^## \[" log.md | head -20` shows recent activity.
-
----
-
 ## [2026-11-03] update | Routine QA: sitemaps, 404 on a DB timeout, the work chip
 **Object**: `app/sitemap.js`, `app/lib/page-load.mjs`, city/place/letter pages, `app/lib/filter-url.mjs`.
 **Scenario**: QA (desktop 1366 + phone 390, local prod build on the live DB)
 **Outcome**: ✅ fixed three, three left in `TASKS.md`
 **What happened**: the build prerenders all 27 sitemap letters at once and the DB answers part of the burst with a statement timeout; 10 of 27 shipped empty (b, s, t, d…). Now a 502 is asked again twice. The SEO pages treated any failed route as "not found", so a timeout gave 404 (crawlers drop the URL); now only the route's own 404 is a 404, anything else is a 500. Picking a work from search labelled the filter chip "One work" when the work was not among the graph's works in view; the picked title is the fallback now.
 Gotcha: a fresh cloud container may come up without `node_modules` (34 suites fail on `@supabase/supabase-js`); run `npm ci` before reading the test result.
+
 ## [2026-11-03] update | "Harvey Dent" was never a place: the trail cut stop names at the apostrophe
 **Object**: `app/lib/plot-order.mjs`, `app/lib/vague-place-name.mjs`, `submission-review.mjs`, `promote-submission.mjs`, live `scenes`.
 **Scenario**: data quality
@@ -56,6 +58,7 @@ The same one-word check is now an ingest refusal (`vague_not_a_place`) and `best
 
 Claude Haiku also read all 2,908 places, looking for character names, titles and vague words ($0.83). It flagged 6, and none was junk. Two were false alarms: "Waiting for the Interurban" is a Seattle sculpture and "Newbridge Memo" a Welsh hall. The other four are real pins with vague names, so I renamed them rather than hid them: "Railway Station, Carnforth", "Cloisters, Temple, London", "The Lake, Central Park", "Humanities Wing, University of Toronto Scarborough". Nothing was hidden. The verdicts and the before-names are in the snapshot folder.
 **Updated**: code + tests, 43 live scene rows.
+
 ## [2026-11-03] update | TMDB ids by title from the cloud, four pins moved, and Claude as a provider
 **Object**: `works.tmdb_id/poster_path`, `places` (4 rows), `app/lib/model-client.mjs`, `app/api/enrich/stills/route.js`.
 **Scenario**: data + tooling
@@ -105,6 +108,7 @@ Decisions worth keeping: the first unfiltered pass would have moved "Dorchester 
 
 Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
 **Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
+
 ## [2026-10-13] update | Mobile design review at 360–430 px
 **Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
 **Scenario**: design review (phone)
@@ -1437,6 +1441,7 @@ match, which is the only thing a null can do.
 **1,217 tests, all passing** (11 new). Note for anyone reading the earlier Los Angeles
 figures: the owner's LA film count drops **326 → 291**, because 35 of them were never his
 films.
+
 ## [2026-09-10] fix | The empty sitemap that claimed a letter was empty
 
 **Object**: `app/sitemap.js`, `test/sitemap.test.mjs`, `.claude/launch.json`
@@ -1518,6 +1523,7 @@ matched; `workIsInLibrary` is now that question with the answer thrown away.
 **1,201 tests, all passing** (18 new). Verified in the browser against a library with a
 spread of scores: by places the five London chips are alphabetical, by rating they are
 5★ → 4.5★ → 3★ → 2.5★ → unrated, and a 4.5★ bar leaves two.
+
 ## [2026-09-10] update | The sitemap had 27 files and no door: robots.txt and an index
 
 **Object**: `app/robots.js`, `app/sitemap.xml/route.js`, `app/lib/site-url.mjs`,
@@ -1632,6 +1638,7 @@ are two sites agreeing on a name, not evidence a shoot happened.
 **1,169 tests, all passing** (33 new). Verified locally against production: 464 candidate
 pins over Los Angeles in the running app, *The Big Lebowski* with no studio badge at all,
 and *Back to the Future*'s Courthouse Square reading "Appears as Downtown Hill Valley".
+
 ## [2026-09-10] update | The 70 place pages are in the sitemap, and only the ones that exist
 
 **Object**: `app/api/directory/places/route.js`, `app/sitemap.js`, `test/sitemap.test.mjs`,
@@ -1766,8 +1773,6 @@ answer was to deploy and read the production smoke step, one round trip per look
 servers work there, which is how this migration was applied and checked, and that is enough
 for a query and not enough for a card.
 
-
-
 **Object**: `wiki/handoff.md`
 **Scenario**: docs · **Outcome**: ✅ success
 **Code changes**: this commit
@@ -1841,6 +1846,7 @@ list together (10 → 4 → 12, rows matching each time).
 
 **Updated**: `wiki/concepts/place-card.md` (new), `wiki/index.md`, `wiki/handoff.md`,
 `test/place-card.test.mjs`
+
 ## [2026-08-19] incident | Two sessions built #158 at the same time, and the other one was better
 
 **Object**: `app/components/SceneMapApp.jsx`, `.github/workflows/deploy-production.yml`
@@ -2267,6 +2273,7 @@ updates.
 
 **Updated**: `wiki/concepts/moviemaps-source.md` (new), `wiki/index.md`,
 `wiki/sources/source-evaluation.md`, `.gitignore`, `test/moviemaps-source.test.mjs`
+
 ## [2026-08-08] incident | The names were not the problem, and the first diagnosis said they were
 
 **Object**: `app/lib/place-name-head.mjs`, `scripts/geocode-submissions.mjs`,
@@ -2746,7 +2753,6 @@ separates it from reelstreets, whose terms exist and forbid); we take **facts** 
 name and a coordinate — not their prose or their images; every row is labelled unverified
 and links back; the project is not commercial.
 
-
 ## [2026-08-05] update | The juror scenario: 24 favourite films, three empty maps, zero after the fix
 
 **Object**: `app/lib/location-search.mjs`, `app/api/locations/route.js`
@@ -2780,7 +2786,6 @@ never a doorway.
 
 **After: empty for 0 of 24.** 824 tests green.
 
-
 ## [2026-08-05] rule-change | Not a commercial project — which changes some refusals and not others
 
 **Object**: `wiki/sources/source-evaluation.md`, issue #127
@@ -2809,7 +2814,6 @@ you may at all.** The first depends on commerce, the second does not.
 The practical gain is modest — ALIKED + LightGlue under Apache/BSD already cover what
 SuperPoint/SuperGlue do. The real gain is elsewhere: Fandom's stop lists open up as DATA
 rather than only as a recall benchmark.
-
 
 ## [2026-08-05] decision | Four directions the owner set: photo verification, music, facts, plaques
 
@@ -2850,7 +2854,6 @@ quietly becomes "places connected to anything Rowling ever touched".
 
 **Updated**: `wiki/sources/commemorative-plaques.md` (#125 recorded separately)
 
-
 ## [2026-08-05] ingest | Plaques on facades: the quote is already written on the wall
 
 **Object**: `wiki/sources/commemorative-plaques.md`, issue #125
@@ -2884,7 +2887,6 @@ world dump returns a hundred Texas markers about Jim Bowie and Bowie County.
 **Open question for the owner:** music is a new kind of work. `work_kind` knows
 film/series/book, musicians are the largest group of plaque subjects, and "this album was
 recorded here" is neither a filming location nor a narrative one.
-
 
 ## [2026-08-05] decision | Shipped, and a merge turns out to be a release
 
@@ -4337,6 +4339,7 @@ tier 1 of [[geocoding-cascade]] exists; the submissions queue has no review UI y
 - Recorded the brief in `Context/brief-scenemap-design.md` and filled in the "Project" block in `AGENTS.md`.
 - Assembled the first MVP slice: a dark Leaflet map of London, 10 hardcoded film-location pins, a location card, a list of points, and a local route line after adding 3 stops.
 - The Supabase schema and tables were not created; the next slice is the data contract + seed/API.
+
 ## [2026-07-21] update | Codebase mapped for GSD initialization
 
 - Created the seven reference documents in `.planning/codebase/`.
