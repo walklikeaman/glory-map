@@ -2,9 +2,11 @@
 //
 // Takes the oldest pending suggestions the model has not seen yet ({ limit } in the body,
 // 10 by default, at most 25), and for each one: refuses obvious junk without a model,
-// otherwise asks the model, then applies what code allows (see suggestion-ai-review.mjs).
-// A pass goes into the map's queue as an unchecked candidate; a rejection tells the reader
-// why; anything else waits. Every row it looks at is stamped, so a run never pays twice.
+// otherwise opens the reader's source and asks the model, then applies what code allows
+// (see suggestion-ai-review.mjs). A pass goes into the map's queue as an unchecked
+// candidate; a rejection tells the reader why; anything else goes to the manual queue
+// (/review) with the list of what is wrong with it. Every row it looks at is stamped, so a
+// run never pays twice.
 //
 // Guarded like the other paid write routes (ENRICH_TOKEN, enrich-auth.mjs), and meant for a
 // scheduler. Nothing schedules it yet: owner's decision, 13.10.2026, to have it ready and
@@ -19,8 +21,10 @@ import {
   AI_VERDICTS,
   decideFromAi,
   obviousJunk,
+  readSource,
 } from "../../../../lib/suggestion-ai-review.mjs";
 import { promoteSuggestion } from "../../../../lib/suggestion-review.mjs";
+import { USER_AGENT } from "../../../../lib/user-agent.mjs";
 import { prepareSearchQuery } from "../../../../lib/work-search.mjs";
 import { defaultReviewServices } from "../route.js";
 
@@ -40,6 +44,8 @@ export function createAiReviewHandler({
   services,
   // Careful tier: a pass puts a claim on the public map.
   createRuntime = (env) => createModelClient(env, { tier: TIERS.CAREFUL }),
+  // Opens the reader's source link so the model reads the page, not just the URL.
+  fetchSource = (url, place) => readSource(url, { place, userAgent: USER_AGENT }),
   logError = (...args) => console.error(...args),
   now = () => new Date(),
 } = {}) {
@@ -50,27 +56,31 @@ export function createAiReviewHandler({
     const junk = obviousJunk(suggestion);
     let decision;
     if (junk) {
-      decision = { verdict: AI_VERDICTS.reject, reason: junk, note: `rule: ${junk}` };
+      decision = { verdict: AI_VERDICTS.reject, reason: junk, note: `rule: ${junk}`, problems: [junk] };
     } else {
       const prepared = prepareSearchQuery(suggestion.work_title, { limit: 5 });
       const candidates = prepared ? await svc.searchWorks(prepared.query, prepared.limit) : [];
+      const source = suggestion.source_url ? await fetchSource(suggestion.source_url, suggestion.place_name) : null;
       const result = await parseStructured({
         runtime: modelRuntime,
         schema: aiReviewSchema,
         schemaName: "suggestion_review",
         instructions: aiReviewInstructions(),
-        input: aiReviewInput(suggestion, candidates),
+        input: aiReviewInput(suggestion, candidates, source),
         maxTokens: 2000,
         timeout: 60_000,
       });
       // A failed call is not a verdict: the row stays unstamped and the next run tries again.
       if (!result.ok) return { id: suggestion.id, verdict: "error", reason: result.reason };
-      decision = decideFromAi(result.parsed, { suggestion, candidates });
+      decision = decideFromAi(result.parsed, { suggestion, candidates, source });
     }
 
+    stamp.ai_note = decision.note;
+    stamp.ai_problems = decision.problems ?? [];
+    // Unsure goes to the manual queue with its list of problems; nothing else changes.
     if (decision.verdict === AI_VERDICTS.unsure) {
-      await svc.updateSuggestion(suggestion.id, { ...stamp, ai_note: decision.note });
-      return { id: suggestion.id, verdict: decision.verdict };
+      await svc.updateSuggestion(suggestion.id, stamp);
+      return { id: suggestion.id, verdict: decision.verdict, problems: stamp.ai_problems };
     }
 
     let submissionId = null;
@@ -86,13 +96,12 @@ export function createAiReviewHandler({
     const passed = decision.verdict === AI_VERDICTS.pass;
     await svc.updateSuggestion(suggestion.id, {
       ...stamp,
-      ai_note: decision.note,
       status: passed ? "verified" : "rejected",
       status_reason: passed ? "passed the AI pre-check" : decision.reason,
       reviewed_at: stamp.ai_reviewed_at,
       submission_id: submissionId,
     });
-    return { id: suggestion.id, verdict: decision.verdict, submission_id: submissionId, linked };
+    return { id: suggestion.id, verdict: decision.verdict, submission_id: submissionId, linked, problems: stamp.ai_problems };
   }
 
   return async function POST(request) {

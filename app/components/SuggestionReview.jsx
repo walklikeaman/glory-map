@@ -75,6 +75,15 @@ function SuggestionCard({ suggestion, busy, onDecide }) {
         For <strong>{suggestion.work_title}</strong> · sent {when}
       </p>
       {suggestion.scene && <p className="review-scene">&ldquo;{suggestion.scene}&rdquo;</p>}
+      {suggestion.ai_reviewed_at && (
+        <div className="review-ai">
+          <strong>What the AI check found</strong>
+          {suggestion.ai_problems?.length
+            ? <ul>{suggestion.ai_problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>
+            : <p className="section-note">No specific problem, but it was not sure enough to decide.</p>}
+          {suggestion.ai_note && <small className="section-note">{suggestion.ai_note}</small>}
+        </div>
+      )}
       <p className="review-links">
         <a href={osmLink(suggestion.lat, suggestion.lng)} target="_blank" rel="noreferrer">
           <MapPin size={14} aria-hidden="true" /> {suggestion.lat}, {suggestion.lng}
@@ -218,6 +227,7 @@ export default function SuggestionReview() {
             <>
               <p className="section-note">
                 {total} waiting{total > suggestions.length ? `, the oldest ${suggestions.length} shown` : ""}.
+                The AI check sends here what it could not decide, with what it found wrong.
                 Nobody but the reader sees them until you verify one.
               </p>
               <ul className="review-list">

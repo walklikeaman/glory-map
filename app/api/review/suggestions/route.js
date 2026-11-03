@@ -25,7 +25,7 @@ export const runtime = "nodejs";
 
 const noStoreHeaders = { "Cache-Control": "private, no-store" };
 const PAGE = 50;
-const SUGGESTION_COLUMNS = "id, place_name, work_title, scene, lat, lng, source_url, status, status_reason, created_at";
+const SUGGESTION_COLUMNS = "id, place_name, work_title, scene, lat, lng, source_url, status, status_reason, created_at, ai_reviewed_at, ai_note, ai_problems";
 
 function jsonError(message, status) {
   return Response.json({ error: message }, { status, headers: noStoreHeaders });

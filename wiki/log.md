@@ -16,6 +16,13 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] decision | What the AI cannot decide goes to a person, with what is wrong with it
+**Object**: `app/lib/suggestion-ai-review.mjs` (`readSource`, `problems`), `app/api/review/suggestions/ai/route.js`, `/review`, column `ai_problems`.
+**Scenario**: feature
+**Outcome**: ⚠️ ready, still not switched on
+**What happened**: The owner: an unclear source still has to be dealt with; what the AI can't settle stays for manual moderation, and the checker should see what is wrong with each one. The model now returns `problems` (one sentence each) beside its verdict, and code adds what it can see itself: no source link, the work not in the graph, the source not opening, the source page not naming the place. The server now **opens the reader's source** (public http(s) hosts only, no IPs or internal names, redirects re-checked, 8 s, first 8k characters of text) and the model reads the page. An "unsure" row stays pending with `ai_problems`, and `/review` shows them on the card. A confident pass whose page does not name the place goes to a person instead of the map.
+**Updated**: as listed, plus `test/suggestion-ai-review.test.mjs` and `app/globals.css`.
+
 ## [2026-10-13] decision | A model pre-checks readers' suggestions; nobody reviews by hand for now
 **Object**: `app/lib/suggestion-ai-review.mjs`, `app/api/review/suggestions/ai/route.js`, columns `ai_reviewed_at` / `ai_note` in `20261013000100_reader_suggestions_reviewed.sql`.
 **Scenario**: feature

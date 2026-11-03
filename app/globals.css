@@ -5381,3 +5381,5 @@ figcaption a {
 .review-work { display: flex !important; align-items: center; gap: 8px; min-height: 36px; }
 .review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .review-actions .wide-button { flex: 1 1 220px; }
+.review-ai { display: grid; gap: 4px; padding: 10px 12px; border-left: 3px solid var(--accent); border-radius: 6px; background: rgba(240, 168, 60, 0.08); font-size: 0.85rem; }
+.review-ai ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }

@@ -17,7 +17,10 @@ alter table public.reader_place_suggestions
 -- left "unsure" is not paid for again on the next run.
 alter table public.reader_place_suggestions
   add column if not exists ai_reviewed_at timestamptz,
-  add column if not exists ai_note text;
+  add column if not exists ai_note text,
+  -- What a person deciding it should look at (owner, 03.11.2026): "the source page does not
+  -- mention the place", "no source link", "the title matches several works", …
+  add column if not exists ai_problems text[];
 
 create index if not exists reader_place_suggestions_ai_queue_idx
   on public.reader_place_suggestions (created_at)
@@ -35,6 +38,7 @@ create policy "readers suggest as themselves, for review"
     and reviewed_by is null
     and ai_reviewed_at is null
     and ai_note is null
+    and ai_problems is null
     and submission_id is null
   );
 
