@@ -236,7 +236,7 @@ export default function SearchBox({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="A film, a series, a book — or a city"
+          placeholder="Film, series, book or city"
           role="combobox"
           type="text"
           value={value}

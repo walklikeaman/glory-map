@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  MAX_QUOTE_WORDS, MIN_QUOTE_WORDS, appearsAsName, findPlotSection, normalisedText, placeInPlot,
+  MAX_QUOTE_WORDS, MIN_QUOTE_WORDS, appearsAsName, findPlotSection,
+  plotSectionFromWikitext, normalisedText, placeInPlot, sceneName,
   scenesFromPlacement,
 } from "../app/lib/plot-order.mjs";
 
@@ -61,6 +62,22 @@ test("what a place appears as is read off the guide line, or not at all", () => 
   assert.equal(appearsAsName("Westminster Bridge was designed by Thomas Page."), null);
 });
 
+// The Dark Knight's trail named two stops "Harvey Dent" and "Lau": the old pattern closed
+// the quote at the first apostrophe.
+test("an apostrophe inside the quoted name does not end it", () => {
+  assert.equal(appearsAsName("Appears as \"Harvey Dent's Office\". Jim Gordon has a meeting…"), "Harvey Dent's Office");
+  assert.equal(appearsAsName("Appears as “Lau’s Offices”."), "Lau’s Offices");
+  assert.equal(appearsAsName("Appears as “Grand Hotel\"."), "Grand Hotel");
+  assert.equal(appearsAsName("Appears as 'Lau's Offices'. Batman kidnaps Lau."), "Lau's Offices");
+  assert.equal(appearsAsName("Appears as \"St. Paul's Cathedral (crypt)\"."), "St. Paul's Cathedral (crypt)");
+});
+
+test("a stop the guide only calls a kind of place keeps its real name", () => {
+  assert.equal(sceneName({ location: "Van Buren Street Bridge", appears_as: "Appears as \"Bridge\". Police search it." }), "Van Buren Street Bridge");
+  assert.equal(sceneName({ location: "Old Chicago Main Post Office", appears_as: "Appears as \"Gotham National Bank\"." }), "Gotham National Bank");
+  assert.equal(sceneName({ location: "Navy Pier", appears_as: null }), "Navy Pier");
+});
+
 // A film has no chapters: its spoiler tier IS its place in the story, so the trail shows
 // the walk only as far as the reader has watched. The teaser names nothing.
 test("the scenes keep the order as their spoiler tier, credit the quote, and spoil nothing early", () => {
@@ -100,4 +117,15 @@ test("one quote is one scene, kept at its most precise place, and one building i
   assert.deepEqual(distinctStops(placed, places).map((entry) => entry.location), [
     "London Heathrow Airport", "Grosvenor Chapel, Mayfair", "Selfridges",
   ]);
+});
+
+test("the plot section is cut from whole-article wikitext, subsections included", () => {
+  const source = [
+    "Intro text.", "== Plot ==", "Paddington arrives.", "=== Later ===", "He finds a home.",
+    "== Cast ==", "* Ben Whishaw",
+  ].join("\n");
+  assert.equal(plotSectionFromWikitext(source),
+    "== Plot ==\nPaddington arrives.\n=== Later ===\nHe finds a home.");
+  assert.equal(plotSectionFromWikitext("== Plot summary ==\nA.\n"), "== Plot summary ==\nA.\n");
+  assert.equal(plotSectionFromWikitext("== Cast ==\nB"), null);
 });

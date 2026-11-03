@@ -13,6 +13,7 @@ import { GET as cityRoute } from "../../api/directory/city/route.js";
 import { findCity } from "../../lib/city-gazetteer.mjs";
 import { cityCoverage, cityWorkLine } from "../../lib/directory.mjs";
 import { workPath } from "../../lib/work-url.mjs";
+import { readRoute } from "../../lib/page-load.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,7 @@ async function loadCity(slug, page) {
   url.searchParams.set("slug", slug);
   if (page) url.searchParams.set("page", page);
   const response = await cityRoute(new Request(url));
-  if (!response.ok) return null;
-  return response.json();
+  return readRoute(response, "The city page");
 }
 
 export async function generateMetadata({ params }) {

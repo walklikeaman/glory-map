@@ -23,12 +23,16 @@
 // --older-than N redoes only trails whose scenes are older than N minutes, so a run that
 // stops halfway can be resumed without paying again for what it already did.
 //
-// Costs money: three passes of gpt-5-mini per film, about a cent and a half.
+// Costs money: three passes of gpt-5-mini per film, about a cent and a half. With
+// ANTHROPIC_API_KEY set the passes run on Claude (ANTHROPIC_MODEL), and the run ends
+// with what it cost, measured from the API's usage counts.
 
 import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 
 import { createTrailHandler } from "../app/api/trail/route.js";
+import { createUsageMeter, meteredAnthropic } from "../app/lib/claude-usage.mjs";
+import { createModelClient, TIERS } from "../app/lib/model-client.mjs";
 
 const CITIES = Object.freeze({
   london: { south: 51.28, north: 51.70, west: -0.51, east: 0.33 },
@@ -140,8 +144,12 @@ if (DRY) {
 }
 
 const token = `fill-${Math.random().toString(36).slice(2)}`;
+const meter = createUsageMeter();
 const handler = createTrailHandler({
   env: { ...process.env, ENRICH_TOKEN: token },
+  ...(process.env.ANTHROPIC_API_KEY ? {
+    createRuntime: (env) => createModelClient(env, { tier: TIERS.CAREFUL, AnthropicImpl: meteredAnthropic(meter) }),
+  } : {}),
   logError: (message, detail) => console.log(`    ! ${message} ${detail?.message ?? ""}`),
 });
 
@@ -165,3 +173,7 @@ for (const work of works) {
   if (body.extracted) { scenes += body.extracted; filled += 1; }
 }
 console.log(`\n${filled} trails, ${scenes} scenes.`);
+for (const row of meter.summary()) {
+  console.log(`${row.model}: ${row.calls} calls, ${row.input} in / ${row.output} out tokens, `
+    + `${row.dollars === null ? "price unknown" : `$${row.dollars.toFixed(4)}`}`);
+}

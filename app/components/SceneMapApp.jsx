@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Award,
   Check,
@@ -103,7 +104,7 @@ import {
 } from "../lib/films-in-view.mjs";
 import {
   FILTER_DEFAULTS, clearedFilter, filterChipLabel, filtersFromParams,
-  narrowingFilters, writeFilterParams,
+  narrowingFilters, workChipTitle, writeFilterParams,
 } from "../lib/filter-url.mjs";
 import {
   EMPTY_REASON, labelledPlaces, notableEmptyReason, notableHere, ratingOf,
@@ -162,11 +163,15 @@ import { wipeMode } from "../lib/then-now-wipe.mjs";
 import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
 
+
 // The ground under the vector style while it loads, and the map itself if WebGL fails.
 // OSM's own raster, dimmed by CSS rather than inverted — it is a stand-in for a second or
 // two, not a theme.
 const VECTOR_FALLBACK_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 import { RATING_LABELS } from "../lib/work-ratings.mjs";
+
+// The camera code loads only when someone opens "Recreate this shot" (#50).
+const ShotSync = dynamic(() => import("./ShotSync.jsx"), { ssr: false });
 
 // A new `() => {}` every render is a changed prop, and a changed prop re-renders the whole
 // marker layer — which is the work this whole component is trying not to do. Clicking a pin
@@ -501,8 +506,8 @@ function filmImagePlaceholderLabel(status) {
   if (status === "loading") return "Matching scene to this place…";
   if (status === "no_match") return "No verified scene match";
   if (status === "studio_lot") return "Filmed on a studio lot";
-  if (status === "error") return "Scene matching failed";
-  return "Scene matching unavailable";
+  if (status === "error") return "Couldn't load the film frame";
+  return "No film frame for this place yet";
 }
 
 const frameLocationLabels = {
@@ -714,6 +719,8 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
   const [photoUrl, setPhotoUrl] = useState("");
   const [view, setView] = useState("overlay");
   const [opacity, setOpacity] = useState(55);
+  // Live camera first (#50); uploading a photo taken earlier stays one tap away.
+  const [mode, setMode] = useState("live");
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -774,6 +781,17 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
     }
   }
 
+  function usePhoto(blob) {
+    if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
+    const nextUrl = URL.createObjectURL(blob);
+    photoUrlRef.current = nextUrl;
+    photoFileRef.current = blob;
+    setPhotoUrl(nextUrl);
+    setView("compare");
+    setShare({ status: "idle", message: "" });
+    setMode("upload");
+  }
+
   function resetPhoto() {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     photoUrlRef.current = "";
@@ -812,6 +830,29 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
           </button>
         </header>
 
+        <div className="recreate-mode-switch" aria-label="How to recreate">
+          <button
+            aria-pressed={mode === "live"}
+            className="ghost-button"
+            onClick={() => setMode("live")}
+            type="button"
+          >
+            Live camera
+          </button>
+          <button
+            aria-pressed={mode === "upload"}
+            className="ghost-button"
+            onClick={() => setMode("upload")}
+            type="button"
+          >
+            Upload a photo
+          </button>
+        </div>
+
+        {mode === "live" ? (
+          <ShotSync location={location} onUpload={() => setMode("upload")} onUsePhoto={usePhoto} />
+        ) : (
+        <>
         <div className="recreate-stage">
           {view === "overlay" ? (
             <div className="recreate-canvas">
@@ -921,12 +962,13 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
               )}
             </div>
           )}
-
-          <p className="recreate-privacy">
-            Your photo stays in this browser tab unless you share it. Shared photos are
-            re-saved without location data and checked before anyone else sees them.
-          </p>
         </div>
+        </>
+        )}
+        <p className="recreate-privacy">
+          Your photo stays in this browser tab unless you share it. Shared photos are
+          re-saved without location data and checked before anyone else sees them.
+        </p>
       </section>
     </div>
   );
@@ -1004,6 +1046,7 @@ export default function SceneMapApp() {
   const [minImdb, setMinImdb] = useState(initialFilters.minImdb);
   const [graphKinds, setGraphKinds] = useState(initialFilters.kinds);   // [] = every kind
   const [graphWorkId, setGraphWorkId] = useState(initialFilters.workId); // "" = the whole library
+  const [pickedWork, setPickedWork] = useState(null); // { work_id, title } from the search box
   const [graphWorks, setGraphWorks] = useState([]);
 
   // Works that actually have a mappable place under the current kind filter, so the
@@ -2233,7 +2276,7 @@ export default function SceneMapApp() {
       the place today
       {/* Commons files are licensed per FILE, so the credit belongs with
           the image itself, not in a page footer. */}
-      {activeLocation.now && (
+      {activeLocation.now && !brokenImages.has(activeLocation.now) && (
         <ImageAttribution attribution={imageAttribution[activeLocation.now] ?? { url: activeLocation.now }} />
       )}
     </>
@@ -3370,6 +3413,7 @@ export default function SceneMapApp() {
             setWorkQuery(suggestion.title);
             setGraphLayerOn(true);
             setGraphWorkId(suggestion.work_id);
+            setPickedWork({ work_id: suggestion.work_id, title: suggestion.title });
             if (suggestion.kind && suggestion.kind !== workKind) changeWorkKind(suggestion.kind);
           }}
           onSubmit={searchWork}
@@ -3496,7 +3540,7 @@ export default function SceneMapApp() {
           <div className="filter-chips" role="group" aria-label="Filters narrowing the map">
             {narrowing.map((key) => {
               const label = filterChipLabel(key, filters, {
-                workTitle: graphWorks.find((work) => work.work_id === graphWorkId)?.title ?? null,
+                workTitle: workChipTitle(graphWorkId, { worksInView: graphWorks, picked: pickedWork }),
               });
               return (
                 <button
@@ -4556,6 +4600,7 @@ export default function SceneMapApp() {
                 {activeLocation.now && !brokenImages.has(activeLocation.now) ? (
                   <img
                     src={activeLocation.now}
+                    onError={() => markImageBroken(activeLocation.now)}
                     alt={`${activeLocation.place} today`}
                     // Half a 430 px sheet on a desktop, the whole sheet on a phone. A
                     // Special:FilePath URL renders on demand, so the one URL stored on
@@ -4910,6 +4955,7 @@ export default function SceneMapApp() {
         marks={placeMarks}
         onMarks={updateMarks}
         accountUser={accountUser}
+        supabase={supabase}
         suggestions={suggestions}
         onSuggestions={(next) => { setSuggestions(next); saveSuggestions(window.localStorage, next); }}
         mapCenter={mapCenter}
