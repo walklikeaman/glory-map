@@ -16,6 +16,32 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-10-18] update | TMDB ids for the catalogue, through Wikidata
+**Object**: `works.tmdb_id`, `poster_path`, `backdrop_path` (production).
+**Scenario**: data backfill (owner's go, 18.10)
+**Outcome**: ✅ success
+**What happened**: ran the fixed `/api/enrich/artwork` handler in-process over every work with a Wikidata id and no poster: 100 batches, 5,919 checked. 4,826 got a TMDB id and a poster, 587 are not on TMDB (stamped, so they are not asked again), and 9 hit a TMDB error and stay queued. Works with a TMDB id went from 565 to 4,919. Pilot first, on the 12 works of the live check: all 10 films right, both books correctly left alone. A random sample of 8 matched TMDB on title and year. A snapshot of the 5,460 rows as they were was taken before the run, for rollback. 2,135 films and series still have no id; most of them have no Wikidata id.
+
+The 24 pin fixes from the audit were already in production when this ran, written at 14:39 UTC by someone else, exactly at the audited coordinates with `pre_snap_*` kept, so they were not written again.
+**Updated**: production `works`.
+
+## [2026-10-18] update | Every pin checked against Wikidata and Nominatim (read-only)
+**Object**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `data/pin-audit/`.
+**Scenario**: data quality (live content check follow-up)
+**Outcome**: ⚠️ audit done, 24 fixes waiting for a write
+**What happened**: checked all 2,908 places. 1,846 of the 1,856 places with a Q-id stand within 150 m of their Wikidata P625. Of the 1,052 without one, 377 match Nominatim within 300 m. That leaves 24 clear fixes, both Shard rows among them (about 800 m, off the Tower of London), and 157 rows for a person.
+
+Decisions worth keeping: the first unfiltered pass would have moved "Dorchester Hotel" onto a bus stop, "Caesar's Palace" onto a monorail station, "Alabama Hills" onto a trail and "The Old Mitre" 40 km to another pub. So a geocoder fix needs all of these: an exact name, no stand-in type, an area in the query, a move under 5 km, and a point or a building as the answer. A street is never moved onto one of its segments. Whitehall's pin, for one, sits on its north end and is right. Wikidata's `maxlag` answers 200 with no entities, and the first run read that as "no coordinate" for 1,589 places. The fixes are not written: the service key is not on the Mac and auto mode refuses a production-write script, so `docs/content-fixes-apply.md` is the spec for the owner's command.
+**Updated**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `test/pin-audit.test.mjs`, `docs/content-fixes-apply.md`, `data/pin-audit/{fixes,ambiguous}.csv`.
+
+## [2026-10-18] incident | Live content check: 12 works, 7 cities, against the real services
+**Object**: `/api/work`, `/api/trip/plan`, `/api/tour`, `/api/scenes`, `/api/film-image`, `/api/enrich/stills`, `/api/trail`, `/api/route`.
+**Scenario**: QA against live TMDB, Wikidata, Wikipedia, OpenAI and Supabase. Writes were blocked at the fetch layer, and trail and stills ran dry with in-memory stores.
+**Outcome**: ⚠️ four bugs fixed, data gaps listed
+**What happened**: fixed four things. (1) A verified trip-plan stop named no film, because `map_points_in_view` returns no titles. So a library filter refused every graph place: in Rome, a Roman Holiday + To Rome with Love list got 3 unchecked rows instead of the Spanish Steps, the Trevi Fountain and Piazza del Popolo. The route now reads `work_place_links` for the places in view, and the library matches any film at a stop. (2) An unknown-precision pin (`none`) was refused as "an area — none precision". It now says the pin's precision is unknown. (3) `/api/work` cached a failed graph read as `public, max-age=3600`. (4) `/api/tour` on gpt-5-nano spent 3,000 of 3,000 tokens on reasoning and always returned 422 "truncated". Cheap-tier gpt-5 calls now send `reasoning_effort: "low"`.
+
+Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
+**Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
 ## [2026-10-13] update | Mobile design review at 360–430 px
 **Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
 **Scenario**: design review (phone)
