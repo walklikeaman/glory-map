@@ -109,6 +109,29 @@ Decisions worth keeping: the first unfiltered pass would have moved "Dorchester 
 Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
 **Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
 
+## [2026-11-03] decision | What the AI cannot decide goes to a person, with what is wrong with it
+**Object**: `app/lib/suggestion-ai-review.mjs` (`readSource`, `problems`), `app/api/review/suggestions/ai/route.js`, `/review`, column `ai_problems`.
+**Scenario**: feature
+**Outcome**: ⚠️ ready, still not switched on
+**What happened**: The owner: an unclear source still has to be dealt with; what the AI can't settle stays for manual moderation, and the checker should see what is wrong with each one. The model now returns `problems` (one sentence each) beside its verdict, and code adds what it can see itself: no source link, the work not in the graph, the source not opening, the source page not naming the place. The server now **opens the reader's source** (public http(s) hosts only, no IPs or internal names, redirects re-checked, 8 s, first 8k characters of text) and the model reads the page. An "unsure" row stays pending with `ai_problems`, and `/review` shows them on the card. A confident pass whose page does not name the place goes to a person instead of the map.
+**Updated**: as listed, plus `test/suggestion-ai-review.test.mjs` and `app/globals.css`.
+
+## [2026-10-13] decision | A model pre-checks readers' suggestions; nobody reviews by hand for now
+**Object**: `app/lib/suggestion-ai-review.mjs`, `app/api/review/suggestions/ai/route.js`, columns `ai_reviewed_at` / `ai_note` in `20261013000100_reader_suggestions_reviewed.sql`.
+**Scenario**: feature
+**Outcome**: ⚠️ ready, not switched on: no schedule calls the route, the migrations are not applied
+**What happened**: The owner chose: no manual moderation and no mail about it; an AI checks first, a person maybe later. `/review` stays built and unused. `POST /api/review/suggestions/ai` (ENRICH_TOKEN, careful tier) takes the oldest unseen pending suggestions. Obvious junk (a link in the name, no letters, a character repeated) is rejected without a model. Otherwise the model sees the suggestion and up to five candidate works from `search_works`, and answers pass / reject / unsure with a confidence. Code decides what that may become: a pass needs confidence ≥ 0.85, a candidate work_id and the reader's source link, and enters `location_submissions` as **`pending`**, so the map shows it as an unchecked candidate. A model's judgement is a filter, not a check, so it never writes `verified` into the queue. A reject needs confidence ≥ 0.8 and gives the reader its reason. Anything else is stamped `ai_reviewed_at` and waits. A failed call stamps nothing, so the next run retries it.
+
+Open choice for later: a suggestion without a source link can never pass, because the queue's `source_url` is NOT NULL and every fact must cite something.
+**Updated**: as listed, plus `app/lib/suggestion-review.mjs` (`promoteSuggestion`, queue status as a parameter) and `test/suggestion-ai-review.test.mjs`.
+
+## [2026-10-13] update | Readers' suggestions get a review page: /review
+**Object**: `app/review/page.jsx`, `app/components/SuggestionReview.jsx`, `app/api/review/suggestions/route.js`, `app/lib/suggestion-review.mjs`, migrations `20261013000000_reader_is_a_source.sql` and `20261013000100_reader_suggestions_reviewed.sql`.
+**Scenario**: feature
+**Outcome**: ⚠️ code ready; both migrations (after 20261012000000) and `MODERATOR_EMAILS` still have to reach production
+**What happened**: The review step the previous entry left open. A moderator is a signed-in account whose confirmed email is in `MODERATOR_EMAILS`; unset means the route answers 503, not that it opens. The route reads and writes under the service role, because RLS lets only the author see a suggestion. Verify needs a work from the graph (picked through `/api/search`) and a web page that backs the claim; it inserts a `location_submissions` row with the new source kind `reader`, status `verified`, and links the suggestion to it (`submission_id`, `reviewed_by`, `reviewed_at`). A place the queue already holds for that work is linked, not duplicated, because (work_id, place_key) is unique. Reject needs a reason, and the reader's Add list now shows it ("Not accepted · …") or "Checked · it is on the map". Only a still-pending row is updated, so two moderators cannot both decide one. Checked on Postgres 16 with stubbed `auth.uid()`: a reader still cannot set `reviewed_by` or update anything; a `reader` queue row without `source_record_id` is refused.
+**Updated**: as listed, plus `app/components/AppSections.jsx`, `app/lib/submission-places.mjs` (label for the new kind), `.env.example`, `test/suggestion-review.test.mjs`.
+
 ## [2026-10-13] update | Mobile design review at 360–430 px
 **Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
 **Scenario**: design review (phone)
