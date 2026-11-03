@@ -19,6 +19,7 @@ import { DEFAULT_CLAUDE_MODEL } from "../../../lib/model-client.mjs";
 import {
   buildClassificationContent,
   buildClaudeClassificationContent,
+  inlineImage,
   classificationInstructions,
   imageBatches,
   MAX_IMAGES_PER_WORK,
@@ -116,16 +117,17 @@ async function backdropsFor(work, { env, fetchImpl }) {
 
 // One batch of images in, the parsed verdicts out — or a thrown error, which loses only
 // that batch. Claude is used when its key is configured; OpenAI otherwise.
-function createClassifier(env, { createOpenAIClient, createAnthropicClient }) {
+function createClassifier(env, { createOpenAIClient, createAnthropicClient, fetchImpl }) {
   if (env.ANTHROPIC_API_KEY) {
     const claude = createAnthropicClient(env.ANTHROPIC_API_KEY);
     return async (urls) => {
+      const images = await Promise.all(urls.map((url) => inlineImage(url, fetchImpl)));
       const message = await claude.messages.parse({
         model: env.ANTHROPIC_VISION_MODEL || env.ANTHROPIC_MODEL || DEFAULT_CLAUDE_MODEL,
         // Thinking counts against this budget too; the verdicts alone are small.
         max_tokens: 16_000,
         system: classificationInstructions(),
-        messages: [{ role: "user", content: buildClaudeClassificationContent(urls) }],
+        messages: [{ role: "user", content: buildClaudeClassificationContent(images) }],
         output_config: { format: zodOutputFormat(stillClassificationSchema), effort: "low" },
       }, { timeout: 120_000 });
       // A refused or truncated response must not be written: storing its silence
@@ -204,7 +206,7 @@ export function createStillsEnrichHandler({
       return Response.json({ classified: 0, works: [] }, { headers: noStoreHeaders });
     }
 
-    const classify = createClassifier(env, { createOpenAIClient, createAnthropicClient });
+    const classify = createClassifier(env, { createOpenAIClient, createAnthropicClient, fetchImpl });
     const results = [];
 
     for (const work of works) {
