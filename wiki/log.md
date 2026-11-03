@@ -109,6 +109,32 @@ Decisions worth keeping: the first unfiltered pass would have moved "Dorchester 
 Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
 **Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
 
+## [2026-11-03] decision | Visitors' shots on a place, and "recreate" any shot (#157)
+**Object**: `place_shots` table + private `place-shots` bucket (migration `20261103100000`, **not applied**), `app/api/shots/route.js`, `app/lib/place-shots.mjs`, `app/lib/shot-moderation.mjs`, `app/components/VisitorShots.jsx`, the recreate dialog.
+**Scenario**: imagery / community
+**Outcome**: 🟡 built and tested offline + Playwright with mocked API; waiting on the owner's yes to apply the migration
+**What happened**: Nikita asked (2026-11-03) that readers can add their own shots to a place, and recreate either the film frame or somebody else's shot. The card now has a "Visitors' shots" strip; each shot has "Recreate", and "Add your shot" opens the same dialog without a reference. Sharing needs sign-in.
+
+Decisions worth keeping:
+- A shot belongs to the **place** (`loc_wikidata_id`), not the film. A pin with no stable id has no shots.
+- Upload goes browser → private bucket under `<uid>/`, then `POST /api/shots` records it under the reader's token (RLS) as `pending`. The browser re-encodes through a canvas, which strips EXIF/GPS. Approved shots are served through 1-hour signed URLs.
+- No manual moderation (owner, 2026-10-13): Claude Haiku looks at the **image only**. approve → public, reject → row rejected and the file deleted, unsure/failed/over the limit → stays pending, visible to its author ("held back for a closer look"). Place and work names stay out of the prompt, because the browser supplies them and they could carry instructions.
+- Spend guard: 200 checks per UTC day across all users (`SHOT_MODERATION_DAILY_LIMIT`), 20 shares per account per day.
+- Not built: re-checking pending shots later, and a "delete my shot" button (the storage policy already allows it).
+**Updated**: `wiki/log.md`, `.env.example`.
+
+## [2026-11-03] decision | Then/now wipe on the place card (#57)
+**Object**: `app/components/ThenNowWipe.jsx`, `app/lib/then-now-wipe.mjs`, place card in `SceneMapApp.jsx`.
+**Scenario**: imagery
+**Outcome**: ✅ success (tests + desktop/390 px Playwright, frame mocked)
+**What happened**: when a card has both a matched film frame and a "place today" photo, the two are shown as one 16:9 wipe with a draggable divider instead of side by side. With only one image, or with either URL known broken, the old pair stays, because a wipe over half an error icon is worse than the pair that already says what is missing.
+
+Decisions worth keeping:
+- Keyboard and screen readers drive a native `<input type=range>` under the image (it takes no pointer events); the drag lives on the wrapper. `touch-action: pan-y` keeps vertical swipes scrolling the sheet.
+- A touch never jumps the divider on touch-down, only on a sideways move: a scroll that starts on the image must not move it. A mouse click does jump.
+- Both captions (frame source, Commons credit) stay under the wipe; attribution travels with the layout.
+- No alignment step: there is no vision-verified camera alignment in the data to use. The wipe uses only frames that already passed the matcher, so it is honest but rare. Issue #57's comment still applies: matched frames with wide shots of the location are the bottleneck, not the UI.
+**Updated**: `wiki/log.md`.
 ## [2026-11-03] decision | What the AI cannot decide goes to a person, with what is wrong with it
 **Object**: `app/lib/suggestion-ai-review.mjs` (`readSource`, `problems`), `app/api/review/suggestions/ai/route.js`, `/review`, column `ai_problems`.
 **Scenario**: feature

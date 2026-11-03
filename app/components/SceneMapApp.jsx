@@ -157,6 +157,9 @@ import {
 } from "./map/layers.jsx";
 import SearchBox from "./SearchBox";
 import { ImageAttribution } from "./ImageAttribution";
+import { ThenNowWipe } from "./ThenNowWipe";
+import { VisitorShots, shareResultMessage, shareShot } from "./VisitorShots";
+import { wipeMode } from "../lib/then-now-wipe.mjs";
 import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
 
@@ -706,9 +709,13 @@ function makeImageSearchUrl(location) {
   return `https://www.bing.com/images/search?${new URLSearchParams({ q: query })}`;
 }
 
-function RecreateShot({ location, onClose }) {
+function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onShared }) {
   const inputRef = useRef(null);
   const photoUrlRef = useRef("");
+  const photoFileRef = useRef(null);
+  const [share, setShare] = useState({ status: "idle", message: "" });
+  // No reference means "Add your shot": a plain photo of the place, nothing to line up.
+  const hasReference = Boolean(location.backdrop);
   const [photoUrl, setPhotoUrl] = useState("");
   const [view, setView] = useState("overlay");
   const [opacity, setOpacity] = useState(55);
@@ -741,22 +748,55 @@ function RecreateShot({ location, onClose }) {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     const nextUrl = URL.createObjectURL(file);
     photoUrlRef.current = nextUrl;
+    photoFileRef.current = file;
     setPhotoUrl(nextUrl);
     setView("overlay");
+    setShare({ status: "idle", message: "" });
+  }
+
+  async function sharePhoto() {
+    if (!userId) {
+      onRequestSignIn?.();
+      return;
+    }
+    if (!photoFileRef.current || share.status === "sending") return;
+    setShare({ status: "sending", message: "Sharing…" });
+    try {
+      const shot = await shareShot({
+        file: photoFileRef.current,
+        userId,
+        placeKey: String(location.locationId),
+        placeName: location.place,
+        workKey: location.filmId ? String(location.filmId) : null,
+        kind: hasReference ? "recreation" : "photo",
+        // A visitor's shot is served by a signed URL that expires; it is not stored.
+        referenceUrl: hasReference
+          ? ("referenceUrl" in location ? location.referenceUrl : location.backdrop)
+          : null,
+      });
+      setShare({ status: shot?.status === "rejected" ? "error" : "done", message: shareResultMessage(shot) });
+      onShared?.(shot);
+    } catch (error) {
+      setShare({ status: "error", message: error?.message || "The shot could not be shared." });
+    }
   }
 
   function usePhoto(blob) {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     const nextUrl = URL.createObjectURL(blob);
     photoUrlRef.current = nextUrl;
+    photoFileRef.current = blob;
     setPhotoUrl(nextUrl);
     setView("compare");
+    setShare({ status: "idle", message: "" });
     setMode("upload");
   }
 
   function resetPhoto() {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     photoUrlRef.current = "";
+    photoFileRef.current = null;
+    setShare({ status: "idle", message: "" });
     setPhotoUrl("");
     setView("overlay");
     setOpacity(55);
@@ -773,7 +813,9 @@ function RecreateShot({ location, onClose }) {
       >
         <header className="recreate-header">
           <div>
-            <p className="eyebrow">Recreate the shot</p>
+            <p className="eyebrow">
+              {hasReference ? `Recreate ${location.referenceLabel ?? "the shot"}` : "Add your shot"}
+            </p>
             <h2 id="recreate-title">{location.scene}</h2>
             <span>{location.film} · {location.place}</span>
           </div>
@@ -814,13 +856,13 @@ function RecreateShot({ location, onClose }) {
         <div className="recreate-stage">
           {view === "overlay" ? (
             <div className="recreate-canvas">
-              <img src={location.backdrop} alt={`Reference frame for ${location.film}`} />
+              {hasReference && <img src={location.backdrop} alt={`Reference frame for ${location.film}`} />}
               {photoUrl && (
                 <img
-                  className="recreate-user-photo"
+                  className={hasReference ? "recreate-user-photo" : undefined}
                   src={photoUrl}
                   alt="Your uploaded recreation"
-                  style={{ opacity: opacity / 100 }}
+                  style={hasReference ? { opacity: opacity / 100 } : undefined}
                 />
               )}
             </div>
@@ -838,8 +880,12 @@ function RecreateShot({ location, onClose }) {
           )}
           {!photoUrl && (
             <div className="recreate-empty">
-              <strong>Match the framing</strong>
-              <span>Upload a photo from this device to line it up with the reference.</span>
+              <strong>{hasReference ? "Match the framing" : "Show how it looks today"}</strong>
+              <span>
+                {hasReference
+                  ? "Upload a photo from this device to line it up with the reference."
+                  : "Pick a photo you took here. You can share it with the place."}
+              </span>
             </div>
           )}
         </div>
@@ -859,6 +905,7 @@ function RecreateShot({ location, onClose }) {
 
           {photoUrl && (
             <>
+              {hasReference && (
               <div className="recreate-view-switch" aria-label="Comparison mode">
                 <button
                   aria-pressed={view === "overlay"}
@@ -877,8 +924,9 @@ function RecreateShot({ location, onClose }) {
                   Then / now
                 </button>
               </div>
+              )}
 
-              {view === "overlay" && (
+              {hasReference && view === "overlay" && (
                 <label className="recreate-opacity">
                   <span>Your photo opacity</span>
                   <input
@@ -899,10 +947,28 @@ function RecreateShot({ location, onClose }) {
             </>
           )}
 
+          {photoUrl && location.locationId && (
+            <div className="recreate-share">
+              <button
+                className="wide-button"
+                disabled={share.status === "sending" || share.status === "done"}
+                onClick={sharePhoto}
+                type="button"
+              >
+                {userId ? "Share to this place" : "Sign in to share"}
+              </button>
+              {share.message && (
+                <p className={`recreate-share-status is-${share.status}`} role="status">{share.message}</p>
+              )}
+            </div>
+          )}
         </div>
         </>
         )}
-        <p className="recreate-privacy">Your photo stays in this browser tab and is never uploaded.</p>
+        <p className="recreate-privacy">
+          Your photo stays in this browser tab unless you share it. Shared photos are
+          re-saved without location data and checked before anyone else sees them.
+        </p>
       </section>
     </div>
   );
@@ -1193,6 +1259,7 @@ export default function SceneMapApp() {
   const [importMessage, setImportMessage] = useState("");
 
   const [recreateLocation, setRecreateLocation] = useState(null);
+  const [shotsVersion, setShotsVersion] = useState(0);
 
   useEffect(() => {
     localStorage.setItem(libraryStorageKey, JSON.stringify(library));
@@ -1524,8 +1591,6 @@ export default function SceneMapApp() {
   // nothing, which is most of the time.
   const [highlightedFilm, setHighlightedFilm] = useState(null);
   const [legendOpen, setLegendOpen] = useState(false);
-  // A "place today" photo that fails to load showed its alt text in a broken box.
-  const [failedNowPhoto, setFailedNowPhoto] = useState(null);
   const zoom = useMemo(() => zoomAffordance(mapZoom), [mapZoom]);
   useEffect(() => {
     if (typeof window !== "undefined") setBasemapId(readStoredLayerId(window.localStorage));
@@ -2183,6 +2248,52 @@ export default function SceneMapApp() {
       : activeLocation?.filmTmdbId ? "loading" : "unavailable";
   const activeFilmImageSource = activePrimaryFrame?.sourceUrl
     ?? (filmImageState.locationId === activeLocation?.id ? filmImageState.sourceUrl : null);
+  // Both captions are shown under the side-by-side pair and under the wipe (#57), so
+  // the frame's source and the photo's licence credit travel with either layout.
+  const thenCaption = activeLocation ? (
+    <>
+      <span className="scene-frame-meta">
+        {activePrimaryFrame && (
+          <span className="scene-frame-type">
+            {frameLocationLabel(activePrimaryFrame.locationType)}
+          </span>
+        )}
+        {activeFilmImage && activeFilmImageSource ? (
+          <a href={activeFilmImageSource} target="_blank" rel="noopener noreferrer">
+            AI-matched frame · TMDB
+          </a>
+        ) : "scene reference"}
+      </span>
+      {activePrimaryFrame?.description && (
+        <span className="scene-frame-description">
+          {activePrimaryFrame.description}
+        </span>
+      )}
+    </>
+  ) : null;
+  const nowCaption = activeLocation ? (
+    <>
+      the place today
+      {/* Commons files are licensed per FILE, so the credit belongs with
+          the image itself, not in a page footer. */}
+      {activeLocation.now && !brokenImages.has(activeLocation.now) && (
+        <ImageAttribution attribution={imageAttribution[activeLocation.now] ?? { url: activeLocation.now }} />
+      )}
+    </>
+  ) : null;
+  const dropActiveFilmImage = () => {
+    filmImageCache.current.delete(filmLocationImageKey(
+      activeLocation.filmTmdbId,
+      activeLocation.locationId ?? activeLocation.id,
+    ));
+    setFilmImageState({
+      locationId: activeLocation.id,
+      url: null,
+      sourceUrl: null,
+      frames: [],
+      status: "error",
+    });
+  };
   const activeNarration = aiTour?.stops?.find(
     (stop) => stop.locationId === activeLocation?.id,
   )?.narration;
@@ -4423,25 +4534,35 @@ export default function SceneMapApp() {
             )}
             <p>{activeLocation.description}</p>
             <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} />
+            {wipeMode({ thenUrl: activeFilmImage, nowUrl: activeLocation.now, broken: brokenImages }) === "wipe" ? (
+              <figure className="then-now-figure">
+                <ThenNowWipe
+                  key={activeLocation.id}
+                  thenSrc={activeFilmImage}
+                  thenAlt={`Matched film scene for ${activeLocation.film} at ${activeLocation.place}`}
+                  // A verified backdrop is not in filmImageState, so dropping that alone
+                  // would leave it in place; marking the URL broken is what ends the wipe.
+                  onThenError={() => { markImageBroken(activeFilmImage); dropActiveFilmImage(); }}
+                  nowSrc={activeLocation.now}
+                  nowAlt={`${activeLocation.place} today`}
+                  // The same rungs as the pair; only the box is wider, the full sheet.
+                  nowSrcSet={commonsSrcSetForSurface(activeLocation.now, "placePhoto") ?? undefined}
+                  nowSizes="(max-width: 860px) 100vw, 396px"
+                  onNowError={() => markImageBroken(activeLocation.now)}
+                />
+                <figcaption className="then-now-captions">
+                  <span>{thenCaption}</span>
+                  <span>{nowCaption}</span>
+                </figcaption>
+              </figure>
+            ) : (
             <div className="comparison-grid">
               <figure>
                 {activeFilmImage ? (
                   <img
                     src={activeFilmImage}
                     alt={`Matched film scene for ${activeLocation.film} at ${activeLocation.place}`}
-                    onError={() => {
-                      filmImageCache.current.delete(filmLocationImageKey(
-                        activeLocation.filmTmdbId,
-                        activeLocation.locationId ?? activeLocation.id,
-                      ));
-                      setFilmImageState({
-                        locationId: activeLocation.id,
-                        url: null,
-                        sourceUrl: null,
-                        frames: [],
-                        status: "error",
-                      });
-                    }}
+                    onError={dropActiveFilmImage}
                   />
                 ) : (
                   <div className="image-placeholder" role="status">
@@ -4473,31 +4594,13 @@ export default function SceneMapApp() {
                     )}
                   </div>
                 )}
-                <figcaption>
-                  <span className="scene-frame-meta">
-                    {activePrimaryFrame && (
-                      <span className="scene-frame-type">
-                        {frameLocationLabel(activePrimaryFrame.locationType)}
-                      </span>
-                    )}
-                    {activeFilmImage && activeFilmImageSource ? (
-                      <a href={activeFilmImageSource} target="_blank" rel="noopener noreferrer">
-                        AI-matched frame · TMDB
-                      </a>
-                    ) : "scene reference"}
-                  </span>
-                  {activePrimaryFrame?.description && (
-                    <span className="scene-frame-description">
-                      {activePrimaryFrame.description}
-                    </span>
-                  )}
-                </figcaption>
+                <figcaption>{thenCaption}</figcaption>
               </figure>
               <figure>
-                {activeLocation.now && failedNowPhoto !== activeLocation.now ? (
+                {activeLocation.now && !brokenImages.has(activeLocation.now) ? (
                   <img
                     src={activeLocation.now}
-                    onError={() => setFailedNowPhoto(activeLocation.now)}
+                    onError={() => markImageBroken(activeLocation.now)}
                     alt={`${activeLocation.place} today`}
                     // Half a 430 px sheet on a desktop, the whole sheet on a phone. A
                     // Special:FilePath URL renders on demand, so the one URL stored on
@@ -4509,16 +4612,10 @@ export default function SceneMapApp() {
                 ) : (
                   <div className="image-placeholder">Place photo unavailable</div>
                 )}
-                <figcaption>
-                  the place today
-                  {/* Commons files are licensed per FILE, so the credit belongs with
-                      the image itself, not in a page footer. */}
-                  {activeLocation.now && failedNowPhoto !== activeLocation.now && (
-                    <ImageAttribution attribution={imageAttribution[activeLocation.now] ?? { url: activeLocation.now }} />
-                  )}
-                </figcaption>
+                <figcaption>{nowCaption}</figcaption>
               </figure>
             </div>
+            )}
             {activeFilmFrames.length > 1 && (
               <section className="scene-frame-gallery" aria-label={`More matched frames from ${activeLocation.film}`}>
                 <div className="scene-frame-gallery-heading">
@@ -4563,6 +4660,20 @@ export default function SceneMapApp() {
               <Clapperboard size={18} />
               Recreate this shot
             </button>
+            <VisitorShots
+              // Shots belong to the place, not the film, so the key is the place's own
+              // id. A pin with no stable id (a map point, an article) has no shots.
+              placeKey={activeLocation.locationId ? String(activeLocation.locationId) : null}
+              signedIn={Boolean(accountUser)}
+              refreshKey={shotsVersion}
+              onAdd={() => setRecreateLocation({ ...activeLocation, backdrop: null })}
+              onRecreate={(shot) => setRecreateLocation({
+                ...activeLocation,
+                backdrop: shot.url,
+                referenceUrl: null,
+                referenceLabel: "a visitor's shot",
+              })}
+            />
             {activeLocation.sourceUrl && (
               <a className="source-link" href={activeLocation.sourceUrl} target="_blank" rel="noopener noreferrer">
                 {activeLocation.sourceTitle ?? (activeLocation.evidenceSource === "web_search" ? "Research source" : "Wikidata source")}
@@ -4807,7 +4918,13 @@ export default function SceneMapApp() {
       )}
 
       {recreateLocation && (
-        <RecreateShot location={recreateLocation} onClose={() => setRecreateLocation(null)} />
+        <RecreateShot
+          location={recreateLocation}
+          onClose={() => setRecreateLocation(null)}
+          userId={accountUser?.id ?? null}
+          onRequestSignIn={() => { setRecreateLocation(null); setAccountOpen(true); }}
+          onShared={() => setShotsVersion((value) => value + 1)}
+        />
       )}
 
       {profileFilm && (
