@@ -1,7 +1,16 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [2026-11-03] experiment | Claude pilot: still classification on 10 films, Opus vs Haiku
+Format: `## [2026-11-03] update | Whole catalogue's stills classified on Haiku; London trails on Opus
+**Object**: `scripts/classify-stills.mjs --all`, `scripts/fill-story-trails.mjs`, `app/api/trail/route.js`.
+**Scenario**: data enrichment (paid, Nikita chose Haiku for stills)
+**Outcome**: ✅ success
+**What happened**: `classify-stills --all` on claude-haiku-5-5 went through all 5,691 pending works with a TMDB id in about 1h45m (concurrency 6): 5,384 films judged, 122,641 images, 62,554 kept as frames, 305 with no TMDB images, 2 failed. It cost **$9.26**, about $0.0017 per film. Story trails on Opus for London: 8 of 10 new films (Dark Knight, Theory of Everything, Atonement, Paddington, About a Boy, National Treasure 2, Match Point, Spectre) for $0.74, about $0.09 per film. American Werewolf and Pirates 4 kept getting 429 from Wikipedia.
+
+Gotchas: from the shared cloud egress both the Wikipedia and Wikidata action APIs answer 429 "too many requests". The trail route now falls back to `rest.php/v1/page` (plot cut from the source) and `Special:EntityData`. Those rate-limit too, but less often. The Dark Knight trail shows junk "places" in the DB (Harvey Dent, Lau, Bridge, Commissioner Leob), and those need cleaning at the source.
+**Updated**: `scripts/classify-stills.mjs`, `app/api/trail/route.js`, `app/lib/plot-order.mjs`.
+
+## [2026-11-03] experiment | Claude pilot: still classification on 10 films, Opus vs Haiku
 **Object**: `scripts/classify-stills.mjs`, `app/lib/still-classify.mjs`.
 **Scenario**: data enrichment (paid)
 **Outcome**: ✅ stills done · ⏸ story trails blocked on network
