@@ -1303,11 +1303,16 @@ h2 {
 }
 
 .location-sheet {
-  right: 24px;
+  /* Left of the map's own buttons, like .section-sheet: at right 24px the card covered
+     zoom, locate and layers. Capped to the viewport and scrollable: a tall card grew up
+     past the top edge, hiding its title and close button (audit 2026-11-03). */
+  right: 72px;
   bottom: 24px;
-  width: min(430px, calc(100vw - 48px));
+  width: min(430px, calc(100vw - 120px));
+  max-height: calc(100% - 48px);
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .sheet-media {

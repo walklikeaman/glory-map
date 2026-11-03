@@ -1,7 +1,14 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
+Format: `## [2026-11-03] audit | UX audit of web and phone; the UX pass goes first in the queue
+**Object**: `docs/ux-audit-2026-11-03.md`, `TASKS.md`, `ROADMAP.md`, place card CSS.
+**Scenario**: audit
+**Outcome**: ✅ success
+**What happened**: Playwright at 1440×900 and 390×844 on a local prod build, four lenses (UX flow, visual, mobile-first, newcomer). Main finding: the screen shows everything at once (pin soup, 12-block panel, search hidden on the phone, routes in two places, engineering words). Fixed now: the desktop place card ran off the top of the screen (bottom-anchored, no height cap, overflow hidden) and covered the map buttons. UX-1…UX-11 are queued at the top of `TASKS.md`; new features wait for UX-1…UX-5.
+**Updated**: `TASKS.md` became the real queue for the daily feature routine (it was still the hackathon template).
+
+## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
 **Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
 **Scenario**: tooling
 **Outcome**: ✅ success
