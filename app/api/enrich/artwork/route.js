@@ -15,6 +15,7 @@ export const runtime = "nodejs";
 const noStoreHeaders = { "Cache-Control": "private, no-store" };
 const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 const MAX_WORKS = 60;
+const WIKIDATA_BATCH = 50;
 
 function jsonError(message, status) {
   return Response.json({ error: message }, { status, headers: noStoreHeaders });
@@ -30,6 +31,8 @@ async function loadWorksAnon(env, fetchImpl, limit) {
   const endpoint = new URL(`${url}/rest/v1/works`);
   endpoint.searchParams.set("select", "id,kind,title,wikidata_id,tmdb_id,poster_path");
   endpoint.searchParams.set("poster_path", "is.null");
+  endpoint.searchParams.set("wikidata_id", "not.is.null");
+  endpoint.searchParams.set("artwork_updated_at", "is.null");
   endpoint.searchParams.set("limit", String(limit));
 
   const response = await fetchImpl(endpoint, {
@@ -39,6 +42,8 @@ async function loadWorksAnon(env, fetchImpl, limit) {
   return response.json();
 }
 
+const UNIQUE_VIOLATION = "23505";
+
 function defaultCreateWriter(env) {
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -47,11 +52,16 @@ function defaultCreateWriter(env) {
   const client = createClient(url, serviceKey, { auth: { persistSession: false } });
   return {
     async loadWorks(limit) {
-      // Only what still needs artwork, so re-running is cheap and idempotent.
+      // Only what still needs artwork AND has not been looked up yet. Without the last two
+      // filters a work with no Wikidata id, or none on TMDB, came back in every batch:
+      // measured 18.10, 16 of a 60-work dry run found nothing, and 6,489 of 7,054 films
+      // and series lack a tmdb_id — so batches fill with misses and the run stops moving.
       const { data, error } = await client
         .from("works")
         .select("id, kind, title, wikidata_id, tmdb_id, poster_path")
         .is("poster_path", null)
+        .not("wikidata_id", "is", null)
+        .is("artwork_updated_at", null)
         .limit(limit);
       if (error) throw new Error(`works load failed: ${error.message}`);
       return data ?? [];
@@ -68,10 +78,26 @@ function defaultCreateWriter(env) {
             artwork_updated_at: new Date().toISOString(),
           })
           .eq("id", row.id);
+        // `works.tmdb_id` is unique, and two of our rows can resolve to one TMDB record
+        // (a duplicate work). That is one row to review, not a reason to lose the batch:
+        // it is stamped as looked at and left without the id.
+        if (error?.code === UNIQUE_VIOLATION) {
+          await this.markChecked([row.id]);
+          continue;
+        }
         if (error) throw new Error(`artwork update failed: ${error.message}`);
         saved += 1;
       }
       return saved;
+    },
+    // Looked up and found nothing on TMDB. Stamped so the next batch moves on.
+    async markChecked(ids) {
+      if (ids.length === 0) return;
+      const { error } = await client
+        .from("works")
+        .update({ artwork_updated_at: new Date().toISOString() })
+        .in("id", ids);
+      if (error) throw new Error(`artwork stamp failed: ${error.message}`);
     },
   };
 }
@@ -120,8 +146,11 @@ export function createArtworkEnrichHandler({
 
       // One batched Wikidata call for every work still missing its TMDB id.
       const needIds = candidates.filter((candidate) => !candidate.tmdbId);
-      if (needIds.length > 0) {
-        const entitiesUrl = buildWikidataEntitiesUrl(needIds.map((c) => c.wikidataId));
+      // wbgetentities takes at most 50 ids, and a batch of 60 works with no TMDB id yet
+      // asks for 60 — the request builder throws and the whole pass is lost.
+      for (let start = 0; start < needIds.length; start += WIKIDATA_BATCH) {
+        const chunk = needIds.slice(start, start + WIKIDATA_BATCH);
+        const entitiesUrl = buildWikidataEntitiesUrl(chunk.map((c) => c.wikidataId));
         const response = await fetchImpl(entitiesUrl, {
           headers: { Accept: "application/json", "User-Agent": USER_AGENT },
           signal: request.signal,
@@ -129,14 +158,17 @@ export function createArtworkEnrichHandler({
         });
         if (!response.ok) throw new Error(`Wikidata responded with ${response.status}`);
         const payload = await response.json();
-        for (const candidate of needIds) {
+        for (const candidate of chunk) {
           candidate.tmdbId = tmdbIdFromEntity(payload?.entities?.[candidate.wikidataId], candidate.kind);
         }
       }
 
       const results = [];
+      // Definite misses only: Wikidata names no TMDB id, or TMDB says the id is gone. A
+      // 5xx or a timeout is not an answer and must not take a work out of the queue.
+      const misses = [];
       for (const candidate of candidates) {
-        if (!candidate.tmdbId) continue; // no TMDB entry — recorded by writing nothing
+        if (!candidate.tmdbId) { misses.push(candidate.workId); continue; }
         const segment = candidate.kind === "series" ? "tv" : "movie";
         const endpoint = new URL(`${TMDB_API_BASE_URL}/${segment}/${candidate.tmdbId}`);
         if (tmdbKey) endpoint.searchParams.set("api_key", tmdbKey);
@@ -148,7 +180,10 @@ export function createArtworkEnrichHandler({
           signal: request.signal,
           next: { revalidate: 86400 },
         });
-        if (!response.ok) continue; // one missing title must not fail the whole pass
+        if (!response.ok) { // one missing title must not fail the whole pass
+          if (response.status === 404) misses.push(candidate.workId);
+          continue;
+        }
 
         results.push({
           workId: candidate.workId,
@@ -160,11 +195,12 @@ export function createArtworkEnrichHandler({
       const updates = artworkUpdates(results);
       if (dryRun) {
         return Response.json(
-          { dry_run: true, checked: works.length, found: updates.length, updates },
+          { dry_run: true, checked: works.length, found: updates.length, misses: misses.length, updates },
           { headers: noStoreHeaders },
         );
       }
       const saved = updates.length > 0 ? await writer.saveArtwork(updates) : 0;
+      if (writer.markChecked) await writer.markChecked(misses);
 
       return Response.json(
         {
@@ -172,6 +208,7 @@ export function createArtworkEnrichHandler({
           enriched: saved,
           with_poster: updates.filter((row) => row.poster_path).length,
           skipped: works.length - saved,
+          not_on_tmdb: misses.length,
         },
         { headers: noStoreHeaders },
       );

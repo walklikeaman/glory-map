@@ -229,6 +229,13 @@ test("a broken graph still returns the stills rather than failing the page", asy
   assert.equal(response.status, 200);
   assert.equal(body.stills.length, 1);
   assert.equal(body.work.in_graph, false);
+  // "No places" because a read failed is not an answer to keep for an hour.
+  assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+});
+
+test("a card whose graph read succeeded is still cached publicly", async () => {
+  const response = await handlerWith({ places: [place()] }).handler(request("film=509"));
+  assert.match(response.headers.get("Cache-Control"), /^public/);
 });
 
 test("TMDB being unavailable loses the stills, not the profile", async () => {

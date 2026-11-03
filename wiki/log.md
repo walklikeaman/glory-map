@@ -39,6 +39,32 @@ Found:
 3. Not fixed: 643 pairs of places at an identical coordinate; 156 share a name head ("Casa de Pilatos" + "Casa de Pilatos, Plaza de Pilatos, Seville"), so one film shows two pins. Books: only 4 have narrative links.
 **Updated**: as listed, plus tests.
 
+## [2026-10-18] update | TMDB ids for the catalogue, through Wikidata
+**Object**: `works.tmdb_id`, `poster_path`, `backdrop_path` (production).
+**Scenario**: data backfill (owner's go, 18.10)
+**Outcome**: ✅ success
+**What happened**: ran the fixed `/api/enrich/artwork` handler in-process over every work with a Wikidata id and no poster: 100 batches, 5,919 checked. 4,826 got a TMDB id and a poster, 587 are not on TMDB (stamped, so they are not asked again), and 9 hit a TMDB error and stay queued. Works with a TMDB id went from 565 to 4,919. Pilot first, on the 12 works of the live check: all 10 films right, both books correctly left alone. A random sample of 8 matched TMDB on title and year. A snapshot of the 5,460 rows as they were was taken before the run, for rollback. 2,135 films and series still have no id; most of them have no Wikidata id.
+
+The 24 pin fixes from the audit were already in production when this ran, written at 14:39 UTC by someone else, exactly at the audited coordinates with `pre_snap_*` kept, so they were not written again.
+**Updated**: production `works`.
+
+## [2026-10-18] update | Every pin checked against Wikidata and Nominatim (read-only)
+**Object**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `data/pin-audit/`.
+**Scenario**: data quality (live content check follow-up)
+**Outcome**: ⚠️ audit done, 24 fixes waiting for a write
+**What happened**: checked all 2,908 places. 1,846 of the 1,856 places with a Q-id stand within 150 m of their Wikidata P625. Of the 1,052 without one, 377 match Nominatim within 300 m. That leaves 24 clear fixes, both Shard rows among them (about 800 m, off the Tower of London), and 157 rows for a person.
+
+Decisions worth keeping: the first unfiltered pass would have moved "Dorchester Hotel" onto a bus stop, "Caesar's Palace" onto a monorail station, "Alabama Hills" onto a trail and "The Old Mitre" 40 km to another pub. So a geocoder fix needs all of these: an exact name, no stand-in type, an area in the query, a move under 5 km, and a point or a building as the answer. A street is never moved onto one of its segments. Whitehall's pin, for one, sits on its north end and is right. Wikidata's `maxlag` answers 200 with no entities, and the first run read that as "no coordinate" for 1,589 places. The fixes are not written: the service key is not on the Mac and auto mode refuses a production-write script, so `docs/content-fixes-apply.md` is the spec for the owner's command.
+**Updated**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `test/pin-audit.test.mjs`, `docs/content-fixes-apply.md`, `data/pin-audit/{fixes,ambiguous}.csv`.
+
+## [2026-10-18] incident | Live content check: 12 works, 7 cities, against the real services
+**Object**: `/api/work`, `/api/trip/plan`, `/api/tour`, `/api/scenes`, `/api/film-image`, `/api/enrich/stills`, `/api/trail`, `/api/route`.
+**Scenario**: QA against live TMDB, Wikidata, Wikipedia, OpenAI and Supabase. Writes were blocked at the fetch layer, and trail and stills ran dry with in-memory stores.
+**Outcome**: ⚠️ four bugs fixed, data gaps listed
+**What happened**: fixed four things. (1) A verified trip-plan stop named no film, because `map_points_in_view` returns no titles. So a library filter refused every graph place: in Rome, a Roman Holiday + To Rome with Love list got 3 unchecked rows instead of the Spanish Steps, the Trevi Fountain and Piazza del Popolo. The route now reads `work_place_links` for the places in view, and the library matches any film at a stop. (2) An unknown-precision pin (`none`) was refused as "an area — none precision". It now says the pin's precision is unknown. (3) `/api/work` cached a failed graph read as `public, max-age=3600`. (4) `/api/tour` on gpt-5-nano spent 3,000 of 3,000 tokens on reasoning and always returned 422 "truncated". Cheap-tier gpt-5 calls now send `reasoning_effort: "low"`.
+
+Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
+**Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
 ## [2026-10-13] update | Mobile design review at 360–430 px
 **Object**: `app/globals.css`, `app/components/AppSections.jsx`, `app/components/SceneMapApp.jsx`.
 **Scenario**: design review (phone)
@@ -110,6 +136,24 @@ Gotcha worth keeping: on phones the header has no account button at all, so befo
 
 Gotcha worth keeping: a library row now carries `kind: "book"` when it is a book, and every matcher (`matchOne`, `libraryEntryFor`, the merge key) keeps books and everything else apart. Without that, "Dune" the novel lit up "Dune" the film whenever one side had no year. Rows with no `kind` are films, which is every library saved before this. Trakt and Last.fm need API keys, Kinopoisk has no export, so they stay open in #92.
 **Updated**: the files above, `app/components/SceneMapApp.jsx`, `app/globals.css`, `test/goodreads-import.test.mjs`.
+
+## [2026-10-12] decision | "Add a place" goes to review for signed-in readers, hidden until checked
+**Object**: `reader_place_suggestions` (migration `20261012000000_suggestions_from_signed_in_readers.sql`), `app/lib/suggestions.mjs`, the Add view.
+**Scenario**: feature
+**Outcome**: ✅ success; the migration was applied to production on 2026-10-13
+**What happened**: The owner chose: sign-in required, nothing public until verified. A signed-in reader's suggestion is inserted from the browser under their own token into `reader_place_suggestions`, which is its own table on purpose: `location_submissions` is read by the map, the work card, the directory and title search with `status <> 'rejected'`, so a pending row there would be public within minutes. RLS: insert only as yourself and only `pending`; select only your own; no update/delete; anon has no grants. A trigger caps 20 per reader per 24 h. Without an account a suggestion stays on the device, and the Add view says to sign in. Checked against Postgres 16 with stubbed `auth.uid()`: cross-user insert, self-verify, anon read/write, update/delete all refused; the 21st row in a day is refused.
+
+Still open: the review step (promote a verified row into `location_submissions` and set `submission_id`) runs under the service role and has no UI yet.
+**Updated**: as listed, plus `app/components/AppSections.jsx` and `test/suggestions.test.mjs`.
+
+## [2026-10-11] update | ShotSync: the film frame over the live camera
+**Object**: `app/components/ShotSync.jsx`, `app/lib/shot-sync.mjs`, the Recreate dialog.
+**Scenario**: feature
+**Outcome**: ✅ success, checked with Chromium's fake camera; a real phone is still to try
+**What happened**: #50. "Recreate this shot" opens on a live rear camera with the frame as a ghost (opacity slider, one finger drags, two pinch and twist, wheel zooms on desktop), then "Take photo" composes the picture on the device. Upload stays one tap away, and "Compare then / now" hands the clean shot to the old side-by-side view. The camera code is lazy-loaded and the camera stops when the dialog closes.
+
+Worth keeping: the photo is drawn at the camera's own resolution for the part the screen showed (`snapshotLayout`), so what was lined up on screen is where it lands in the file. A frame from a host without CORS would taint the canvas; then the photo is saved without the ghost and the UI says so. `facingMode` is `ideal`, not `exact`, or laptops fail with OverconstrainedError.
+**Updated**: as listed, plus `app/globals.css` and `test/shot-sync.test.mjs`.
 
 ## [2026-10-04] update | The map gets sections, visits, Glory — and "Add" stays on the device on purpose
 **Object**: `app/components/AppSections.jsx`, `app/lib/place-marks.mjs`, `app/lib/suggestions.mjs`, the place card.
