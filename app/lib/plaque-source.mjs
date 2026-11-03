@@ -10,6 +10,7 @@
 // are real, and this module is almost entirely about the difference.
 
 import { finiteOrNull } from "./numbers.mjs";
+import { plaqueYears, preferredKinds, yearFits } from "./plaque-title-resolve.mjs";
 
 export const PLAQUE_SOURCE_KIND = "open_plaques";
 export const PLAQUE_LICENSE = "PDDL 1.0";
@@ -233,7 +234,18 @@ export function matchPlaque(row, works) {
   const inscription = String(row?.inscription ?? "");
   if (!inscription.trim()) return null;
 
+  // The same two checks the Wikidata resolver applies, because a title we already hold
+  // is no less ambiguous than one we look up. Measured on the live graph: plaque #8600,
+  // "The Gainsborough Film Studios 1924-1949 … 'The Wicked Lady'", was linked to the 1983
+  // remake; #2361, Roger Moore "starred in The Saint television series (1962-9)", to the
+  // 1997 Val Kilmer film; #3288, "Ian Fleming … novelist wrote 'You Only Live Twice' here
+  // in 1964", to the 1967 film. A work with no year is not refused for lacking one.
+  const years = plaqueYears(inscription);
+  const kinds = preferredKinds(inscription);
+
   for (const work of works) {
+    if (kinds && !kinds.includes(work.kind)) continue;
+    if (years.length && work.year && !yearFits(work.year, years)) continue;
     const claim = findTitleClaim(inscription, work);
     if (!claim) continue;
     const submission = plaqueSubmission(row, work, claim);

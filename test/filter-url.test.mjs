@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   FILTER_DEFAULTS, activeFilterCount, activeFilters, clearedFilter, filterChipLabel, filtersFromParams,
-  narrowingFilters, writeFilterParams,
+  narrowingFilters, workChipTitle, writeFilterParams,
 } from "../app/lib/filter-url.mjs";
 import { NO_MINIMUM } from "../app/lib/library-view.mjs";
 
@@ -135,4 +135,14 @@ test("clearing one chip puts back exactly that filter's default", () => {
   assert.equal(clearedFilter("minImdb"), NO_MINIMUM);
   assert.deepEqual(clearedFilter("kinds"), []);
   assert.equal(clearedFilter("nonsense"), undefined);
+});
+
+test("a work picked from search keeps its title on the chip when it is not in view", () => {
+  const id = "7fdfc23c-bb31-4e50-8586-b2ce0200c676";
+  const picked = { work_id: id, title: "Notting Hill" };
+  assert.equal(workChipTitle(id, { worksInView: [], picked }), "Notting Hill");
+  assert.equal(workChipTitle(id, { worksInView: [{ work_id: id, title: "Notting Hill (1999)" }], picked }), "Notting Hill (1999)");
+  // A pick that is no longer the filter (a shared link replaced it) does not name it.
+  assert.equal(workChipTitle("other-id", { worksInView: [], picked }), null);
+  assert.equal(workChipTitle("", { picked }), null);
 });

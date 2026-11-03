@@ -1303,11 +1303,16 @@ h2 {
 }
 
 .location-sheet {
-  right: 24px;
+  /* Left of the map's own buttons, like .section-sheet: at right 24px the card covered
+     zoom, locate and layers. Capped to the viewport and scrollable: a tall card grew up
+     past the top edge, hiding its title and close button (audit 2026-11-03). */
+  right: 72px;
   bottom: 24px;
-  width: min(430px, calc(100vw - 48px));
+  width: min(430px, calc(100vw - 120px));
+  max-height: calc(100% - 48px);
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .sheet-media {
@@ -1916,6 +1921,37 @@ figcaption a {
   margin-top: 18px;
 }
 
+/* The library's own search: the icon sits inside the field, styled like the main search. */
+.film-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* A grid item will not shrink below its input's default width without this, and the
+     Clear button beside it was pushed off a phone's screen. */
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.film-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+}
+
+.film-search input::placeholder {
+  color: var(--muted);
+}
+
 .clear-library {
   display: inline-flex;
   align-items: center;
@@ -2386,6 +2422,14 @@ figcaption a {
     min-height: 118px;
   }
 
+  /* A narrow card here: poster on top, title under it. Left as a row, the full-width
+     poster squeezed the title into a column one letter wide. */
+  .film-chip-toggle {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
   .poster-tile {
     width: 100%;
     height: 72px;
@@ -2645,6 +2689,7 @@ figcaption a {
 .graph-badge { font-weight: 600; }
 .graph-badge.badge-exact { color: #b8860b; }
 .graph-badge.badge-approximate { color: #b8860b; }
+.graph-badge.badge-unconfirmed { color: #b8860b; }
 .graph-badge.badge-studio { color: #6b3fa0; }
 .graph-badge.badge-narrative { color: #1f7a70; }
 
@@ -4897,6 +4942,12 @@ figcaption a {
   .scene-shell:has(.command-panel.is-open) .map-mine {
     left: calc(min(380px, 50vw) + (100% - min(380px, 50vw)) / 2);
   }
+}
+
+/* On a phone the opened sheet covers the map, and the listen button at the top of the
+   map sat on the sheet's own top edge, over "Hide panel". It comes back with the map. */
+@media (max-width: 639px) {
+  .scene-shell:has(.command-panel.is-open) .walk-controls { visibility: hidden; }
 }
 
 /* Above the collapsed sheet, which owns the bottom 60-odd px of a phone: at 2.4rem the

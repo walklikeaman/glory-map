@@ -104,7 +104,7 @@ import {
 } from "../lib/films-in-view.mjs";
 import {
   FILTER_DEFAULTS, clearedFilter, filterChipLabel, filtersFromParams,
-  narrowingFilters, writeFilterParams,
+  narrowingFilters, workChipTitle, writeFilterParams,
 } from "../lib/filter-url.mjs";
 import {
   EMPTY_REASON, labelledPlaces, notableEmptyReason, notableHere, ratingOf,
@@ -503,8 +503,8 @@ function filmImagePlaceholderLabel(status) {
   if (status === "loading") return "Matching scene to this place…";
   if (status === "no_match") return "No verified scene match";
   if (status === "studio_lot") return "Filmed on a studio lot";
-  if (status === "error") return "Scene matching failed";
-  return "Scene matching unavailable";
+  if (status === "error") return "Couldn't load the film frame";
+  return "No film frame for this place yet";
 }
 
 const frameLocationLabels = {
@@ -980,6 +980,7 @@ export default function SceneMapApp() {
   const [minImdb, setMinImdb] = useState(initialFilters.minImdb);
   const [graphKinds, setGraphKinds] = useState(initialFilters.kinds);   // [] = every kind
   const [graphWorkId, setGraphWorkId] = useState(initialFilters.workId); // "" = the whole library
+  const [pickedWork, setPickedWork] = useState(null); // { work_id, title } from the search box
   const [graphWorks, setGraphWorks] = useState([]);
 
   // Works that actually have a mappable place under the current kind filter, so the
@@ -1523,6 +1524,8 @@ export default function SceneMapApp() {
   // nothing, which is most of the time.
   const [highlightedFilm, setHighlightedFilm] = useState(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  // A "place today" photo that fails to load showed its alt text in a broken box.
+  const [failedNowPhoto, setFailedNowPhoto] = useState(null);
   const zoom = useMemo(() => zoomAffordance(mapZoom), [mapZoom]);
   useEffect(() => {
     if (typeof window !== "undefined") setBasemapId(readStoredLayerId(window.localStorage));
@@ -3299,6 +3302,7 @@ export default function SceneMapApp() {
             setWorkQuery(suggestion.title);
             setGraphLayerOn(true);
             setGraphWorkId(suggestion.work_id);
+            setPickedWork({ work_id: suggestion.work_id, title: suggestion.title });
             if (suggestion.kind && suggestion.kind !== workKind) changeWorkKind(suggestion.kind);
           }}
           onSubmit={searchWork}
@@ -3425,7 +3429,7 @@ export default function SceneMapApp() {
           <div className="filter-chips" role="group" aria-label="Filters narrowing the map">
             {narrowing.map((key) => {
               const label = filterChipLabel(key, filters, {
-                workTitle: graphWorks.find((work) => work.work_id === graphWorkId)?.title ?? null,
+                workTitle: workChipTitle(graphWorkId, { worksInView: graphWorks, picked: pickedWork }),
               });
               return (
                 <button
@@ -4490,9 +4494,10 @@ export default function SceneMapApp() {
                 </figcaption>
               </figure>
               <figure>
-                {activeLocation.now ? (
+                {activeLocation.now && failedNowPhoto !== activeLocation.now ? (
                   <img
                     src={activeLocation.now}
+                    onError={() => setFailedNowPhoto(activeLocation.now)}
                     alt={`${activeLocation.place} today`}
                     // Half a 430 px sheet on a desktop, the whole sheet on a phone. A
                     // Special:FilePath URL renders on demand, so the one URL stored on
@@ -4508,7 +4513,7 @@ export default function SceneMapApp() {
                   the place today
                   {/* Commons files are licensed per FILE, so the credit belongs with
                       the image itself, not in a page footer. */}
-                  {activeLocation.now && (
+                  {activeLocation.now && failedNowPhoto !== activeLocation.now && (
                     <ImageAttribution attribution={imageAttribution[activeLocation.now] ?? { url: activeLocation.now }} />
                   )}
                 </figcaption>

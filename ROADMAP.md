@@ -38,6 +38,15 @@ See [Releases](https://github.com/walklikeaman/glory-map/releases).
 
 ---
 
+## 🧹 Now · UX pass (from the 2026-11-03 audit)
+**Goal:** the first screen shows one clear job. Clustered pins, a three-zone panel,
+search on top of the phone map, one home for routes, plain words.
+**List:** UX-1 … UX-11 in [`TASKS.md`](TASKS.md), details in
+[`docs/ux-audit-2026-11-03.md`](docs/ux-audit-2026-11-03.md). New features wait until
+the P1 lines (UX-1 … UX-5) are merged.
+
+---
+
 ## 🏛️ Phase F · Foundation — the grounded content graph *(do first)*
 **Goal:** the spine that makes every later phase possible — one canonical content
 graph where **every point is backed by evidence, never invented**, and studio /

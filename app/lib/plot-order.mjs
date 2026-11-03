@@ -20,6 +20,7 @@
 // which is the evidence for the order, and is kept with the article it came from.
 
 import { z } from "zod";
+import { isVaguePlaceName } from "./vague-place-name.mjs";
 
 // The section a film article tells its story in. English Wikipedia's film manual of style
 // calls it "Plot"; series and older articles use the others.
@@ -31,6 +32,23 @@ export function findPlotSection(tocdata) {
     .replace(/<[^>]+>/g, "")
     .trim()));
   return found ? String(found.index) : null;
+}
+
+// The same section cut from a whole article's wikitext, heading line included, as
+// action=parse&section=N returns it. Used when the action API refuses us: from a shared
+// cloud egress it answers 429 "too many requests" to every call, while the core REST
+// endpoint (rest.php/v1/page) still serves the source.
+export function plotSectionFromWikitext(source) {
+  const lines = String(source ?? "").split("\n");
+  const start = lines.findIndex((line) => {
+    const heading = line.match(/^(={2,6})\s*(.*?)\s*\1\s*$/);
+    return heading && PLOT_SECTION.test(heading[2].replace(/<[^>]+>/g, "").trim());
+  });
+  if (start === -1) return null;
+  const level = lines[start].match(/^=+/)[0].length;
+  const end = lines.findIndex((line, index) => index > start
+    && /^(={2,6})[^=].*\1\s*$/.test(line) && line.match(/^=+/)[0].length <= level);
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
 }
 
 // Quotes are short on purpose: long enough to be unambiguous in a plot of a few thousand
@@ -115,9 +133,23 @@ export function placeInPlot(plot, passes, knownLocations) {
 
 // "Appears as "Grand Hotel (exterior)"." → Grand Hotel (exterior). What the guide says the
 // place plays, as a name; null when the guide line is something else (a building history).
+//
+// A double quote, straight or curly, closes on either kind. One shared character class
+// that also held the apostrophe used to stop at it, so "Harvey Dent's Office" became
+// "Harvey Dent" and "Lau's Offices" became "Lau": a character's name written into The
+// Dark Knight's trail as a stop. A single quote closes only where no letter follows it,
+// so 'Lau's Offices' holds.
 export function appearsAsName(note) {
-  const match = String(note ?? "").match(/appears as\s+["“']([^"”']+)["”']/i);
-  return match ? match[1].trim() : null;
+  const match = String(note ?? "").match(/appears as\s+(?:["“]([^"”]+)["”]|'(.+?)'(?!\p{L}))/iu);
+  const name = match ? (match[1] ?? match[2]).trim() : "";
+  return name || null;
+}
+
+// The name a stop is shown under. What the guide says it plays, unless that is only a kind
+// of place — "Bridge", "Street" — when the real name says more.
+export function sceneName(entry) {
+  const playsAs = appearsAsName(entry?.appears_as);
+  return playsAs && !isVaguePlaceName(playsAs) ? playsAs : entry?.location;
 }
 
 // The rows the scenes table keeps. A film has no chapters, so a scene's spoiler tier is
@@ -125,7 +157,7 @@ export function appearsAsName(note) {
 export function scenesFromPlacement(placed, { title }) {
   return placed.map((entry, index) => ({
     sequence_index: index + 1,
-    place_name: appearsAsName(entry.appears_as) ?? entry.location,
+    place_name: sceneName(entry),
     known_place: entry.location,
     // The quote that placed it, credited — a CC BY-SA sentence fragment is a citation
     // only when it says where it is from.

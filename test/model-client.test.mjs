@@ -6,6 +6,7 @@ import {
   chooseProvider,
   createModelClient,
   createThrottle,
+  DEFAULT_CLAUDE_MODEL,
   DEFAULT_FREE_MODEL,
   OPENROUTER_BASE_URL,
   parseStructured,
@@ -73,7 +74,22 @@ test("the OpenAI client keeps its own base URL and takes no provider hint", () =
 
   assert.equal(runtime.provider, "openai");
   assert.equal(built[0].baseURL, undefined);
-  assert.deepEqual(runtime.extraBody, {});
+  assert.equal(runtime.extraBody.provider, undefined);
+});
+
+test("a cheap gpt-5 call reasons briefly, so the reasoning cannot eat the answer", () => {
+  // Measured live: gpt-5-nano at the default effort spent all 3,000 tokens of a tour
+  // request on reasoning and every tour came back "truncated".
+  const { OpenAIImpl } = fakeSdk({});
+  const cheap = createModelClient({ OPENAI_API_KEY: "j", OPENAI_MODEL: "gpt-5-nano" }, { OpenAIImpl });
+  assert.deepEqual(cheap.extraBody, { reasoning_effort: "low" });
+
+  const careful = createModelClient(
+    { OPENAI_API_KEY: "j", OPENAI_MODEL: "gpt-5-mini" }, { OpenAIImpl, tier: TIERS.CAREFUL });
+  assert.deepEqual(careful.extraBody, {}, "a careful task keeps the model's own effort");
+
+  const older = createModelClient({ OPENAI_API_KEY: "j", OPENAI_MODEL: "gpt-4o-mini" }, { OpenAIImpl });
+  assert.deepEqual(older.extraBody, {}, "a model without reasoning is not sent the parameter");
 });
 
 // --- the call shape ------------------------------------------------------------------
@@ -313,4 +329,70 @@ test("nothing but a refusal can spend the quota", () => {
   assert.equal(dailyQuotaSpent({ ok: false, reason: "refused", detail: "daily" }), false);
   assert.equal(dailyQuotaSpent({ ok: false, reason: "request_failed", status: 500, detail: "per-day" }), false);
   assert.equal(dailyQuotaSpent(null), false);
+});
+
+// --- Claude ----------------------------------------------------------------------------
+
+function fakeClaude(reply) {
+  const built = [];
+  class Fake {
+    constructor(options) {
+      built.push(options);
+      this.messages = { parse: async (body, opts) => {
+        built.at(-1).lastCall = { body, opts };
+        if (reply instanceof Error) throw reply;
+        return reply;
+      } };
+    }
+  }
+  return { AnthropicImpl: Fake, built };
+}
+
+test("a careful task goes to Claude when its key is present", () => {
+  assert.equal(chooseProvider({ ANTHROPIC_API_KEY: "a", OPENAI_API_KEY: "o" }, TIERS.CAREFUL), "anthropic");
+});
+
+test("a Claude key does not move a cheap task off the free provider", () => {
+  assert.equal(chooseProvider({ ANTHROPIC_API_KEY: "a", OPENROUTER_API_KEY: "r" }, TIERS.CHEAP), "openrouter");
+  assert.equal(chooseProvider({ ANTHROPIC_API_KEY: "a", OPENAI_API_KEY: "o" }, TIERS.CHEAP), "anthropic");
+});
+
+test("the Claude model comes from ANTHROPIC_MODEL, with a default", () => {
+  const { AnthropicImpl } = fakeClaude({});
+  assert.equal(createModelClient({ ANTHROPIC_API_KEY: "a" }, { tier: TIERS.CAREFUL, AnthropicImpl }).model, DEFAULT_CLAUDE_MODEL);
+  assert.equal(createModelClient({ ANTHROPIC_API_KEY: "a", ANTHROPIC_MODEL: "claude-haiku-5-5" },
+    { tier: TIERS.CAREFUL, AnthropicImpl }).model, "claude-haiku-5-5");
+});
+
+test("Claude is asked for structured output and the answer is still checked by the schema", async () => {
+  const { AnthropicImpl, built } = fakeClaude({
+    stop_reason: "end_turn", model: "claude-opus-5-5", parsed_output: { places: ["Rome"] },
+  });
+  const runtime = createModelClient({ ANTHROPIC_API_KEY: "a" }, { tier: TIERS.CAREFUL, AnthropicImpl });
+  const result = await call(runtime);
+  assert.deepEqual(result.parsed, { places: ["Rome"] });
+  assert.equal(result.servedBy, "anthropic");
+  const body = built[0].lastCall.body;
+  assert.equal(body.system, "list them");
+  assert.equal(body.output_config.format.type, "json_schema");
+  assert.equal(body.output_config.effort, "medium");
+  assert.ok(body.max_tokens >= 16000, "thinking needs room in the budget");
+});
+
+test("a Claude refusal and a Claude truncation are not successes", async () => {
+  for (const [reply, reason] of [
+    [{ stop_reason: "refusal", stop_details: { explanation: "no" }, parsed_output: null }, "refused"],
+    [{ stop_reason: "max_tokens", parsed_output: null }, "truncated"],
+    [{ stop_reason: "end_turn", parsed_output: { places: "Rome" } }, "schema_mismatch"],
+  ]) {
+    const { AnthropicImpl } = fakeClaude(reply);
+    const runtime = createModelClient({ ANTHROPIC_API_KEY: "a" }, { tier: TIERS.CAREFUL, AnthropicImpl });
+    assert.equal((await call(runtime)).reason, reason);
+  }
+});
+
+test("a Claude rate limit is named as one", async () => {
+  const { AnthropicImpl } = fakeClaude(Object.assign(new Error("slow down"), { status: 429 }));
+  const runtime = createModelClient({ ANTHROPIC_API_KEY: "a" }, { tier: TIERS.CAREFUL, AnthropicImpl });
+  assert.equal((await call(runtime)).reason, "rate_limited");
 });

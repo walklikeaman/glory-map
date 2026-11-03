@@ -9,12 +9,17 @@
 // rejected images are stored as rejections — without that we would re-ask about the
 // same gun-barrel poster on every visit.
 
+import Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { createClient } from "@supabase/supabase-js";
 
+import { DEFAULT_CLAUDE_MODEL } from "../../../lib/model-client.mjs";
 import {
   buildClassificationContent,
+  buildClaudeClassificationContent,
+  inlineImage,
   classificationInstructions,
   imageBatches,
   MAX_IMAGES_PER_WORK,
@@ -110,10 +115,59 @@ async function backdropsFor(work, { env, fetchImpl }) {
   return { picked: [], available: 0 };
 }
 
+// One batch of images in, the parsed verdicts out — or a thrown error, which loses only
+// that batch. Claude is used when its key is configured; OpenAI otherwise.
+function createClassifier(env, { createOpenAIClient, createAnthropicClient, fetchImpl }) {
+  if (env.ANTHROPIC_API_KEY) {
+    const claude = createAnthropicClient(env.ANTHROPIC_API_KEY);
+    return async (urls) => {
+      const images = await Promise.all(urls.map((url) => inlineImage(url, fetchImpl)));
+      const message = await claude.messages.parse({
+        model: env.ANTHROPIC_VISION_MODEL || env.ANTHROPIC_MODEL || DEFAULT_CLAUDE_MODEL,
+        // Thinking counts against this budget too; the verdicts alone are small.
+        max_tokens: 16_000,
+        system: classificationInstructions(),
+        messages: [{ role: "user", content: buildClaudeClassificationContent(images) }],
+        output_config: { format: zodOutputFormat(stillClassificationSchema), effort: "low" },
+      }, { timeout: 120_000 });
+      // A refused or truncated response must not be written: storing its silence
+      // would permanently mark real frames as rejected.
+      if (message.stop_reason !== "end_turn" || !message.parsed_output) {
+        throw new Error(`vision stopped with ${message.stop_reason}`);
+      }
+      return message.parsed_output;
+    };
+  }
+
+  const openai = createOpenAIClient(env.OPENAI_API_KEY);
+  return async (urls) => {
+    const response = await openai.responses.parse({
+      model: env.OPENAI_VISION_MODEL || "gpt-5-nano",
+      store: false,
+      // A verdict per image is small, but this is a reasoning model and reasoning
+      // tokens count against the same budget. 1200 produced `incomplete` on a
+      // 12-image gallery and wrote nothing at all; low effort plus real headroom
+      // is what makes a full batch fit.
+      max_output_tokens: 4000,
+      reasoning: { effort: "low" },
+      instructions: classificationInstructions(),
+      input: [{ role: "user", content: buildClassificationContent(urls) }],
+      text: { format: zodTextFormat(stillClassificationSchema, "still_classification") },
+    }, { timeout: 60_000 });
+    // A refused or truncated response must not be written: storing its silence
+    // would permanently mark real frames as rejected.
+    if (response.status !== "completed" || !response.output_parsed) {
+      throw new Error(`vision responded ${response.status}`);
+    }
+    return response.output_parsed;
+  };
+}
+
 export function createStillsEnrichHandler({
   env = process.env,
   createStore = defaultCreateStore,
   createOpenAIClient = (apiKey) => new OpenAI({ apiKey }),
+  createAnthropicClient = (apiKey) => new Anthropic({ apiKey }),
   fetchImpl = fetch,
   logError = console.error,
 } = {}) {
@@ -129,7 +183,7 @@ export function createStillsEnrichHandler({
       body = {};
     }
 
-    if (!env.OPENAI_API_KEY) return jsonError("Vision is not configured.", 503);
+    if (!env.ANTHROPIC_API_KEY && !env.OPENAI_API_KEY) return jsonError("Vision is not configured.", 503);
     const store = createStore(env);
     if (!store) return jsonError("Storage is not configured.", 503);
 
@@ -152,7 +206,7 @@ export function createStillsEnrichHandler({
       return Response.json({ classified: 0, works: [] }, { headers: noStoreHeaders });
     }
 
-    const openai = createOpenAIClient(env.OPENAI_API_KEY);
+    const classify = createClassifier(env, { createOpenAIClient, createAnthropicClient, fetchImpl });
     const results = [];
 
     for (const work of works) {
@@ -174,30 +228,8 @@ export function createStillsEnrichHandler({
       let failed = false;
       for (const batch of imageBatches(candidates)) {
       try {
-        const response = await openai.responses.parse({
-          model: env.OPENAI_VISION_MODEL || "gpt-5-nano",
-          store: false,
-          // A verdict per image is small, but this is a reasoning model and reasoning
-          // tokens count against the same budget. 1200 produced `incomplete` on a
-          // 12-image gallery and wrote nothing at all; low effort plus real headroom
-          // is what makes a full batch fit.
-          max_output_tokens: 4000,
-          reasoning: { effort: "low" },
-          instructions: classificationInstructions(),
-          input: [{
-            role: "user",
-            content: buildClassificationContent(
-              batch.map((image) => tmdbImageUrl(image.file_path, "w780")),
-            ),
-          }],
-          text: { format: zodTextFormat(stillClassificationSchema, "still_classification") },
-        }, { timeout: 60_000 });
-        // A refused or truncated response must not be written: storing its silence
-        // would permanently mark real frames as rejected.
-        if (response.status !== "completed" || !response.output_parsed) {
-          throw new Error(`vision responded ${response.status}`);
-        }
-        rows.push(...verdictRows(work.id, batch, response.output_parsed));
+        const parsed = await classify(batch.map((image) => tmdbImageUrl(image.file_path, "w780")));
+        rows.push(...verdictRows(work.id, batch, parsed));
       } catch (error) {
         // One failed batch loses its own images, not the whole gallery.
         logError(`stills: vision failed for ${work.id}`, error);

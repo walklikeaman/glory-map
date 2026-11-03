@@ -1,7 +1,38 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
+Format: `## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+
+Tip: `grep "^## \[" log.md | head -20` shows recent activity.
+
+---
+
+## [2026-11-03] audit | UX audit of web and phone; the UX pass goes first in the queue
+**Object**: `docs/ux-audit-2026-11-03.md`, `TASKS.md`, `ROADMAP.md`, place card CSS.
+**Scenario**: audit
+**Outcome**: ✅ success
+**What happened**: Playwright at 1440×900 and 390×844 on a local prod build, four lenses (UX flow, visual, mobile-first, newcomer). Main finding: the screen shows everything at once (pin soup, 12-block panel, search hidden on the phone, routes in two places, engineering words). Fixed now: the desktop place card ran off the top of the screen (bottom-anchored, no height cap, overflow hidden) and covered the map buttons. UX-1…UX-11 are queued at the top of `TASKS.md`; new features wait for UX-1…UX-5.
+**Updated**: `TASKS.md` became the real queue for the daily feature routine (it was still the hackathon template).
+
+## [2026-11-03] update | Whole catalogue's stills classified on Haiku; London trails on Opus
+**Object**: `scripts/classify-stills.mjs --all`, `scripts/fill-story-trails.mjs`, `app/api/trail/route.js`.
+**Scenario**: data enrichment (paid, Nikita chose Haiku for stills)
+**Outcome**: ✅ success
+**What happened**: `classify-stills --all` on claude-haiku-5-5 went through all 5,691 pending works with a TMDB id in about 1h45m (concurrency 6): 5,384 films judged, 122,641 images, 62,554 kept as frames, 305 with no TMDB images, 2 failed. It cost **$9.26**, about $0.0017 per film. Story trails on Opus for London: 8 of 10 new films (Dark Knight, Theory of Everything, Atonement, Paddington, About a Boy, National Treasure 2, Match Point, Spectre) for $0.74, about $0.09 per film. American Werewolf and Pirates 4 kept getting 429 from Wikipedia.
+
+Gotchas: from the shared cloud egress both the Wikipedia and Wikidata action APIs answer 429 "too many requests". The trail route now falls back to `rest.php/v1/page` (plot cut from the source) and `Special:EntityData`. Those rate-limit too, but less often. The Dark Knight trail shows junk "places" in the DB (Harvey Dent, Lau, Bridge, Commissioner Leob), and those need cleaning at the source.
+**Updated**: `scripts/classify-stills.mjs`, `app/api/trail/route.js`, `app/lib/plot-order.mjs`.
+
+## [2026-11-03] experiment | Claude pilot: still classification on 10 films, Opus vs Haiku
+**Object**: `scripts/classify-stills.mjs`, `app/lib/still-classify.mjs`.
+**Scenario**: data enrichment (paid)
+**Outcome**: ✅ stills done · ⏸ story trails blocked on network
+**What happened**: Opus 5.5 judged 247 TMDB images across 9 films (1 had none) for $0.73, about $0.003 per image or $0.08 per film. Haiku 5.5 re-judged 144 of those images without writing for $0.0105 (about 40x cheaper) and agreed on 142. Both disagreements were real frames that Haiku rejected and Opus kept. About 5.7k works with a TMDB id still have no verdicts: roughly $460 on Opus, $20 on Haiku.
+
+Gotcha: from a network-restricted cloud sandbox the Claude API refuses image URL sources (400 "not allowed to use URL sources"), so the Claude classifier now downloads each image and sends it as base64. Story trails need `en.wikipedia.org` for the plot, which the cloud allowlist does not include yet (403), so that half of the pilot waits on it. `pendingWorks` claims to order by place count but has no ORDER BY, so the queue is arbitrary.
+**Updated**: `app/lib/still-classify.mjs`, `app/api/enrich/stills/route.js`, `test/still-classify.test.mjs`.
+
+## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
 **Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
 **Scenario**: tooling
 **Outcome**: ✅ success
@@ -10,11 +41,73 @@ Format: `## [2026-10-11] update | Claude Code can work on the repo from cloud se
 Gotcha worth keeping: the default cloud network reaches only package registries. Supabase, Wikidata, Wikipedia, TMDB and OpenAI are refused by the proxy, so `/api/map/works` returns 502 there while the page itself serves 200. The fix is the environment's network allowlist, not code.
 **Updated**: `CLAUDE.md`, `.claude/`.
 
-## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+## [2026-11-03] update | Routine QA: sitemaps, 404 on a DB timeout, the work chip
+**Object**: `app/sitemap.js`, `app/lib/page-load.mjs`, city/place/letter pages, `app/lib/filter-url.mjs`.
+**Scenario**: QA (desktop 1366 + phone 390, local prod build on the live DB)
+**Outcome**: ✅ fixed three, three left in `TASKS.md`
+**What happened**: the build prerenders all 27 sitemap letters at once and the DB answers part of the burst with a statement timeout; 10 of 27 shipped empty (b, s, t, d…). Now a 502 is asked again twice. The SEO pages treated any failed route as "not found", so a timeout gave 404 (crawlers drop the URL); now only the route's own 404 is a 404, anything else is a 500. Picking a work from search labelled the filter chip "One work" when the work was not among the graph's works in view; the picked title is the fallback now.
+Gotcha: a fresh cloud container may come up without `node_modules` (34 suites fail on `@supabase/supabase-js`); run `npm ci` before reading the test result.
 
-Tip: `grep "^## \[" log.md | head -20` shows recent activity.
+## [2026-11-03] update | "Harvey Dent" was never a place: the trail cut stop names at the apostrophe
+**Object**: `app/lib/plot-order.mjs`, `app/lib/vague-place-name.mjs`, `submission-review.mjs`, `promote-submission.mjs`, live `scenes`.
+**Scenario**: data quality
+**Outcome**: ✅ success
+**What happened**: The Dark Knight's story trail showed stops called "Harvey Dent", "Lau" and "Bridge". The `places` table was clean; the junk was in `scenes.act_or_chapter`. `appearsAsName` used one character class for every quote mark, so `Appears as "Harvey Dent's Office"` ended at the apostrophe. 43 of 209 live scene labels were wrong (Bridget, Jenny, Juliet, Mark Darcy, Silva, "Buckingham Palace (king"…), and were rewritten from the guide line with the fixed parser (snapshot in `/mnt/project-files/glorymap-backfill/2026-11-03-junk-places/`). A guide label that is one common noun ("Bridge", "Street", "Funeral") now falls back to the real place name.
 
----
+The same one-word check is now an ingest refusal (`vague_not_a_place`) and `bestName` skips it. Measured on the 55k-row queue before choosing one word only: a rule over every word of a name refused "Tower Bridge", "Park Lane" and "Victory Square". One word refuses 41 pending rows and no verified ones.
+
+Claude Haiku also read all 2,908 places, looking for character names, titles and vague words ($0.83). It flagged 6, and none was junk. Two were false alarms: "Waiting for the Interurban" is a Seattle sculpture and "Newbridge Memo" a Welsh hall. The other four are real pins with vague names, so I renamed them rather than hid them: "Railway Station, Carnforth", "Cloisters, Temple, London", "The Lake, Central Park", "Humanities Wing, University of Toronto Scarborough". Nothing was hidden. The verdicts and the before-names are in the snapshot folder.
+**Updated**: code + tests, 43 live scene rows.
+
+## [2026-11-03] update | TMDB ids by title from the cloud, four pins moved, and Claude as a provider
+**Object**: `works.tmdb_id/poster_path`, `places` (4 rows), `app/lib/model-client.mjs`, `app/api/enrich/stills/route.js`.
+**Scenario**: data + tooling
+**Outcome**: ✅ success
+**What happened**: The cloud environment now holds `SUPABASE_SERVICE_ROLE_KEY`, `TMDB_API_READ_ACCESS_TOKEN` and `ANTHROPIC_API_KEY`, and allows Supabase, TMDB and Wikidata. The title-and-year TMDB search (PR #337's rules) re-ran from the cloud: 874 candidates. Before writing, the 68 whose year differed by one were dropped. A spot check showed most were other works with the same title (Birdman 2014 matched a 2015 Birdman, and the series Community matched a film). 806 were written, 778 of them with a poster. `tmdb_id` now covers 5,725 of 7,063 works. The snapshot and the held-back list are in `/mnt/project-files/glorymap-backfill/`. Four pins moved to Wikidata coordinates, with the old values in `pre_snap_*`: two NYPL Fifth Avenue rows, Ham House and Friedhof der Namenlosen.
+
+Claude is now a third provider. A careful task (story trails) and still classification go to Claude when its key is set. A cheap task stays on OpenRouter, so the key never silently moves a catalogue job onto a paid model. The default model is `claude-opus-5-5`, set by `ANTHROPIC_MODEL`. A cheaper one is the owner's call after a measured run. `scripts/fill-story-trails.mjs` and the new `scripts/classify-stills.mjs` end with the run's cost in dollars.
+
+Gotchas: Node's `fetch` in the cloud needs `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`. The `places.wikidata_id` column is unique, and another row already holds the NYPL Q-id, so a duplicate place exists there.
+**Updated**: `.env.example`, `wiki/log.md`.
+
+## [2026-10-13] update | Sixteen cities checked against the live graph: unconfirmed pins and plaques on the wrong film
+**Object**: `app/lib/map-points.mjs`, `app/lib/map-layer.mjs`, `app/lib/plaque-source.mjs`.
+**Scenario**: content audit + bugfix
+**Outcome**: ⚠️ partial — code fixed; the wrong links already in production are listed, not deleted
+**What happened**: the cloud reaches no Supabase/Wikidata/TMDB, but the Supabase MCP reads production, so the map RPCs (`map_points_in_view`, `map_candidate_points_in_view`) were called directly for Edinburgh, Prague, Rome, Tokyo, Reykjavik, Dubrovnik, Marrakech, Sydney, Budapest, Wellington, Istanbul, Havana, Mumbai, Berlin, Oxford and Seville (≈12×9 km box, z14). Graph pins: Berlin 16, Prague 11, Rome 9, Oxford 9, Edinburgh 8, Seville 7; Dubrovnik, Wellington, Havana and Mumbai 0 (queue rows only).
+
+Found:
+1. `pointBadge` called every `none` place `exact`, so 860 unconfirmed places read "Filmed here" with a raw "none" under them. Eight different Vienna places (Votivkirche, Zollamtssteg…) share one coordinate in the Prater; Parliament Square and Trafalgar Square share one too. New `unconfirmed` badge, same rule as `isPinnable`.
+2. `matchPlaque` ignored the plaque's years and verb, which `chooseWork` already used: The Wicked Lady 1983 on Gainsborough Studios 1924–1949 (#8600), The Saint 1997 film for Roger Moore's 1962–9 TV series (#2361), the film You Only Live Twice for Fleming writing the novel (#3288).
+3. Not fixed: 643 pairs of places at an identical coordinate; 156 share a name head ("Casa de Pilatos" + "Casa de Pilatos, Plaza de Pilatos, Seville"), so one film shows two pins. Books: only 4 have narrative links.
+**Updated**: as listed, plus tests.
+
+## [2026-10-18] update | TMDB ids for the catalogue, through Wikidata
+**Object**: `works.tmdb_id`, `poster_path`, `backdrop_path` (production).
+**Scenario**: data backfill (owner's go, 18.10)
+**Outcome**: ✅ success
+**What happened**: ran the fixed `/api/enrich/artwork` handler in-process over every work with a Wikidata id and no poster: 100 batches, 5,919 checked. 4,826 got a TMDB id and a poster, 587 are not on TMDB (stamped, so they are not asked again), and 9 hit a TMDB error and stay queued. Works with a TMDB id went from 565 to 4,919. Pilot first, on the 12 works of the live check: all 10 films right, both books correctly left alone. A random sample of 8 matched TMDB on title and year. A snapshot of the 5,460 rows as they were was taken before the run, for rollback. 2,135 films and series still have no id; most of them have no Wikidata id.
+
+The 24 pin fixes from the audit were already in production when this ran, written at 14:39 UTC by someone else, exactly at the audited coordinates with `pre_snap_*` kept, so they were not written again.
+**Updated**: production `works`.
+
+## [2026-10-18] update | Every pin checked against Wikidata and Nominatim (read-only)
+**Object**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `data/pin-audit/`.
+**Scenario**: data quality (live content check follow-up)
+**Outcome**: ⚠️ audit done, 24 fixes waiting for a write
+**What happened**: checked all 2,908 places. 1,846 of the 1,856 places with a Q-id stand within 150 m of their Wikidata P625. Of the 1,052 without one, 377 match Nominatim within 300 m. That leaves 24 clear fixes, both Shard rows among them (about 800 m, off the Tower of London), and 157 rows for a person.
+
+Decisions worth keeping: the first unfiltered pass would have moved "Dorchester Hotel" onto a bus stop, "Caesar's Palace" onto a monorail station, "Alabama Hills" onto a trail and "The Old Mitre" 40 km to another pub. So a geocoder fix needs all of these: an exact name, no stand-in type, an area in the query, a move under 5 km, and a point or a building as the answer. A street is never moved onto one of its segments. Whitehall's pin, for one, sits on its north end and is right. Wikidata's `maxlag` answers 200 with no entities, and the first run read that as "no coordinate" for 1,589 places. The fixes are not written: the service key is not on the Mac and auto mode refuses a production-write script, so `docs/content-fixes-apply.md` is the spec for the owner's command.
+**Updated**: `app/lib/pin-audit.mjs`, `scripts/audit-place-pins.mjs`, `test/pin-audit.test.mjs`, `docs/content-fixes-apply.md`, `data/pin-audit/{fixes,ambiguous}.csv`.
+
+## [2026-10-18] incident | Live content check: 12 works, 7 cities, against the real services
+**Object**: `/api/work`, `/api/trip/plan`, `/api/tour`, `/api/scenes`, `/api/film-image`, `/api/enrich/stills`, `/api/trail`, `/api/route`.
+**Scenario**: QA against live TMDB, Wikidata, Wikipedia, OpenAI and Supabase. Writes were blocked at the fetch layer, and trail and stills ran dry with in-memory stores.
+**Outcome**: ⚠️ four bugs fixed, data gaps listed
+**What happened**: fixed four things. (1) A verified trip-plan stop named no film, because `map_points_in_view` returns no titles. So a library filter refused every graph place: in Rome, a Roman Holiday + To Rome with Love list got 3 unchecked rows instead of the Spanish Steps, the Trevi Fountain and Piazza del Popolo. The route now reads `work_place_links` for the places in view, and the library matches any film at a stop. (2) An unknown-precision pin (`none`) was refused as "an area — none precision". It now says the pin's precision is unknown. (3) `/api/work` cached a failed graph read as `public, max-age=3600`. (4) `/api/tour` on gpt-5-nano spent 3,000 of 3,000 tokens on reasoning and always returned 422 "truncated". Cheap-tier gpt-5 calls now send `reasoning_effort: "low"`.
+
+Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
+**Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
 
 ## [2026-11-03] decision | What the AI cannot decide goes to a person, with what is wrong with it
 **Object**: `app/lib/suggestion-ai-review.mjs` (`readSource`, `problems`), `app/api/review/suggestions/ai/route.js`, `/review`, column `ai_problems`.
@@ -1371,6 +1464,7 @@ match, which is the only thing a null can do.
 **1,217 tests, all passing** (11 new). Note for anyone reading the earlier Los Angeles
 figures: the owner's LA film count drops **326 → 291**, because 35 of them were never his
 films.
+
 ## [2026-09-10] fix | The empty sitemap that claimed a letter was empty
 
 **Object**: `app/sitemap.js`, `test/sitemap.test.mjs`, `.claude/launch.json`
@@ -1452,6 +1546,7 @@ matched; `workIsInLibrary` is now that question with the answer thrown away.
 **1,201 tests, all passing** (18 new). Verified in the browser against a library with a
 spread of scores: by places the five London chips are alphabetical, by rating they are
 5★ → 4.5★ → 3★ → 2.5★ → unrated, and a 4.5★ bar leaves two.
+
 ## [2026-09-10] update | The sitemap had 27 files and no door: robots.txt and an index
 
 **Object**: `app/robots.js`, `app/sitemap.xml/route.js`, `app/lib/site-url.mjs`,
@@ -1566,6 +1661,7 @@ are two sites agreeing on a name, not evidence a shoot happened.
 **1,169 tests, all passing** (33 new). Verified locally against production: 464 candidate
 pins over Los Angeles in the running app, *The Big Lebowski* with no studio badge at all,
 and *Back to the Future*'s Courthouse Square reading "Appears as Downtown Hill Valley".
+
 ## [2026-09-10] update | The 70 place pages are in the sitemap, and only the ones that exist
 
 **Object**: `app/api/directory/places/route.js`, `app/sitemap.js`, `test/sitemap.test.mjs`,
@@ -1700,8 +1796,6 @@ answer was to deploy and read the production smoke step, one round trip per look
 servers work there, which is how this migration was applied and checked, and that is enough
 for a query and not enough for a card.
 
-
-
 **Object**: `wiki/handoff.md`
 **Scenario**: docs · **Outcome**: ✅ success
 **Code changes**: this commit
@@ -1775,6 +1869,7 @@ list together (10 → 4 → 12, rows matching each time).
 
 **Updated**: `wiki/concepts/place-card.md` (new), `wiki/index.md`, `wiki/handoff.md`,
 `test/place-card.test.mjs`
+
 ## [2026-08-19] incident | Two sessions built #158 at the same time, and the other one was better
 
 **Object**: `app/components/SceneMapApp.jsx`, `.github/workflows/deploy-production.yml`
@@ -2201,6 +2296,7 @@ updates.
 
 **Updated**: `wiki/concepts/moviemaps-source.md` (new), `wiki/index.md`,
 `wiki/sources/source-evaluation.md`, `.gitignore`, `test/moviemaps-source.test.mjs`
+
 ## [2026-08-08] incident | The names were not the problem, and the first diagnosis said they were
 
 **Object**: `app/lib/place-name-head.mjs`, `scripts/geocode-submissions.mjs`,
@@ -2680,7 +2776,6 @@ separates it from reelstreets, whose terms exist and forbid); we take **facts** 
 name and a coordinate — not their prose or their images; every row is labelled unverified
 and links back; the project is not commercial.
 
-
 ## [2026-08-05] update | The juror scenario: 24 favourite films, three empty maps, zero after the fix
 
 **Object**: `app/lib/location-search.mjs`, `app/api/locations/route.js`
@@ -2714,7 +2809,6 @@ never a doorway.
 
 **After: empty for 0 of 24.** 824 tests green.
 
-
 ## [2026-08-05] rule-change | Not a commercial project — which changes some refusals and not others
 
 **Object**: `wiki/sources/source-evaluation.md`, issue #127
@@ -2743,7 +2837,6 @@ you may at all.** The first depends on commerce, the second does not.
 The practical gain is modest — ALIKED + LightGlue under Apache/BSD already cover what
 SuperPoint/SuperGlue do. The real gain is elsewhere: Fandom's stop lists open up as DATA
 rather than only as a recall benchmark.
-
 
 ## [2026-08-05] decision | Four directions the owner set: photo verification, music, facts, plaques
 
@@ -2784,7 +2877,6 @@ quietly becomes "places connected to anything Rowling ever touched".
 
 **Updated**: `wiki/sources/commemorative-plaques.md` (#125 recorded separately)
 
-
 ## [2026-08-05] ingest | Plaques on facades: the quote is already written on the wall
 
 **Object**: `wiki/sources/commemorative-plaques.md`, issue #125
@@ -2818,7 +2910,6 @@ world dump returns a hundred Texas markers about Jim Bowie and Bowie County.
 **Open question for the owner:** music is a new kind of work. `work_kind` knows
 film/series/book, musicians are the largest group of plaque subjects, and "this album was
 recorded here" is neither a filming location nor a narrative one.
-
 
 ## [2026-08-05] decision | Shipped, and a merge turns out to be a release
 
@@ -4271,6 +4362,7 @@ tier 1 of [[geocoding-cascade]] exists; the submissions queue has no review UI y
 - Recorded the brief in `Context/brief-scenemap-design.md` and filled in the "Project" block in `AGENTS.md`.
 - Assembled the first MVP slice: a dark Leaflet map of London, 10 hardcoded film-location pins, a location card, a list of points, and a local route line after adding 3 stops.
 - The Supabase schema and tables were not created; the next slice is the data contract + seed/API.
+
 ## [2026-07-21] update | Codebase mapped for GSD initialization
 
 - Created the seven reference documents in `.planning/codebase/`.
