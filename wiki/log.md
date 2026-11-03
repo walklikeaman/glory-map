@@ -40,6 +40,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] update | Routine QA: sitemaps, 404 on a DB timeout, the work chip
+**Object**: `app/sitemap.js`, `app/lib/page-load.mjs`, city/place/letter pages, `app/lib/filter-url.mjs`.
+**Scenario**: QA (desktop 1366 + phone 390, local prod build on the live DB)
+**Outcome**: ✅ fixed three, three left in `TASKS.md`
+**What happened**: the build prerenders all 27 sitemap letters at once and the DB answers part of the burst with a statement timeout; 10 of 27 shipped empty (b, s, t, d…). Now a 502 is asked again twice. The SEO pages treated any failed route as "not found", so a timeout gave 404 (crawlers drop the URL); now only the route's own 404 is a 404, anything else is a 500. Picking a work from search labelled the filter chip "One work" when the work was not among the graph's works in view; the picked title is the fallback now.
+Gotcha: a fresh cloud container may come up without `node_modules` (34 suites fail on `@supabase/supabase-js`); run `npm ci` before reading the test result.
 ## [2026-11-03] update | "Harvey Dent" was never a place: the trail cut stop names at the apostrophe
 **Object**: `app/lib/plot-order.mjs`, `app/lib/vague-place-name.mjs`, `submission-review.mjs`, `promote-submission.mjs`, live `scenes`.
 **Scenario**: data quality

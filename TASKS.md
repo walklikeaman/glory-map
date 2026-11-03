@@ -53,6 +53,12 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] #114 rest: tablet, landscape, ≤360 px, PWA install
 - [ ] #65 streaming narration, #70 offline tours
 
+## QA findings (routine check, 2026-11-03)
+
+- [ ] Map, a picked work: "Known for" says "Nothing here passes your filters" while the work's pins are drawn, and the Locations list under it still lists other films' nearby places (seen with Notting Hill over London). Needs a check on production with real tiles: the cloud browser can't load the basemap.
+- [ ] `/work/<slug>` answers 404 when the database fails: `/api/work` swallows the load error and returns `work.title: null`. Same fix as the city/place/letter pages (#readRoute), but the route has to say 502 first.
+- [ ] Production (`codex-hackathon-starter.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
+
 ## In progress (open draft PRs waiting for review)
 
 - [ ] #341 QA 03.11: sitemaps, 500 on DB failure, chip title

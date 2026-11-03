@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { GET as filmsRoute } from "../../../api/directory/films/route.js";
 import { OTHER_LETTER, letterFromSlug, letterToSlug } from "../../../lib/directory.mjs";
 import { workPath } from "../../../lib/work-url.mjs";
+import { readRoute } from "../../../lib/page-load.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,7 @@ async function loadLetter(slug, page) {
   url.searchParams.set("letter", slug);
   if (page) url.searchParams.set("page", page);
   const response = await filmsRoute(new Request(url));
-  if (!response.ok) return null;
-  return response.json();
+  return readRoute(response, "The directory");
 }
 
 export async function generateMetadata({ params }) {

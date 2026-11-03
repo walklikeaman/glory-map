@@ -178,6 +178,16 @@ export function filterChipLabel(key, filters, { workTitle = null } = {}) {
   }
 }
 
+// The title the work chip shows. The works in view come first; the one picked from search
+// is the fallback, because a work picked by name need not be among the works the graph
+// drew here — QA 03.11: picking "Notting Hill" over London labelled the chip "One work".
+export function workChipTitle(workId, { worksInView = [], picked = null } = {}) {
+  if (!workId) return null;
+  const inView = worksInView.find((work) => work?.work_id === workId)?.title;
+  if (inView) return inView;
+  return picked?.work_id === workId && picked.title ? picked.title : null;
+}
+
 // The single value one chip's × puts back.
 export function clearedFilter(key) {
   return Object.hasOwn(FILTER_DEFAULTS, key) ? FILTER_DEFAULTS[key] : undefined;
