@@ -274,6 +274,35 @@ WHERE {
 GROUP BY ?work ?workLabel ?location ?locationLabel ?coord ?locationDescription${kindColumn}`;
 }
 
+// **The nearby question, asked the same way by everyone near the same spot.** The map
+// sends its exact centre and a radius from the viewport, so no two pans wrote the same
+// SPARQL, and the query service and our fetch cache only ever answer a query text they
+// have seen before. Measured on production 11.10: an unseen nearby query took 3–11.5 s,
+// the same text again 0.27 s. So the query goes out for a cell: the centre snapped to a
+// 0.005° grid (about 550 m) and the radius widened by the distance snapped, then rounded
+// up to half a kilometre. The answer is still cut to the exact centre and radius
+// afterwards (`locationsWithinRadius`), so the widening adds no place outside the circle
+// asked about.
+export const NEARBY_CELL_DEGREES = 0.005;
+export const NEARBY_RADIUS_STEP_KM = 0.5;
+
+function onGrid(value, step) {
+  // toFixed then Number: 51.505000000000003 must print as 51.505, or the text differs.
+  return Number((Math.round(value / step) * step).toFixed(6));
+}
+
+export function nearbyQueryCell({ lat, lng, radius }) {
+  const cellLat = onGrid(lat, NEARBY_CELL_DEGREES);
+  const cellLng = onGrid(lng, NEARBY_CELL_DEGREES);
+  const drift = haversineKm([lat, lng], [cellLat, cellLng]);
+  const steps = Math.ceil((radius + drift) / NEARBY_RADIUS_STEP_KM - 1e-9);
+  return {
+    lat: cellLat,
+    lng: cellLng,
+    radius: Number((Math.max(1, steps) * NEARBY_RADIUS_STEP_KM).toFixed(1)),
+  };
+}
+
 // How many title candidates to consider before deciding which work was meant.
 //
 // It was 8, and 8 is where the demo breaks. Measured on the live search: "Skyfall"
