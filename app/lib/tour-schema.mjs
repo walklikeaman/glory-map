@@ -13,6 +13,7 @@ export const tourRequestSchema = z
       .optional(),
     durationMinutes: z.union([z.literal(30), z.literal(60), z.literal(120)]).optional(),
     preserveOrder: z.boolean().optional().default(false),
+    language: z.string().trim().max(16).optional(),
     locations: z
       .array(
         z.object({

@@ -206,7 +206,7 @@ test("the model's guide is used only when it returns every stop in the given ord
   const inOrder = { title: "T", stops: stops.map((stop) => ({ locationId: stop.id, narration: "n" })) };
   const good = await fetchTimedTourGuide(stops, { city: "London", budgetMinutes: 60, fetchImpl: async () => jsonResponse(200, inOrder) });
   assert.equal(good.usedAiFallback, false);
-  assert.equal(good.guide, inOrder);
+  assert.deepEqual(good.guide, { ...inOrder, language: "en" });
 
   const reordered = { stops: [...inOrder.stops].reverse() };
   for (const fetchImpl of [
@@ -227,4 +227,38 @@ test("the guide request asks the model to keep the order, and sends only what it
   await fetchTimedTourGuide(stops, { city: "London", budgetMinutes: 30, fetchImpl: async (url, init) => { sent = { url, body: JSON.parse(init.body) }; return jsonResponse(500, {}); } });
   assert.equal(sent.url, "/api/tour");
   assert.deepEqual(sent.body, { city: "London", durationMinutes: 30, preserveOrder: true, locations: [{ id: "a", place: "P", scene: "S", description: "D", film: "F" }] });
+});
+
+test("a guide in another language is asked for, and falls back to English before the script", async () => {
+  const stops = plan(3).stops;
+  const tour = (language) => ({ title: "T", language, stops: stops.map((stop) => ({ locationId: stop.id, narration: "n" })) });
+
+  const sent = [];
+  const french = await fetchTimedTourGuide(stops, {
+    city: "Paris", budgetMinutes: 60, language: "fr",
+    fetchImpl: async (url, init) => { sent.push(JSON.parse(init.body).language); return jsonResponse(200, tour("fr")); },
+  });
+  assert.deepEqual(sent, ["fr"]);
+  assert.equal(french.guide.language, "fr");
+  assert.equal(french.usedLanguageFallback, false);
+
+  const asked = [];
+  const english = await fetchTimedTourGuide(stops, {
+    city: "Paris", budgetMinutes: 60, language: "fr",
+    fetchImpl: async (url, init) => {
+      const language = JSON.parse(init.body).language ?? "en";
+      asked.push(language);
+      return language === "fr" ? jsonResponse(502, {}) : jsonResponse(200, tour("en"));
+    },
+  });
+  assert.deepEqual(asked, ["fr", "en"]);
+  assert.equal(english.guide.language, "en");
+  assert.equal(english.usedAiFallback, false);
+  assert.equal(english.usedLanguageFallback, true);
+
+  const scripted = await fetchTimedTourGuide(stops, {
+    city: "Paris", budgetMinutes: 60, language: "fr", fetchImpl: async () => { throw new Error("offline"); },
+  });
+  assert.equal(scripted.usedAiFallback, true);
+  assert.equal(scripted.guide.language, "en");
 });
