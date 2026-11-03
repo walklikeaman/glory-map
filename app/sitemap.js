@@ -32,13 +32,26 @@ export function generateSitemaps() {
   return DIRECTORY_LETTERS.map((letter) => ({ id: letterToSlug(letter) }));
 }
 
-async function worksForLetter(slug) {
+// The letter files are prerendered at build, all 27 at once, and the database answers part
+// of that burst with a statement timeout (a 502 from the route). Measured 03.11: 10 of 27
+// letters failed that way and shipped empty until the next deploy — b, s and t among them,
+// 1,500 works missing from the sitemap. One letter asked on its own answers in ~0.3 s, so a
+// short wait and a second ask is enough; a 503 (no database configured) is not retried.
+const RETRY_WAITS_MS = [1500, 4000];
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function worksForLetter(slug, { route = filmsRoute, waits = RETRY_WAITS_MS, wait = sleep } = {}) {
   const works = [];
   for (let page = 1; ; page += 1) {
     const url = new URL("https://glorymap.local/api/directory/films");
     url.searchParams.set("letter", slug);
     url.searchParams.set("page", String(page));
-    const response = await filmsRoute(new Request(url));
+    let response = await route(new Request(url));
+    for (const ms of waits) {
+      if (response.status !== 502) break;
+      await wait(ms);
+      response = await route(new Request(url));
+    }
     if (!response.ok) break;
     const data = await response.json();
     works.push(...(data.works ?? []));

@@ -21,6 +21,7 @@ import { googleMapsUrl, streetViewUrl } from "../../lib/place-links.mjs";
 import { placeIdFromSlug, placePath } from "../../lib/place-url.mjs";
 import { placeBlocks } from "../../lib/work-card.mjs";
 import { workPath } from "../../lib/work-url.mjs";
+import { readRoute } from "../../lib/page-load.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,7 @@ async function loadPlace(slug) {
   const response = await placeRoute(
     new Request(`https://glorymap.local/api/place?id=${encodeURIComponent(id)}`),
   );
-  if (!response.ok) return null;
-  const payload = await response.json();
+  const payload = await readRoute(response, "The place page");
   // The route 404s a place with no rows, so anything that got here has facts. The title is
   // still the minimum a page needs to print.
   return payload?.place?.name ? payload : null;

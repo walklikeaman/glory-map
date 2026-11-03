@@ -104,7 +104,7 @@ import {
 } from "../lib/films-in-view.mjs";
 import {
   FILTER_DEFAULTS, clearedFilter, filterChipLabel, filtersFromParams,
-  narrowingFilters, writeFilterParams,
+  narrowingFilters, workChipTitle, writeFilterParams,
 } from "../lib/filter-url.mjs";
 import {
   EMPTY_REASON, labelledPlaces, notableEmptyReason, notableHere, ratingOf,
@@ -980,6 +980,7 @@ export default function SceneMapApp() {
   const [minImdb, setMinImdb] = useState(initialFilters.minImdb);
   const [graphKinds, setGraphKinds] = useState(initialFilters.kinds);   // [] = every kind
   const [graphWorkId, setGraphWorkId] = useState(initialFilters.workId); // "" = the whole library
+  const [pickedWork, setPickedWork] = useState(null); // { work_id, title } from the search box
   const [graphWorks, setGraphWorks] = useState([]);
 
   // Works that actually have a mappable place under the current kind filter, so the
@@ -3299,6 +3300,7 @@ export default function SceneMapApp() {
             setWorkQuery(suggestion.title);
             setGraphLayerOn(true);
             setGraphWorkId(suggestion.work_id);
+            setPickedWork({ work_id: suggestion.work_id, title: suggestion.title });
             if (suggestion.kind && suggestion.kind !== workKind) changeWorkKind(suggestion.kind);
           }}
           onSubmit={searchWork}
@@ -3425,7 +3427,7 @@ export default function SceneMapApp() {
           <div className="filter-chips" role="group" aria-label="Filters narrowing the map">
             {narrowing.map((key) => {
               const label = filterChipLabel(key, filters, {
-                workTitle: graphWorks.find((work) => work.work_id === graphWorkId)?.title ?? null,
+                workTitle: workChipTitle(graphWorkId, { worksInView: graphWorks, picked: pickedWork }),
               });
               return (
                 <button
