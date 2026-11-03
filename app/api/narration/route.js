@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { modelFailed, notConfigured, readJsonBody } from "../../lib/ai-route.mjs";
 import { createSpeechRequest } from "../../lib/voice-guide.mjs";
 import { ttsCacheTarget, TTS_BUCKET } from "../../lib/tts-cache.mjs";
+import { guideLanguage } from "../../lib/guide-language.mjs";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,7 @@ function defaultCreateCache(env) {
 
 // POST /api/narration — speak a narration, reusing a cached clip when one exists.
 //
-// The cache key is a hash of (text, voice, model), so editing the narration changes
+// The cache key is a hash of (text, voice, model, and the language when it is not English), so editing the narration changes
 // the key and the stale clip is simply never requested again. There is no purge step
 // because none is needed.
 export function createNarrationHandler({
@@ -55,12 +56,14 @@ export function createNarrationHandler({
   return async function POST(request) {
     const body = await readJsonBody(request);
 
+    const language = guideLanguage(body?.language).code;
     let speechRequest;
     try {
       speechRequest = createSpeechRequest({
         text: body?.text,
         profileId: body?.profileId,
         model: env.OPENAI_TTS_MODEL,
+        language,
       });
     } catch {
       return Response.json({ error: "Provide a valid narration and narrator." }, { status: 400 });
@@ -72,6 +75,7 @@ export function createNarrationHandler({
           text: speechRequest.input,
           voice: speechRequest.voice,
           model: speechRequest.model,
+          language,
           supabaseUrl: cache.url,
         })
       : null;

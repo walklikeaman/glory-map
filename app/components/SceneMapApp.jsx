@@ -38,6 +38,7 @@ import {
   List,
   LogIn,
   Mail,
+  Share2,
 } from "lucide-react";
 import {
   DEMO_LOCATION,
@@ -68,6 +69,9 @@ import {
 import WorkProfile from "./WorkProfile.jsx";
 import { isWalkableStop, trailStops } from "../lib/story-trail.mjs";
 import { onFootNote, orderTrail, TRAIL_ORDER, trailOrderNote, walkRuns } from "../lib/trail-order.mjs";
+import { trailFileName, trailGeoJson, trailOrderFromParams, trailShareUrl } from "../lib/trail-share.mjs";
+import { googleMapsDirectionsUrl, gpxFileName, routeGpx } from "../lib/route-export.mjs";
+import { scrubIndex, scrubLabel, scrubStops } from "../lib/trail-scrubber.mjs";
 import {
   achievementsOf, checkIn, checkInMessage, demoCheckIn, distanceFromYou, emptyMarks, gloryOf, isWanted, loadMarks,
   progressOf, saveMarks, toggleWant, visitOf,
@@ -136,6 +140,13 @@ import {
   fetchTimedTourGuide,
   pickRouteThatFitsBudget,
 } from "../lib/timed-tour.mjs";
+import {
+  GUIDE_LANGUAGE_KEY,
+  GUIDE_LANGUAGES,
+  guideLanguage,
+  guideLanguageCode,
+  guideLanguageFromLocales,
+} from "../lib/guide-language.mjs";
 import { ACCESS, accessNote, isRoutable, MAX_PLACES_PER_QUERY } from "../lib/place-access.mjs";
 import VoiceGuide from "./VoiceGuide";
 import GraphLayer from "./GraphLayer";
@@ -986,6 +997,13 @@ export default function SceneMapApp() {
   // Nothing open until the reader opens something. It used to start on the demo pin, and
   // the sheet it opened was the first thing a new visitor saw instead of the map.
   const [activeLocation, setActiveLocation] = useState(null);
+  // On a phone the panel and a place's card are both sheets rising from the bottom, and
+  // stacked they left the card a 380 px slot with the panel's credits printed over it
+  // (mobile review, 2026-10-13). Opening a place puts the panel away; the CSS does the
+  // reverse, hiding the card while the panel is pulled up again.
+  useEffect(() => {
+    if (activeLocation && window.matchMedia("(max-width: 860px)").matches) setPanelOpen(false);
+  }, [activeLocation?.id]);
   const [filmImageState, setFilmImageState] = useState({
     locationId: fallbackLocations[0].id,
     url: null,
@@ -1111,6 +1129,9 @@ export default function SceneMapApp() {
   const [timedTour, setTimedTour] = useState(null);
   const [timedTourStatus, setTimedTourStatus] = useState("idle");
   const [timedTourMessage, setTimedTourMessage] = useState("");
+  // The language the tour guide writes and speaks in (#67). English until the browser
+  // is read on mount, so the server render and the first client render agree.
+  const [tourLanguage, setTourLanguage] = useState("en");
   // What OSM knows about getting into the places around here, keyed by place id. Kept
   // beside the tour rather than inside it so the location card can say the same thing
   // the tour says about a stop.
@@ -1622,6 +1643,19 @@ export default function SceneMapApp() {
     }
   }, [mapFilms, tourFilmId]);
 
+  // A language chosen once is kept; otherwise the phone's own preference decides.
+  useEffect(() => {
+    let saved = null;
+    try { saved = guideLanguageCode(window.localStorage.getItem(GUIDE_LANGUAGE_KEY)); } catch { /* private mode */ }
+    setTourLanguage(saved ?? guideLanguageFromLocales(navigator.languages ?? [navigator.language]));
+  }, []);
+
+  function chooseTourLanguage(code) {
+    setTourLanguage(code);
+    resetTimedTour();
+    try { window.localStorage.setItem(GUIDE_LANGUAGE_KEY, code); } catch { /* still applies for this visit */ }
+  }
+
   // Posters arrive AFTER the pins, never with them: artwork is decoration and the map
   // is the product, so nothing here is allowed to delay a location.
   //
@@ -1677,12 +1711,18 @@ export default function SceneMapApp() {
   // The same stops in the plot's order or in the order a walker would take them (#73). The
   // story is the default: it is what the trail is for, and the switch beside it says what
   // walking it that way costs.
-  const [trailOrder, setTrailOrder] = useState(TRAIL_ORDER.story);
+  // A shared trail link may ask for walking order (#77); read once, like the filters.
+  const [trailOrder, setTrailOrder] = useState(() => (typeof window === "undefined"
+    ? TRAIL_ORDER.story
+    : trailOrderFromParams(new URLSearchParams(window.location.search))));
+  const [trailShareNote, setTrailShareNote] = useState("");
   const [trailWalk, setTrailWalk] = useState({ routes: [], rides: [] });
   // Which city chapter is walked (#74); null until the reader picks one, so each new
   // trail opens on its own best chapter.
   const [trailChapterIndex, setTrailChapterIndex] = useState(null);
-  useEffect(() => { setTrailChapterIndex(null); }, [graphWorkId]);
+  // The timeline's position (#75); null until the reader moves it.
+  const [trailScrub, setTrailScrub] = useState(null);
+  useEffect(() => { setTrailChapterIndex(null); setTrailScrub(null); }, [graphWorkId]);
 
   // "My films only", decided here and nowhere else. The library is in localStorage and
   // never reaches the server ([[personal-library]]), so the server cannot filter by it —
@@ -1992,6 +2032,44 @@ export default function SceneMapApp() {
         sentence: place.sentence ?? null,
       }));
   }, [walkStopsAreStory, walkableTrail, trailOrderable, trailOrder, trailPlaces]);
+
+  const scrubList = useMemo(() => scrubStops(trailStopList), [trailStopList]);
+  const scrubbedStop = trailScrub === null ? null : scrubList[scrubIndex(trailScrub, scrubList.length)] ?? null;
+  function scrubTo(value) {
+    const index = scrubIndex(value, scrubList.length);
+    setTrailScrub(index);
+    if (scrubList[index]) setMapCenter(scrubList[index].position);
+  }
+
+  // Share the trail (#77). The link is the page's own address, which already names the
+  // work and the map, plus the order; the spoiler switch is never in it.
+  const trailTitle = graphWorks.find((work) => work.work_id === graphWorkId)?.title ?? null;
+  async function shareTrail() {
+    const url = trailShareUrl(window.location.href, { order: trailOrderable ? trailOrder : TRAIL_ORDER.story });
+    const title = trailTitle ? `${trailTitle} · story trail` : "Story trail";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        setTrailShareNote("");
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setTrailShareNote("Link copied. It opens without spoilers.");
+    } catch (error) {
+      // Closing the share sheet is a choice, not a failure.
+      if (error?.name !== "AbortError") setTrailShareNote("The link could not be copied.");
+    }
+  }
+
+  function downloadTrail() {
+    const blob = new Blob([JSON.stringify(trailGeoJson({ title: trailTitle, stops: trailStopList }), null, 2)], { type: "application/geo+json" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = trailFileName(trailTitle);
+    link.click();
+    URL.revokeObjectURL(href);
+  }
 
   // The walking order on the streets: each stretch a person walks is asked of the same
   // router every other walk uses, and the legs between stretches are rides, drawn as such.
@@ -2348,6 +2426,22 @@ export default function SceneMapApp() {
       .catch(() => setKeptTiles({ kept: 0, failed: 0, reason: "unavailable" }));
   }
 
+  // Hand the walk to the reader's own maps app (#191): a GPX file for anything that
+  // navigates offline. The Google Maps link is a plain anchor in the panel.
+  function downloadRouteGpx() {
+    const gpx = routeGpx({
+      name: cityName ? `GloryMap walk · ${cityName}` : "GloryMap walk",
+      stops: routeStops,
+      track: routeResult?.positions ?? [],
+    });
+    const href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = gpxFileName(cityName);
+    link.click();
+    URL.revokeObjectURL(href);
+  }
+
   async function buildRoute(stops = routeStops) {
     const requestId = routeRequestId.current + 1;
     routeRequestId.current = requestId;
@@ -2452,9 +2546,10 @@ export default function SceneMapApp() {
     const { plan: selectedPlan, route: plannedRoute, usedRouteFallback } = picked;
 
     setTimedTourMessage("Writing short stories for the selected stops...");
-    const { guide, usedAiFallback } = await fetchTimedTourGuide(selectedPlan.stops, {
+    const { guide, usedAiFallback, usedLanguageFallback } = await fetchTimedTourGuide(selectedPlan.stops, {
       city: cityName,
       budgetMinutes: tourBudget,
+      language: tourLanguage,
     });
 
     const unconfirmed = selectedPlan.stops.filter(
@@ -2480,6 +2575,9 @@ export default function SceneMapApp() {
           ? `${unconfirmed} of ${selectedPlan.stops.length} stops: we have not confirmed you can get in. Check before you go.`
           : null,
         usedAiFallback ? "AI was unavailable, so verified location descriptions were used." : null,
+        usedLanguageFallback && !usedAiFallback
+          ? `The guide could not be written in ${guideLanguage(tourLanguage).name}, so it is in English.`
+          : null,
         usedRouteFallback ? "Walking directions were estimated because the router was unavailable." : null,
       ].filter(Boolean).join(" "),
     );
@@ -3031,7 +3129,7 @@ export default function SceneMapApp() {
             chapters={trailChapterList}
             walkOrder={walkingTrail}
             walk={trailWalk}
-            nextStopId={nextStopId}
+            nextStopId={scrubbedStop?.id ?? nextStopId}
             onSelect={(stop) => setMapCenter(stop.position)}
           />
         </MapCanvas>
@@ -3095,6 +3193,30 @@ export default function SceneMapApp() {
                 />
                 <span>Show the whole story trail <small>reveals plot order</small></span>
               </label>
+              {scrubList.length >= 2 && (
+                <label className="trail-scrubber">
+                  <input
+                    type="range"
+                    min="0"
+                    max={scrubList.length - 1}
+                    step="1"
+                    value={scrubIndex(trailScrub ?? 0, scrubList.length)}
+                    aria-label="Move through the story"
+                    aria-valuetext={scrubLabel(scrubList[scrubIndex(trailScrub ?? 0, scrubList.length)], scrubIndex(trailScrub ?? 0, scrubList.length), scrubList.length)}
+                    onChange={(event) => scrubTo(event.target.value)}
+                  />
+                  <small>
+                    {scrubbedStop
+                      ? `${scrubLabel(scrubbedStop, scrubIndex(trailScrub, scrubList.length), scrubList.length)}${scrubbedStop.sentence ? `. ${scrubbedStop.sentence}` : ""}`
+                      : `Drag through the story, ${scrubList.length} scenes`}
+                  </small>
+                </label>
+              )}
+              <div className="trail-share">
+                <button type="button" onClick={shareTrail}><Share2 size={14} aria-hidden="true" />Share trail</button>
+                <button type="button" onClick={downloadTrail} title="For Google My Maps, uMap or a GPS app"><Download size={14} aria-hidden="true" />GeoJSON</button>
+                {trailShareNote && <small role="status">{trailShareNote}</small>}
+              </div>
             </div>
           )}
         </WalkControls>
@@ -3557,6 +3679,20 @@ export default function SceneMapApp() {
               </button>
             ))}
           </div>
+          <label className="guide-language">
+            <span>Guide language</span>
+            <select
+              value={tourLanguage}
+              disabled={timedTourStatus === "loading"}
+              onChange={(event) => chooseTourLanguage(event.target.value)}
+            >
+              {GUIDE_LANGUAGES.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.nativeName === language.name ? language.name : `${language.nativeName} · ${language.name}`}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="timed-tour-button"
             type="button"
@@ -3713,6 +3849,17 @@ export default function SceneMapApp() {
                 : "Build route"}
           </button>
         </div>
+
+        {routeStops.length >= 2 && (
+          <div className="route-export">
+            <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
+            </a>
+            <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
+              <Download size={14} aria-hidden="true" />GPX
+            </button>
+          </div>
+        )}
 
         {aiTour && (
           <section className="ai-tour-result" aria-live="polite">
@@ -4230,7 +4377,7 @@ export default function SceneMapApp() {
               </p>
             )}
             <p>{activeLocation.description}</p>
-            <VoiceGuide location={activeLocation} story={activeNarration} />
+            <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} />
             <div className="comparison-grid">
               <figure>
                 {activeFilmImage ? (
