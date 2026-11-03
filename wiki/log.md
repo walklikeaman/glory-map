@@ -34,6 +34,16 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-03] update | "Harvey Dent" was never a place: the trail cut stop names at the apostrophe
+**Object**: `app/lib/plot-order.mjs`, `app/lib/vague-place-name.mjs`, `submission-review.mjs`, `promote-submission.mjs`, live `scenes`.
+**Scenario**: data quality
+**Outcome**: ✅ success
+**What happened**: The Dark Knight's story trail showed stops called "Harvey Dent", "Lau" and "Bridge". The `places` table was clean; the junk was in `scenes.act_or_chapter`. `appearsAsName` used one character class for every quote mark, so `Appears as "Harvey Dent's Office"` ended at the apostrophe. 43 of 209 live scene labels were wrong (Bridget, Jenny, Juliet, Mark Darcy, Silva, "Buckingham Palace (king"…), and were rewritten from the guide line with the fixed parser (snapshot in `/mnt/project-files/glorymap-backfill/2026-11-03-junk-places/`). A guide label that is one common noun ("Bridge", "Street", "Funeral") now falls back to the real place name.
+
+The same one-word check is now an ingest refusal (`vague_not_a_place`) and `bestName` skips it. Measured on the 55k-row queue before choosing one word only: a rule over every word of a name refused "Tower Bridge", "Park Lane" and "Victory Square". One word refuses 41 pending rows and no verified ones.
+
+Claude Haiku also read all 2,908 places, looking for character names, titles and vague words ($0.83). It flagged 6, and none was junk. Two were false alarms: "Waiting for the Interurban" is a Seattle sculpture and "Newbridge Memo" a Welsh hall. The other four are real pins with vague names, so I renamed them rather than hid them: "Railway Station, Carnforth", "Cloisters, Temple, London", "The Lake, Central Park", "Humanities Wing, University of Toronto Scarborough". Nothing was hidden. The verdicts and the before-names are in the snapshot folder.
+**Updated**: code + tests, 43 live scene rows.
 ## [2026-11-03] update | TMDB ids by title from the cloud, four pins moved, and Claude as a provider
 **Object**: `works.tmdb_id/poster_path`, `places` (4 rows), `app/lib/model-client.mjs`, `app/api/enrich/stills/route.js`.
 **Scenario**: data + tooling
