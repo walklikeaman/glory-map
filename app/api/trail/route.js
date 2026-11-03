@@ -93,7 +93,16 @@ function defaultCreateStore(env) {
     // The film's plot as Wikipedia tells it: the text the order is read from.
     async plotOf(work) {
       if (!work?.wikidata_id) return null;
-      const entities = await (await fetch(buildEntitiesUrl([work.wikidata_id], ["en"]), { headers: WIKIPEDIA })).json();
+      let entityResponse = await fetch(buildEntitiesUrl([work.wikidata_id], ["en"]), { headers: WIKIPEDIA });
+      // Same rate limit on Wikidata's action API; Special:EntityData has the same shape.
+      if (!entityResponse.ok) {
+        entityResponse = await fetch(
+          `https://www.wikidata.org/wiki/Special:EntityData/${work.wikidata_id}.json`,
+          { headers: WIKIPEDIA },
+        );
+      }
+      if (!entityResponse.ok) throw new Error(`wikidata ${entityResponse.status}`);
+      const entities = await entityResponse.json();
       const title = articleTitleFromEntity(entities?.entities?.[work.wikidata_id], "en");
       if (!title) return null;
       const tocResponse = await fetch(buildTocUrl(title, "en"), { headers: WIKIPEDIA });
