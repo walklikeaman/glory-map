@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import robots from "../app/robots.js";
-import sitemap, { generateSitemaps, placesInTheGraph } from "../app/sitemap.js";
+import sitemap, { generateSitemaps, placesInTheGraph, worksForLetter } from "../app/sitemap.js";
 import { GET as sitemapIndex } from "../app/sitemap.xml/route.js";
 import { ALL_CITIES, cityPath } from "../app/lib/city-gazetteer.mjs";
 import { DIRECTORY_LETTERS } from "../app/lib/directory.mjs";
@@ -184,4 +184,42 @@ test("the index names the other bucket as a slug, never as '#'", async () => {
   const locs = await indexLocs();
   assert.ok(locs.some((loc) => loc.endsWith("/sitemap/other.xml")));
   assert.ok(!locs.some((loc) => loc.includes("#")));
+});
+
+// A route that answers 502 for the first `failures` asks, then one page of works.
+const flakyFilms = (failures) => {
+  let calls = 0;
+  const route = async () => {
+    calls += 1;
+    if (calls <= failures) return Response.json({ error: "The directory is unavailable" }, { status: 502 });
+    return Response.json({ works: [{ id: A, title: "Notting Hill", year: 1999 }], page: { page: 1, hasNext: false } });
+  };
+  return { route, calls: () => calls };
+};
+const noWait = async () => {};
+
+test("a letter the database times out on is asked again, not shipped empty", async () => {
+  // 03.11: 10 of 27 letters came out of the build as empty files because the prerender burst
+  // hit the statement timeout. A second ask answers.
+  const films = flakyFilms(2);
+  const works = await worksForLetter("n", { route: films.route, wait: noWait });
+  assert.equal(works.length, 1);
+  assert.equal(films.calls(), 3);
+});
+
+test("the retries are bounded, and a database that stays down gives up", async () => {
+  const films = flakyFilms(Infinity);
+  const works = await worksForLetter("n", { route: films.route, wait: noWait });
+  assert.deepEqual(works, []);
+  assert.equal(films.calls(), 3);
+});
+
+test("a directory with no database is not retried", async () => {
+  let calls = 0;
+  const route = async () => {
+    calls += 1;
+    return Response.json({ error: "The directory is not configured" }, { status: 503 });
+  };
+  assert.deepEqual(await worksForLetter("n", { route, wait: noWait }), []);
+  assert.equal(calls, 1);
 });

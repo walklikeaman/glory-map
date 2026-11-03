@@ -27,6 +27,12 @@ The working rules are in `TEAMWORK.md`. Update the board yourself after `/ship`.
 - [ ] <slice 3> — @— — `feature/—`
 - [ ] <slice 4> — @— — `feature/—`
 
+## QA findings (routine check, 2026-11-03)
+
+- [ ] Map, a picked work: "Known for" says "Nothing here passes your filters" while the work's pins are drawn, and the Locations list under it still lists other films' nearby places (seen with Notting Hill over London). Needs a check on production with real tiles: the cloud browser can't load the basemap.
+- [ ] `/work/<slug>` answers 404 when the database fails: `/api/work` swallows the load error and returns `work.title: null`. Same fix as the city/place/letter pages (#readRoute), but the route has to say 502 first.
+- [ ] Production (`codex-hackathon-starter.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
+
 ## In progress
 
 - [ ] …
