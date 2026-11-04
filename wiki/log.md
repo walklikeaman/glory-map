@@ -7,6 +7,18 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-04] decision | "Then | now" share card from the recreate dialog (#54)
+**Object**: `app/lib/diptych.mjs`, `app/components/shareDiptych.js`, the recreate dialog.
+**Scenario**: recreate-shot / sharing
+**Outcome**: ✅ built; tests + Playwright (desktop download, phone share sheet emulated)
+**What happened**: once a photo is chosen against a reference (film frame or a visitor's shot), the dialog offers "Share then | now card": a 1200×750 JPEG, the two halves side by side with a footer naming the work and place. On a phone it opens the share sheet with the file; elsewhere it downloads.
+
+Decisions worth keeping:
+- The left half is credited **on the card itself** (re-posts cannot drop it), by its real source: TMDB only when the URL is on tmdb.org, "a visitor's photo" for visitors' shots, a generic credit otherwise.
+- The card is made as soon as the photo is set, not on the click: `navigator.share` needs the click's user activation, and two image loads can use it up (iOS then refuses).
+- The OG image through `next/og` from the issue is **not built**: a link preview needs the user's photo on a public URL, and their photo stays in the browser unless they share it to the place. It fits once a shared visitor shot has its own page.
+**Updated**: `wiki/log.md`.
+
 ## [2026-11-03] audit | UX audit of web and phone; the UX pass goes first in the queue
 **Object**: `docs/ux-audit-2026-11-03.md`, `TASKS.md`, `ROADMAP.md`, place card CSS.
 **Scenario**: audit

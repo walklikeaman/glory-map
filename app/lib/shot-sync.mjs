@@ -148,6 +148,8 @@ export function transformCss(transform) {
 
 // The part of a source (w × h) that `object-fit: cover` shows in a box of the given aspect.
 export function coverCrop(sourceWidth, sourceHeight, boxWidth, boxHeight) {
+  // An image with no size yet (still decoding) has nothing to crop.
+  if (!(sourceWidth > 0) || !(sourceHeight > 0) || !(boxWidth > 0) || !(boxHeight > 0)) return null;
   const sourceAspect = sourceWidth / sourceHeight;
   const boxAspect = boxWidth / boxHeight;
   if (sourceAspect > boxAspect) {
