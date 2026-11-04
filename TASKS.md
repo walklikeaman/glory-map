@@ -65,6 +65,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 
 ## Done
 
+- [x] #54: "Then | now" share card from the recreate dialog (share sheet on a phone, download elsewhere; OG preview not yet) — @Claude — `claude/project-thread-li0oep`
 - [x] 2026-11-03: merged #326, #337, #332, #338, #339, #341, #342, then #327 and #340 with their prod migrations, after green tests (Nikita: merge on green)
 - [x] UX audit of web and phone, 2026-11-03: [docs/ux-audit-2026-11-03.md](docs/ux-audit-2026-11-03.md)
 - [x] Visitors' shots on a place + "Recreate" any shot, AI-checked — @Claude — `claude/project-thread-li0oep`

@@ -159,6 +159,7 @@ import SearchBox from "./SearchBox";
 import { ImageAttribution } from "./ImageAttribution";
 import { ThenNowWipe } from "./ThenNowWipe";
 import { VisitorShots, shareResultMessage, shareShot } from "./VisitorShots";
+import { composeDiptych, shareOrDownload } from "./shareDiptych";
 import { wipeMode } from "../lib/then-now-wipe.mjs";
 import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
@@ -714,6 +715,7 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
   const photoUrlRef = useRef("");
   const photoFileRef = useRef(null);
   const [share, setShare] = useState({ status: "idle", message: "" });
+  const [diptych, setDiptych] = useState({ status: "idle", message: "", card: null });
   // No reference means "Add your shot": a plain photo of the place, nothing to line up.
   const hasReference = Boolean(location.backdrop);
   const [photoUrl, setPhotoUrl] = useState("");
@@ -752,6 +754,42 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
     setPhotoUrl(nextUrl);
     setView("overlay");
     setShare({ status: "idle", message: "" });
+  }
+
+  // The card is made as soon as there is a photo, so the click only has to share it:
+  // a share sheet needs the click's user activation, and loading two images first can
+  // use it up. A newer photo cancels a card still being made for the old one.
+  useEffect(() => {
+    if (!photoUrl || !hasReference) {
+      setDiptych({ status: "idle", message: "", card: null });
+      return undefined;
+    }
+    let cancelled = false;
+    setDiptych({ status: "making", message: "", card: null });
+    composeDiptych({
+      thenSrc: location.backdrop,
+      nowSrc: photoUrl,
+      film: location.film,
+      place: location.place,
+      referenceLabel: location.referenceLabel,
+      kind: location.kind,
+    }).then(
+      (card) => { if (!cancelled) setDiptych({ status: "ready", message: "", card }); },
+      (error) => {
+        if (!cancelled) setDiptych({ status: "error", message: error?.message || "The card could not be made.", card: null });
+      },
+    );
+    return () => { cancelled = true; };
+  }, [photoUrl, hasReference, location.backdrop, location.film, location.place, location.referenceLabel, location.kind]);
+
+  async function shareDiptych() {
+    if (!diptych.card) return;
+    const card = diptych.card;
+    const outcome = await shareOrDownload({ ...card, url: window.location.origin });
+    if (outcome === "cancelled") return;
+    setDiptych((current) => (current.card === card
+      ? { ...current, message: outcome === "shared" ? "Shared." : "Saved the card to your downloads." }
+      : current));
   }
 
   async function sharePhoto() {
@@ -945,6 +983,23 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
                 Reset photo
               </button>
             </>
+          )}
+
+          {photoUrl && hasReference && (
+            <div className="recreate-share">
+              <button
+                className="ghost-button recreate-diptych"
+                disabled={!diptych.card}
+                onClick={shareDiptych}
+                type="button"
+              >
+                <Share2 size={16} aria-hidden="true" />
+                {diptych.status === "making" ? "Making the card…" : "Share then | now card"}
+              </button>
+              {diptych.message && (
+                <p className={`recreate-share-status is-${diptych.status === "error" ? "error" : "done"}`} role="status">{diptych.message}</p>
+              )}
+            </div>
           )}
 
           {photoUrl && location.locationId && (
