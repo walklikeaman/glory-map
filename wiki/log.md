@@ -7,6 +7,20 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-05] decision | Pin soup on the map: one bubble per area, quiet unchecked pins (UX-1)
+**Object**: `app/lib/pin-style.mjs`, `app/components/map/layers.jsx` (`PinLayer` quiet/clustered), `app/components/GraphLayer.jsx`, `useGeoJsonLayer` (source options).
+**Scenario**: map / UX pass
+**Outcome**: ✅ built; tests + Playwright at 1440 and 390 against the live DB (z12–z15 over central London)
+**What happened**: at city zoom the map drew the graph and the queue as two layers of full-size circles stacked on each other. They are now one MapLibre GeoJSON source with clustering on.
+
+Decisions worth keeping:
+- **Zoom bands (MapLibre zooms):** the server still clusters below z12. From z12 to z14 the client clusters (`clusterMaxZoom 14`, radius 48 px), one numbered bubble per area. At z15 bubbles split; unchecked pins are 4 px dots without a number. From z16 everything is full size. Checked, selected and highlighted pins never shrink.
+- **Checked and unchecked cluster together.** Two layers meant two sets of bubbles overlapping. A bubble is filled when it holds at least one checked place, hollow when it holds only queue rows, violet when it holds a studio lot, ringed when it holds the highlighted film or the open pin.
+- A point that is both a graph place and a queue row is drawn once, as the place.
+- Found on the way: graph places were drawn hollow (they carried no `checked`), studio lots in the graph were amber (the graph says studio with `badge`, the pin reads `depicts_elsewhere`), and a click on a graph pin opened nothing (`PinLayer` keeps only drawn properties, so the lookup by `place_id` never matched). All three fixed; picks now go by the "lat,lng" key.
+- Known trade-off: a notable place's name is hidden while its pin is inside a bubble. Selection and highlight call `setData` on the clustered source; fine at a few thousand points, switch to feature-state if it ever lags.
+**Updated**: `wiki/log.md`, `TASKS.md`.
+
 ## [2026-11-04] decision | "Then | now" share card from the recreate dialog (#54)
 **Object**: `app/lib/diptych.mjs`, `app/components/shareDiptych.js`, the recreate dialog.
 **Scenario**: recreate-shot / sharing

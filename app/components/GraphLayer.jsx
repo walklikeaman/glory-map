@@ -108,10 +108,15 @@ function ClusterLayer({ features, onZoomInto }) {
   return null;
 }
 
+// The key the pin layer gives a point: latitude first, as everywhere in this app.
+function pointKey(feature) {
+  const [lng, lat] = feature.geometry.coordinates;
+  return `${lat},${lng}`;
+}
+
 function GraphLayer({
   workId = null,
   kinds = null,
-  selectedPlaceId = null,
   onSelect,
   // Opens the full sheet for a place. Called from the card's own button rather than from
   // the click, so a click answers "what is this?" without covering the map with everything
@@ -266,6 +271,26 @@ function GraphLayer({
     [visibleCandidates],
   );
 
+  // A point that is both a checked place and a queue row is drawn once, as the place: two
+  // features there would count twice in a bubble and paint a hollow ring over the filled pin.
+  // A graph place says "studio" and "narrative" with its badge, not with the queue's flags,
+  // so it is translated here or a studio lot in the graph would be drawn amber.
+  const pins = useMemo(() => {
+    const placeKeys = new Set(places.map(pointKey));
+    return [
+      ...places.map((feature) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          checked: true,
+          depicts_elsewhere: feature.properties?.badge === "studio",
+          narrative: feature.properties?.badge === "narrative",
+        },
+      })),
+      ...candidatePins.filter((feature) => !placeKeys.has(pointKey(feature))),
+    ];
+  }, [places, candidatePins]);
+
   const zoomInto = useCallback((coordinates) => {
     if (!map) return;
     map.flyTo({ center: coordinates, zoom: Math.min(map.getZoom() + 3, 17) });
@@ -282,34 +307,27 @@ function GraphLayer({
     <>
       <ClusterLayer features={clusters} onZoomInto={zoomInto} />
 
-      {/* The graph — places somebody checked. Same vocabulary as the queue, filled rather
-          than hollow, because that distinction IS the evidence. */}
-      <PinLayer
-        id="graph-places"
-        features={places}
-        selectedKey={selectedPlaceId}
-        onSelect={(properties) => {
-          const feature = places.find((candidate) => candidate.properties?.place_id === properties.place_id);
-          setOpenPoint(feature ? { feature, kind: "place" } : null);
-          if (feature) onSelect?.(feature);
-        }}
-      />
+      {/* The graph and the queue in ONE layer (UX-1). Two layers drew two sets of pins,
+          and later two sets of bubbles, on top of each other; one source clusters both, so
+          a district reads as one number. A graph place is filled (somebody checked it),
+          a queue row hollow, and the queue goes quiet at city zoom.
 
-      {/* The queue, drawn hollow so it can never be mistaken for the graph. Filtered here
-          rather than in the query: the library never leaves the browser, and the lot test is
-          a polygon this client already holds. */}
+          Picked by the "lat,lng" key: the pin layer keeps only what it draws, so the old
+          lookup by `place_id` found nothing and a click on a checked pin opened nothing. */}
       <PinLayer
-        id="graph-candidates"
+        id="graph-pins"
+        quiet
+        clustered
         placeLabels={placeLabels}
         highlightedKeys={highlightedKeys}
-        features={candidatePins}
-        selectedKey={openPoint?.kind === "candidate" ? openPoint.key : null}
+        features={pins}
+        selectedKey={openPoint?.key ?? null}
         onSelect={(properties) => {
-          const feature = candidatePins.find((candidate) => {
-            const [lng, lat] = candidate.geometry.coordinates;
-            return `${lat},${lng}` === properties.key;
-          });
-          setOpenPoint(feature ? { feature, kind: "candidate", key: properties.key } : null);
+          const place = places.find((feature) => pointKey(feature) === properties.key);
+          const candidate = place ? null : candidatePins.find((feature) => pointKey(feature) === properties.key);
+          const feature = place ?? candidate;
+          setOpenPoint(feature ? { feature, kind: place ? "place" : "candidate", key: properties.key } : null);
+          if (place) onSelect?.(place);
         }}
       />
 

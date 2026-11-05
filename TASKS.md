@@ -27,7 +27,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 1440 px and 390 px with Playwright, screenshots in the PR.
 
 **UX pass (P1), before any new feature:**
-- [ ] UX-1 Pin soup: real clustering below zoom ~14, unchecked pins as small dots or off by default
+- [x] UX-1 Pin soup: real clustering below zoom ~14, unchecked pins as small dots or off by default (one clustered layer for graph + queue; dots at z15)
 - [ ] UX-2 Left panel / phone sheet: 12 blocks → Search, Results (Works / Places), Plan; filters behind one chip; legal text to Profile
 - [ ] UX-3 Phone: search field floating on the map; "Listen as I walk" off the top of the map
 - [ ] UX-4 One home for routes: stop list, build route and timed tour all in the Routes section

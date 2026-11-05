@@ -6,6 +6,8 @@
 //   node scripts/ingest-tmdb-ratings.mjs --limit 50 # a sample first
 //   node scripts/ingest-tmdb-ratings.mjs --dry-run  # ask TMDB, write nothing
 //
+// Needs TMDB_API_READ_ACCESS_TOKEN (preferred) or TMDB_API_KEY.
+//
 // **Why TMDB and not Rotten Tomatoes.** #224 opens by saying Rotten Tomatoes is already
 // ingested and the map simply cannot see it. Measured 20.09.2026, that is not the shape of
 // the problem: RT covers 10 works of 7,063 and Metacritic 10, while IMDb covers 5,495. The
@@ -45,7 +47,11 @@ function env(name) {
   throw new Error(`${name} is not set — run with it in the environment (see .env.local)`);
 }
 
-const apiKey = env("TMDB_API_KEY");
+// The v4 read token goes in a header; the v3 key in the query string. Either will do, and
+// the cloud environment holds only the token.
+const token = process.env.TMDB_API_READ_ACCESS_TOKEN;
+const apiKey = token ? null : env("TMDB_API_KEY");
+const tmdbHeaders = token ? { Authorization: `Bearer ${token}`, Accept: "application/json" } : {};
 const client = createClient(env("NEXT_PUBLIC_SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
   auth: { persistSession: false },
 });
@@ -85,7 +91,7 @@ async function askTmdb(work) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     let response;
     try {
-      response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      response = await fetch(url, { headers: tmdbHeaders, signal: AbortSignal.timeout(15_000) });
     } catch (error) {
       if (attempt === 2) return { work, outcome: "network", detail: error?.message };
       continue;
