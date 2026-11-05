@@ -113,9 +113,9 @@ export function labelColorExpression() {
 
 // Everything a MapLibre circle layer needs to draw the vocabulary, in one object, so a
 // component never assembles paint properties by hand.
-export function pinCirclePaint() {
+export function pinCirclePaint({ quiet = false } = {}) {
   return {
-    "circle-radius": circleRadiusExpression(),
+    "circle-radius": quiet ? quietRadiusExpression() : circleRadiusExpression(),
     "circle-color": circleColorExpression(),
     "circle-stroke-color": circleStrokeColorExpression(),
     "circle-stroke-width": circleStrokeWidthExpression(),
@@ -132,8 +132,12 @@ export function pinLabelLayout() {
   };
 }
 
-export function pinLabelPaint() {
-  return { "text-color": labelColorExpression() };
+export function pinLabelPaint({ quiet = false } = {}) {
+  const paint = { "text-color": labelColorExpression() };
+  // A dot has no room for a number, so a quiet pin's count waits for the zoom where the pin
+  // is full size again.
+  if (quiet) paint["text-opacity"] = ["step", ["zoom"], ["case", loudExpression(), 1, 0], QUIET_UNTIL_ZOOM, 1];
+  return paint;
 }
 
 // A GeoJSON feature the layers above can draw, from one row of the map API. The colour and
@@ -151,6 +155,109 @@ export function pinFeature(feature) {
       kindColor: PIN_COLORS[shape.kind],
       kindInk: PIN_INK[shape.kind],
     },
+  };
+}
+
+// ---------------------------------------------------------------------------------------
+// UX-1, "pin soup": at city zoom the queue drew hundreds of overlapping hollow circles, each
+// as big as a checked pin, with "2" and "3" printed on half of them. Two changes, both
+// mostly about the unchecked pins, because a checked pin is evidence:
+//
+// - Below QUIET_UNTIL_ZOOM an unchecked pin is a small dot with no number (z15 is the dot
+//   band: bubbles split at z15 and the queue grows to full size by z16). It still says
+//   "something was reported here", it just stops competing with the places somebody checked.
+//   A selected or highlighted one keeps its full size: the reader asked about that one.
+// - Up to CLUSTER_UNCHECKED_UNTIL_ZOOM nearby pins, checked and unchecked together, merge
+//   into one numbered bubble (MapLibre's own clustering on the source), so a district reads
+//   as "40 here" instead of forty rings stacked on each other.
+
+export const QUIET_UNTIL_ZOOM = 16;
+export const UNCHECKED_DOT_RADIUS = 4;
+export const CLUSTER_UNCHECKED_UNTIL_ZOOM = 14;
+// Pixels. Wide enough that a street of pins becomes one bubble, narrow enough that two
+// districts stay two.
+export const CLUSTER_RADIUS_PX = 48;
+
+// The pins that keep their voice while the rest go quiet.
+function loudExpression() {
+  return ["any", ["get", "checked"], ["get", "selected"], ["get", "highlighted"]];
+}
+
+export function quietRadiusExpression() {
+  return [
+    "interpolate", ["linear"], ["zoom"],
+    QUIET_UNTIL_ZOOM - 1, ["case", loudExpression(), circleRadiusExpression(), UNCHECKED_DOT_RADIUS],
+    QUIET_UNTIL_ZOOM, circleRadiusExpression(),
+  ];
+}
+
+// What the clustered source is created with. The cluster keeps four facts from what it
+// swallowed: whether a checked place is inside (then it is filled, like the pin would be),
+// whether a studio lot is (violet, the one colour the pins insist on), and whether the film
+// the reader is pointing at, or the pin whose card is open, is inside (the selection ring),
+// so "where is it?" still gets an answer at city zoom.
+export function pinClusterSource() {
+  return {
+    cluster: true,
+    clusterMaxZoom: CLUSTER_UNCHECKED_UNTIL_ZOOM,
+    clusterRadius: CLUSTER_RADIUS_PX,
+    clusterProperties: {
+      checked: ["any", ["get", "checked"]],
+      studio: ["any", ["==", ["get", "kind"], PIN_KIND.studio]],
+      highlighted: ["any", ["get", "highlighted"]],
+      selected: ["any", ["get", "selected"]],
+    },
+  };
+}
+
+// A point the clustering left alone. Every pin layer on a clustered source needs it, or
+// MapLibre draws each bubble a second time as a pin with no colour.
+export const UNCLUSTERED = ["!", ["has", "point_count"]];
+export const CLUSTERED = ["has", "point_count"];
+
+// Same growth curve as the server's cluster bubbles in GraphLayer, so a bubble means the
+// same size at z11 (server) and z14 (here).
+export function clusterRadiusExpression() {
+  return ["min", 30, ["+", 14, ["*", 8, ["log10", ["max", 1, ["get", "point_count"]]]]]];
+}
+
+// Filled only when a checked place is inside; a bubble of unchecked reports stays hollow,
+// because a filled one would claim somebody looked.
+function clusterColorExpression() {
+  return ["case", ["get", "studio"], PIN_COLORS[PIN_KIND.studio], PIN_COLORS[PIN_KIND.place]];
+}
+
+export function pinClusterCirclePaint() {
+  return {
+    "circle-radius": clusterRadiusExpression(),
+    "circle-color": ["case", ["get", "checked"], clusterColorExpression(), PIN_HOLLOW_MANY],
+    "circle-stroke-color": [
+      "case",
+      ["any", ["get", "highlighted"], ["get", "selected"]], PIN_SELECTED_RING,
+      ["get", "checked"], "rgba(255, 255, 255, 0.85)",
+      clusterColorExpression(),
+    ],
+    "circle-stroke-width": ["case", ["any", ["get", "highlighted"], ["get", "selected"]], 4, 2],
+  };
+}
+
+export function pinClusterLabelLayout() {
+  return {
+    "text-field": ["get", "point_count_abbreviated"],
+    "text-size": 12,
+    "text-font": ["Noto Sans Bold"],
+    "text-allow-overlap": true,
+    "text-ignore-placement": true,
+  };
+}
+
+export function pinClusterLabelPaint() {
+  return {
+    "text-color": [
+      "case",
+      ["get", "checked"], ["case", ["get", "studio"], PIN_INK[PIN_KIND.studio], PIN_INK[PIN_KIND.place]],
+      "#f7e2b0",
+    ],
   };
 }
 

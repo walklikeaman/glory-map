@@ -11,7 +11,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { circleFeature } from "../../lib/geo-circle.mjs";
-import { pinCirclePaint, pinFeature, pinLabelLayout, pinLabelPaint } from "../../lib/pin-style.mjs";
+import {
+  CLUSTERED, UNCLUSTERED,
+  pinCirclePaint, pinClusterCirclePaint, pinClusterLabelLayout, pinClusterLabelPaint, pinClusterSource,
+  pinFeature, pinLabelLayout, pinLabelPaint,
+} from "../../lib/pin-style.mjs";
 import { claimClick, useGeoJsonLayer, useMapCanvas } from "./MapCanvas.jsx";
 
 const EMPTY = { type: "FeatureCollection", features: [] };
@@ -36,8 +40,14 @@ function collection(features) {
 
 // The places. One source, two layers: a circle carrying the vocabulary from `map-pin.mjs`,
 // and a label carrying the count for the points that stack several films.
+//
+// `quiet` and `clustered` (UX-1): quiet draws UNCHECKED pins as small dots below z16 (checked,
+// selected and highlighted ones keep their size); clustered merges ALL the layer's nearby
+// pins, checked or not, into numbered bubbles up to z14. Both are read once, when the layer
+// is created. A name from `placeLabels` waits for its pin to leave the bubble.
 export function PinLayer({
   id = "places", features, onSelect, selectedKey = null, placeLabels = null, highlightedKeys = null,
+  quiet = false, clustered = false,
 }) {
   const map = useMapCanvas();
 
@@ -65,16 +75,29 @@ export function PinLayer({
   const circleId = `${id}-circles`;
   const labelId = `${id}-labels`;
   const nameId = `${id}-names`;
+  const clusterId = `${id}-clusters`;
+  const clusterLabelId = `${id}-cluster-labels`;
+  // Only on a clustered source: an unclustered one has no `point_count` to test.
+  const pinsOnly = clustered ? { filter: UNCLUSTERED } : {};
 
   useGeoJsonLayer({
     id,
     data,
+    source: clustered ? pinClusterSource() : null,
     layers: [
-      { id: circleId, type: "circle", paint: pinCirclePaint() },
-      { id: labelId, type: "symbol", layout: pinLabelLayout(), paint: pinLabelPaint() },
+      { id: circleId, type: "circle", paint: pinCirclePaint({ quiet }), ...pinsOnly },
+      { id: labelId, type: "symbol", layout: pinLabelLayout(), paint: pinLabelPaint({ quiet }), ...pinsOnly },
+      ...(clustered ? [
+        { id: clusterId, type: "circle", filter: CLUSTERED, paint: pinClusterCirclePaint() },
+        {
+          id: clusterLabelId, type: "symbol", filter: CLUSTERED,
+          layout: pinClusterLabelLayout(), paint: pinClusterLabelPaint(),
+        },
+      ] : []),
       {
         id: nameId,
         type: "symbol",
+        ...pinsOnly,
         layout: {
           "text-field": ["get", "placeLabel"],
           "text-size": 11,
@@ -107,31 +130,44 @@ export function PinLayer({
 
   useEffect(() => {
     if (!map) return undefined;
+    const clusterLayers = clustered ? [clusterId, clusterLabelId] : [];
+    const hitLayers = [...clusterLayers, circleId, labelId, nameId];
 
     const pick = (event) => {
-      const hit = map.queryRenderedFeatures(event.point, { layers: [circleId, labelId, nameId] })[0];
+      // Only the layers that exist: an empty list would query every layer on the map.
+      const layers = hitLayers.filter((layer) => map.getLayer(layer));
+      if (!layers.length) return;
+      const hit = map.queryRenderedFeatures(event.point, { layers })[0];
       if (!hit) return;
       // Tell the map's own background handler to stand down: this click was answered.
       claimClick(event);
+      if (hit.properties?.cluster) {
+        // A bubble opens by zooming to the level where it splits, centred on it.
+        const center = hit.geometry.coordinates;
+        map.getSource(id)?.getClusterExpansionZoom(hit.properties.cluster_id)
+          .then((zoom) => map.easeTo({ center, zoom: Math.min(zoom, 17) }))
+          .catch(() => map.easeTo({ center, zoom: map.getZoom() + 2 }));
+        return;
+      }
       selectRef.current?.(hit.properties);
     };
     const enter = () => { map.getCanvas().style.cursor = "pointer"; };
     const leave = () => { map.getCanvas().style.cursor = ""; };
 
     map.on("click", pick);
-    for (const layer of [circleId, labelId, nameId]) {
+    for (const layer of hitLayers) {
       map.on("mouseenter", layer, enter);
       map.on("mouseleave", layer, leave);
     }
 
     return () => {
       map.off("click", pick);
-      for (const layer of [circleId, labelId, nameId]) {
+      for (const layer of hitLayers) {
         map.off("mouseenter", layer, enter);
         map.off("mouseleave", layer, leave);
       }
     };
-  }, [map, circleId, labelId, nameId]);
+  }, [map, id, clustered, circleId, labelId, nameId, clusterId, clusterLabelId]);
 
   return null;
 }

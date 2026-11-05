@@ -232,7 +232,9 @@ export function claimClick(event) {
 // Adding a source and a layer is the same four lines everywhere, and doing it wrong is
 // always the same two mistakes: adding twice after a style swap, and adding to a style that
 // is being replaced. This does both safely and removes what it added.
-export function useGeoJsonLayer({ id, data, layers }) {
+// `source` adds options to the GeoJSON source (clustering). It is read once, when the source
+// is created: MapLibre cannot switch clustering on an existing source.
+export function useGeoJsonLayer({ id, data, layers, source = null }) {
   const map = useMapCanvas();
   // Bumped when an add failed, so the effect runs again once the style settles.
   const [attempt, setAttempt] = useState(0);
@@ -242,7 +244,7 @@ export function useGeoJsonLayer({ id, data, layers }) {
 
     try {
       if (!map.getSource(id)) {
-        map.addSource(id, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addSource(id, { ...source, type: "geojson", data: { type: "FeatureCollection", features: [] } });
       }
       for (const layer of layers) {
         if (!map.getLayer(layer.id)) map.addLayer({ ...layer, source: id });
