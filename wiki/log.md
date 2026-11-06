@@ -7,6 +7,13 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-06] decision | Native iPhone app: a Capacitor shell over the live site
+**Object**: `mobile/` (own `package.json`, Capacitor 8 iOS project, SPM, no CocoaPods).
+**Scenario**: Nikita wants a real iPhone app, not "add to Home Screen".
+**Decision**: the app loads `https://codex-hackathon-starter.vercel.app` via `server.url` instead of bundling a static export. The app has server routes (`app/api/**`), so a static export can't work, and remote mode means every merge to `main` reaches the phone without a rebuild. Native side: icon, dark splash, Info.plist permission strings (camera, location, photos, mic), offline page `mobile/www/index.html`.
+**Install**: Mac + Xcode + free Apple ID (re-install every 7 days), or TestFlight with a $99/yr account. Steps in `mobile/README.md`. Can't be built in a cloud session (no Xcode on Linux).
+**Gotchas**: Google blocks OAuth inside embedded web views and the email link opens in Safari, so sign-in doesn't carry into the app yet (needs ASWebAuthenticationSession + URL scheme). The service worker doesn't run in WKWebView, so no offline map in the app.
+
 ## [2026-11-05] decision | Pin soup on the map: one bubble per area, quiet unchecked pins (UX-1)
 **Object**: `app/lib/pin-style.mjs`, `app/components/map/layers.jsx` (`PinLayer` quiet/clustered), `app/components/GraphLayer.jsx`, `useGeoJsonLayer` (source options).
 **Scenario**: map / UX pass
