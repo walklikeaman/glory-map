@@ -1,0 +1,16 @@
+{
+  "name": "glory-map-ios",
+  "private": true,
+  "description": "Native iPhone shell for GloryMap (Capacitor). Loads the live site inside a native app.",
+  "scripts": {
+    "sync": "cap sync ios",
+    "open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "appId": "com.walklikeaman.glorymap",
+  "appName": "GloryMap",
+  "webDir": "www",
+  "server": {
+    "url": "https://codex-hackathon-starter.vercel.app",
+    "errorPath": "index.html"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#111111"
+  }
+}
