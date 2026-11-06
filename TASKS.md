@@ -57,6 +57,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 
 - [ ] Map, a picked work: "Known for" says "Nothing here passes your filters" while the work's pins are drawn, and the Locations list under it still lists other films' nearby places (seen with Notting Hill over London). Needs a check on production with real tiles: the cloud browser can't load the basemap.
 - [ ] `/work/<slug>` answers 404 when the database fails: `/api/work` swallows the load error and returns `work.title: null`. Same fix as the city/place/letter pages (#readRoute), but the route has to say 502 first.
+- [ ] (04.11) The directory letter pages still hit a statement timeout now and then at runtime (`/directory/films/n?page=2` answered 500, then 0.23 s on the next 8 asks). `catalogue_letter` reads the `catalogue_index` view, which groups every `location_submissions` row on each call. Fix in the DB: a materialized view refreshed after ingest, or an index on `directory_sort_key(title_norm)`. Needs the schema owner.
 - [ ] Production (`codex-hackathon-starter.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
 
 ## In progress
