@@ -5640,3 +5640,87 @@ figcaption a {
   gap: 8px;
   width: 100%;
 }
+
+/* UX-2: the map panel's three zones — Search, Results (Works / Places), Plan. */
+.filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.filters-toggle:hover { border-color: rgba(247, 183, 51, 0.42); }
+.filters-toggle.is-open {
+  border-color: rgba(247, 183, 51, 0.6);
+  background: rgba(247, 183, 51, 0.16);
+}
+.filters-toggle:focus-visible,
+.results-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.panel-zone { display: grid; gap: 12px; }
+
+.results-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.results-tab {
+  flex: 1;
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.results-tab:hover { color: var(--text); }
+.results-tab.is-selected {
+  background: rgba(247, 183, 51, 0.18);
+  color: var(--text);
+}
+.panel-results [role="tabpanel"] { display: grid; gap: 14px; }
+
+.panel-plan {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.panel-zone-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.profile-about .source-notices { margin: 0; padding-top: 0; border-top: 0; font-size: 11px; }
+.panel-toolbar { display: flex; align-items: center; gap: 8px; }
+.panel-toolbar .filters-toggle,
+.panel-toolbar .account-button { min-height: 34px; padding-top: 0; padding-bottom: 0; }
+/* Above the phone width only: on a phone the account button is icon-only (font-size 0). */
+@media (min-width: 521px) {
+  .panel-toolbar .account-button { font-size: 0.84rem; }
+}
+.route-card-hint {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -40,6 +40,7 @@ import {
   LogIn,
   Mail,
   Share2,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   DEMO_LOCATION,
@@ -161,7 +162,7 @@ import { ThenNowWipe } from "./ThenNowWipe";
 import { VisitorShots, shareResultMessage, shareShot } from "./VisitorShots";
 import { composeDiptych, shareOrDownload } from "./shareDiptych";
 import { wipeMode } from "../lib/then-now-wipe.mjs";
-import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
+import { RESULT_TABS, filtersChipLabel, nextResultTab } from "../lib/panel-zones.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
 
 
@@ -1642,6 +1643,9 @@ export default function SceneMapApp() {
   const [layersOpen, setLayersOpen] = useState(false);
   // Closed by default: the console answers an operator's questions, not a visitor's.
   const [layersConsoleOpen, setLayersConsoleOpen] = useState(false);
+  // UX-2: the panel's Filters chip, closed by default, and which results tab is showing.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [resultsTab, setResultsTab] = useState(RESULT_TABS[0].id);
   // Which film the reader is pointing at in the list. Null when they are pointing at
   // nothing, which is most of the time.
   const [highlightedFilm, setHighlightedFilm] = useState(null);
@@ -3577,14 +3581,27 @@ export default function SceneMapApp() {
             </>
           )}
         </div>
-          <button
-            className={`account-button${accountUser ? "" : " is-login"}`}
-            type="button"
-            onClick={() => setAccountOpen(true)}
-          >
-            {accountUser ? <User size={18} /> : null}
-            {library.length > 0 ? `My movies · ${library.length}` : "My movies"}
-          </button>
+          {/* One row for the two switches on the list: what narrows it, and whose it is. */}
+          <div className="panel-toolbar">
+            <button
+              type="button"
+              className={`filters-toggle${filtersOpen ? " is-open" : ""}`}
+              aria-expanded={filtersOpen}
+              aria-controls={filtersOpen ? "panel-filters" : undefined}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              <SlidersHorizontal size={14} aria-hidden="true" />
+              {filtersChipLabel({ minImdb, minRating, hasLibrary: library.length > 0 })}
+            </button>
+            <button
+              className={`account-button${accountUser ? "" : " is-login"}`}
+              type="button"
+              onClick={() => setAccountOpen(true)}
+            >
+              {accountUser ? <User size={18} /> : null}
+              {library.length > 0 ? `My movies · ${library.length}` : "My movies"}
+            </button>
+          </div>
         </div>
 
 
@@ -3616,531 +3633,584 @@ export default function SceneMapApp() {
           </div>
         )}
 
-        {/* What this place is known for, above everything the reader would have to ask for.
-            Ranked by rating AND reach: the rating alone puts a 9.2 with 300 voters above
-            Forrest Gump, and the vote count alone ranks by how many watched rather than by
-            what is worth walking to. See [[notable-here]] for the arithmetic. */}
-        {/* Always mounted. It used to unmount when empty, and the panel around it kept
-            asserting content over a map that had drawn nothing — see notableEmptyReason. */}
-        {notableEmpty ? (
-          <section className="notable-here is-empty" aria-label="Best known here" aria-live="polite">
-            <h2>Known for</h2>
-            <p className="notable-empty">
-              {notableEmpty.text}
-              {notableEmpty.code === EMPTY_REASON.filtered_out && (
-                <button type="button" className="notable-empty-action" onClick={resetFilters}>Reset filters</button>
+        {/* UX-2: the panel is three zones, Search, Results and Plan, instead of twelve blocks
+            one under another. Order and the rating bars sit behind one Filters chip; the
+            chips above still say what is narrowing the map when it is closed. */}
+        {filtersOpen && (
+          <div id="panel-filters">
+            {/* Order and bar, beside the list they act on. Sorting lives here rather than in
+                the queue panel because it orders THESE chips — a control far from the thing
+                it changes is a control nobody connects to the change. */}
+            <div className="list-controls">
+              <label className="list-control">
+                <span>Order</span>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                  {/* Offered only with a library to read it from. Without one it would sort
+                      every film by null and look broken. */}
+                  {library.length > 0 && <option value={SORT.rating}>Your rating</option>}
+                  <option value={SORT.places}>How much we hold</option>
+                  <option value={SORT.title}>A–Z</option>
+                </select>
+              </label>
+
+              {/* Two bars, not one. "Films I rated 8 AND the world rated 7.5" is a real
+                  question and neither answers it alone. The reader's own needs a library;
+                  IMDb's works for anybody. */}
+              {/* Sliders, not fixed steps. "Somewhere around eight" is a real request and a
+                  list of half-points is not a fine enough answer to it — IMDb publishes tenths
+                  and the filter can compare them. The reader's own bar steps in whole points,
+                  because IMDb has no finer rating to give.
+
+                  **Zero is the OFF position, to the left of the range**, so the control reads
+                  as one line from "everything" to "only the best" instead of needing a
+                  separate Any. `clampImdb` keeps 0 out of the clamp for exactly this. */}
+              {library.length > 0 && (
+                <label className="list-control is-slider">
+                  <span>
+                    Mine
+                    <strong>{minRating > NO_MINIMUM ? `${ratingLabel(minRating)}+` : "Any"}</strong>
+                  </span>
+                  <input
+                    type="range"
+                    // One step below the range is the off position, and on a ten-point scale
+                    // stepping by one that lands exactly on 0 — which is why this bar runs the
+                    // whole scale where the IMDb one below is narrowed.
+                    min={MINE_MIN - MINE_STEP}
+                    max={MINE_MAX}
+                    step={MINE_STEP}
+                    value={minRating}
+                    aria-label="Minimum rating you gave"
+                    onChange={(event) => setMinRating(clampMine(event.target.value))}
+                  />
+                </label>
               )}
-              {notableEmpty.code === EMPTY_REASON.queue_hidden && (
-                <button type="button" className="notable-empty-action" onClick={() => setCandidatesOn(true)}>Show them</button>
+
+              <label className="list-control is-slider">
+                <span>
+                  IMDb
+                  <strong>{minImdb > NO_MINIMUM ? `${imdbLabel(minImdb)}+` : "Any"}</strong>
+                </span>
+                <input
+                  type="range"
+                  // The step below the range is the off position; the range itself starts at
+                  // IMDB_MIN. 1,397 of the rated Los Angeles films clear 5.0 and five clear 9.0,
+                  // so outside that the slider would be travel with nothing at the end of it.
+                  min={IMDB_MIN - IMDB_STEP}
+                  max={IMDB_MAX}
+                  step={IMDB_STEP}
+                  value={minImdb > NO_MINIMUM ? minImdb : IMDB_MIN - IMDB_STEP}
+                  aria-label="Minimum IMDb rating"
+                  onChange={(event) => {
+                    const raw = Number(event.target.value);
+                    setMinImdb(raw < IMDB_MIN ? NO_MINIMUM : clampImdb(raw));
+                  }}
+                />
+              </label>
+
+              {/* Only the consequences, and only when there are any. The note used to open by
+                  repeating the sort select's own current value back at the reader — the one
+                  line in this panel that failed AA contrast (3.5:1 at 11.5 px) was also the one
+                  line that said nothing the control beside it did not already say. */}
+              {(impliesLibraryOnly(minRating) || Number(minImdb) > NO_MINIMUM) && (
+                <small className="list-control-note">
+                  {impliesLibraryOnly(minRating)
+                    // Said out loud: a bar on YOUR rating can only describe your list, and a
+                    // reader who did not expect the map to narrow deserves to know why it did.
+                    ? `${ratingLabel(minRating)} and up, from your list only`
+                    : ""}
+                  {impliesLibraryOnly(minRating) && Number(minImdb) > NO_MINIMUM ? " · " : ""}
+                  {Number(minImdb) > NO_MINIMUM
+                    // And the same for the public bar, which also hides every film nobody has
+                    // rated — 123 of the 1,642 Los Angeles works.
+                    ? `IMDb ${imdbLabel(minImdb)}+, rated films only`
+                    : ""}
+                </small>
               )}
-            </p>
-          </section>
-        ) : (
-          <section className="notable-here" aria-label="Best known here">
-            <h2>Known for</h2>
-            <ul>
-              {notable.map((film) => {
-                const rating = ratingOf(film);
-                const place = (film.places ?? []).find(
-                  (candidate) => Number.isFinite(candidate?.lat) && Number.isFinite(candidate?.lng));
-                return (
-                  <li key={film.work_id ?? film.title}>
-                    {/* A row acts on the MAP. It used to be a link to `/work/…`, which took
-                        the reader out of the product to read a description of a place they
-                        were already looking at — and the row lit up on hover while doing
-                        nothing to the map, so it made the same promise the film chips below
-                        it keep. Hovering names its pins; clicking flies to one. */}
-                    <button
-                      type="button"
-                      className="notable-row"
-                      onMouseEnter={() => setHighlightedFilm(film)}
-                      onMouseLeave={() => setHighlightedFilm(null)}
-                      onFocus={() => setHighlightedFilm(film)}
-                      onBlur={() => setHighlightedFilm(null)}
-                      onClick={() => place && showOnMap([place.lat, place.lng])}
-                      disabled={!place}
-                      title={place ? `Show ${film.title} on the map` : film.title}
-                    >
-                      <span className="notable-title">{film.title}</span>
-                      {film.year ? <span className="notable-year">{film.year}</span> : null}
-                      {/* The number, and whose it is. IMDb answers for 5,495 of the works
-                          on the map and TMDB for the 122 it has nothing on; a rating whose
-                          source is hidden is the same failure as a place without one. IMDb
-                          is unmarked because it is the default the filter above names. */}
-                      <span className="notable-rating">
-                        {rating.score.toFixed(1)}
-                        {rating.source !== "imdb" && (
-                          <small className="notable-rating-source">{RATING_LABELS[rating.source] ?? rating.source}</small>
-                        )}
-                      </span>
-                    </button>
-                    {/* A film seen only on a backlot is a different answer from one seen on
-                        the street, and it is said before anybody walks. */}
-                    {film.on_a_lot_only && <span className="notable-lot">studio lot</span>}
-                  </li>
-                );
-              })}
-            </ul>
-            {/* Every row here comes from the queue — the rows our sources name and nobody
-                has checked. The panel's most prominent list was the one place the product
-                made no claim about its own evidence, which is the same failure as the
-                London cover strip in a new shape. */}
-            <p className="notable-note">Named by our sources · not checked by us</p>
-          </section>
+            </div>
+
+          </div>
         )}
 
-
-
-        {/* The map's own answer to "show me only what I have seen".
-            This filter already existed and was correct, and it lived inside the
-            account dialog — which an anonymous visitor could not open at all. A
-            filter on what the map shows belongs beside the map, next to the works
-            it filters. It appears only once there is a list to filter by; an empty
-            toggle is a question the visitor cannot answer. */}
-        {/* Whether the reader's own list is loaded, said before anything else — the owner
-            could not tell whether the map was showing his films or every film we hold, and
-            nothing on screen answered it. It is stated when there is a list AND when there
-            is not, because "no list yet" is the more confusing of the two silences. */}
-        {/* "Only my films" lives ON THE MAP now, and only there. It was in both places,
-            which is not a fix — it is an admission that neither location was right. The map
-            is where the filter's effect is visible, so that is where the switch belongs. */}
-
-        {/* Order and bar, beside the list they act on. Sorting lives here rather than in
-            the queue panel because it orders THESE chips — a control far from the thing
-            it changes is a control nobody connects to the change. */}
-        <div className="list-controls">
-          <label className="list-control">
-            <span>Order</span>
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-              {/* Offered only with a library to read it from. Without one it would sort
-                  every film by null and look broken. */}
-              {library.length > 0 && <option value={SORT.rating}>Your rating</option>}
-              <option value={SORT.places}>How much we hold</option>
-              <option value={SORT.title}>A–Z</option>
-            </select>
-          </label>
-
-          {/* Two bars, not one. "Films I rated 8 AND the world rated 7.5" is a real
-              question and neither answers it alone. The reader's own needs a library;
-              IMDb's works for anybody. */}
-          {/* Sliders, not fixed steps. "Somewhere around eight" is a real request and a
-              list of half-points is not a fine enough answer to it — IMDb publishes tenths
-              and the filter can compare them. The reader's own bar steps in whole points,
-              because IMDb has no finer rating to give.
-
-              **Zero is the OFF position, to the left of the range**, so the control reads
-              as one line from "everything" to "only the best" instead of needing a
-              separate Any. `clampImdb` keeps 0 out of the clamp for exactly this. */}
-          {library.length > 0 && (
-            <label className="list-control is-slider">
-              <span>
-                Mine
-                <strong>{minRating > NO_MINIMUM ? `${ratingLabel(minRating)}+` : "Any"}</strong>
-              </span>
-              <input
-                type="range"
-                // One step below the range is the off position, and on a ten-point scale
-                // stepping by one that lands exactly on 0 — which is why this bar runs the
-                // whole scale where the IMDb one below is narrowed.
-                min={MINE_MIN - MINE_STEP}
-                max={MINE_MAX}
-                step={MINE_STEP}
-                value={minRating}
-                aria-label="Minimum rating you gave"
-                onChange={(event) => setMinRating(clampMine(event.target.value))}
-              />
-            </label>
-          )}
-
-          <label className="list-control is-slider">
-            <span>
-              IMDb
-              <strong>{minImdb > NO_MINIMUM ? `${imdbLabel(minImdb)}+` : "Any"}</strong>
-            </span>
-            <input
-              type="range"
-              // The step below the range is the off position; the range itself starts at
-              // IMDB_MIN. 1,397 of the rated Los Angeles films clear 5.0 and five clear 9.0,
-              // so outside that the slider would be travel with nothing at the end of it.
-              min={IMDB_MIN - IMDB_STEP}
-              max={IMDB_MAX}
-              step={IMDB_STEP}
-              value={minImdb > NO_MINIMUM ? minImdb : IMDB_MIN - IMDB_STEP}
-              aria-label="Minimum IMDb rating"
-              onChange={(event) => {
-                const raw = Number(event.target.value);
-                setMinImdb(raw < IMDB_MIN ? NO_MINIMUM : clampImdb(raw));
-              }}
-            />
-          </label>
-
-          {/* Only the consequences, and only when there are any. The note used to open by
-              repeating the sort select's own current value back at the reader — the one
-              line in this panel that failed AA contrast (3.5:1 at 11.5 px) was also the one
-              line that said nothing the control beside it did not already say. */}
-          {(impliesLibraryOnly(minRating) || Number(minImdb) > NO_MINIMUM) && (
-            <small className="list-control-note">
-              {impliesLibraryOnly(minRating)
-                // Said out loud: a bar on YOUR rating can only describe your list, and a
-                // reader who did not expect the map to narrow deserves to know why it did.
-                ? `${ratingLabel(minRating)} and up, from your list only`
-                : ""}
-              {impliesLibraryOnly(minRating) && Number(minImdb) > NO_MINIMUM ? " · " : ""}
-              {Number(minImdb) > NO_MINIMUM
-                // And the same for the public bar, which also hides every film nobody has
-                // rated — 123 of the 1,642 Los Angeles works.
-                ? `IMDb ${imdbLabel(minImdb)}+, rated films only`
-                : ""}
-            </small>
-          )}
-        </div>
-
-        <div className="film-grid" aria-label="Selected stories">
-          {mapFilms.map((film) => {
-            const selected = selectedFilms.includes(film.id);
-            const poster = filmPosters[posterCacheKey(film)];
-
-            return (
-              // Two actions live here — filter the map, and open the film — so the
-              // chip is a container rather than one button. Nesting a button inside a
-              // button is invalid HTML and the inner click never arrives reliably.
-              <div className={`film-chip${selected ? " is-selected" : ""}`} key={film.id}>
-                <button
-                  className="film-chip-toggle"
-                  onClick={() => toggleFilm(film.id)}
-                  type="button"
-                  aria-pressed={selected}
-                >
-                  {/* The initials tile is the fallback, not the default: books have no
-                      TMDB poster, and a lookup can fail. A broken <img> would be worse
-                      than the tile, so a load error falls back to it too. */}
-                  {poster && !brokenImages.has(poster.thumb) ? (
-                    <img
-                      alt=""
-                      aria-hidden="true"
-                      className="poster-tile poster-tile-art"
-                      loading="lazy"
-                      src={poster.thumb}
-                      // 28 px here, ~84 in the phone's scroller. Without `sizes` the
-                      // browser assumes the full viewport and takes the larger file on
-                      // every screen, which is the overspend wearing a srcset (#198).
-                      srcSet={poster.thumb_srcset ?? undefined}
-                      sizes={poster.thumb_srcset ? poster.thumb_sizes : undefined}
-                      onError={() => setBrokenImages((current) => new Set(current).add(poster.thumb))}
-                    />
-                  ) : (
-                    <span className="poster-tile" aria-hidden="true">{film.code}</span>
-                  )}
-                  <span>
-                    <strong>{film.title}</strong>
-                    <small>
-                      <WorkKindMark kind={film.kind} />
-                      {film.year ? ` · ${film.year}` : ""}
-                      {/* The reader's own score, on the chip. An order nobody can see the
-                          key for is indistinguishable from no order at all — and with the
-                          list sorted by rating this is the column being sorted. */}
-                      {(() => {
-                        const mine = libraryRating(film, library);
-                        return mine === null
-                          ? null
-                          : <span className="chip-rating">{" · "}{ratingLabel(mine)}</span>;
-                      })()}
-                    </small>
-                  </span>
-                </button>
-                {/* Only works with a TMDB id have a profile to open; a book chip would
-                    lead to an empty page, so it simply has no button. */}
-                {film.tmdbId && (
-                  <button
-                    aria-label={`About ${film.title}`}
-                    className="film-chip-open"
-                    onClick={() => setProfileFilm(film)}
-                    type="button"
-                  >
-                    <Info size={15} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <section className="timed-tour-card" aria-labelledby="timed-tour-title">
-          <div className="timed-tour-heading">
-            <span className="timed-tour-icon" aria-hidden="true"><Clock3 size={18} /></span>
-            <div>
-              <p className="eyebrow">Area · {cityName}</p>
-              <strong id="timed-tour-title">Tour by time and place</strong>
-            </div>
-          </div>
-          <div className="budget-options" role="group" aria-label="Tour time budget">
-            {TOUR_BUDGETS.map((minutes) => (
+        <div className="panel-zone panel-results">
+          <div className="results-tabs" role="tablist" aria-label="Results">
+            {RESULT_TABS.map((tab) => (
               <button
-                className={tourBudget === minutes ? "is-selected" : ""}
-                key={minutes}
+                key={tab.id}
                 type="button"
-                aria-pressed={tourBudget === minutes}
-                disabled={timedTourStatus === "loading"}
-                onClick={() => {
-                  setTourBudget(minutes);
-                  resetTimedTour();
+                role="tab"
+                id={`results-tab-${tab.id}`}
+                aria-selected={resultsTab === tab.id}
+                aria-controls={resultsTab === tab.id ? `results-panel-${tab.id}` : undefined}
+                tabIndex={resultsTab === tab.id ? 0 : -1}
+                className={`results-tab${resultsTab === tab.id ? " is-selected" : ""}`}
+                onClick={() => setResultsTab(tab.id)}
+                onKeyDown={(event) => {
+                  const next = nextResultTab(resultsTab, event.key);
+                  if (!next) return;
+                  event.preventDefault();
+                  setResultsTab(next);
+                  document.getElementById(`results-tab-${next}`)?.focus();
                 }}
               >
-                {minutes} min
+                {tab.label}
               </button>
             ))}
           </div>
-          <label className="guide-language">
-            <span>Guide language</span>
-            <select
-              value={tourLanguage}
-              disabled={timedTourStatus === "loading"}
-              onChange={(event) => chooseTourLanguage(event.target.value)}
-            >
-              {GUIDE_LANGUAGES.map((language) => (
-                <option key={language.code} value={language.code}>
-                  {language.nativeName === language.name ? language.name : `${language.nativeName} · ${language.name}`}
-                </option>
+          {resultsTab === "works" ? (
+            <div role="tabpanel" id="results-panel-works" aria-labelledby="results-tab-works">
+              {/* What this place is known for, above everything the reader would have to ask for.
+                  Ranked by rating AND reach: the rating alone puts a 9.2 with 300 voters above
+                  Forrest Gump, and the vote count alone ranks by how many watched rather than by
+                  what is worth walking to. See [[notable-here]] for the arithmetic. */}
+              {/* Always mounted. It used to unmount when empty, and the panel around it kept
+                  asserting content over a map that had drawn nothing — see notableEmptyReason. */}
+              {notableEmpty ? (
+                <section className="notable-here is-empty" aria-label="Best known here" aria-live="polite">
+                  <h2>Known for</h2>
+                  <p className="notable-empty">
+                    {notableEmpty.text}
+                    {notableEmpty.code === EMPTY_REASON.filtered_out && (
+                      <button type="button" className="notable-empty-action" onClick={resetFilters}>Reset filters</button>
+                    )}
+                    {notableEmpty.code === EMPTY_REASON.queue_hidden && (
+                      <button type="button" className="notable-empty-action" onClick={() => setCandidatesOn(true)}>Show them</button>
+                    )}
+                  </p>
+                </section>
+              ) : (
+                <section className="notable-here" aria-label="Best known here">
+                  <h2>Known for</h2>
+                  <ul>
+                    {notable.map((film) => {
+                      const rating = ratingOf(film);
+                      const place = (film.places ?? []).find(
+                        (candidate) => Number.isFinite(candidate?.lat) && Number.isFinite(candidate?.lng));
+                      return (
+                        <li key={film.work_id ?? film.title}>
+                          {/* A row acts on the MAP. It used to be a link to `/work/…`, which took
+                              the reader out of the product to read a description of a place they
+                              were already looking at — and the row lit up on hover while doing
+                              nothing to the map, so it made the same promise the film chips below
+                              it keep. Hovering names its pins; clicking flies to one. */}
+                          <button
+                            type="button"
+                            className="notable-row"
+                            onMouseEnter={() => setHighlightedFilm(film)}
+                            onMouseLeave={() => setHighlightedFilm(null)}
+                            onFocus={() => setHighlightedFilm(film)}
+                            onBlur={() => setHighlightedFilm(null)}
+                            onClick={() => place && showOnMap([place.lat, place.lng])}
+                            disabled={!place}
+                            title={place ? `Show ${film.title} on the map` : film.title}
+                          >
+                            <span className="notable-title">{film.title}</span>
+                            {film.year ? <span className="notable-year">{film.year}</span> : null}
+                            {/* The number, and whose it is. IMDb answers for 5,495 of the works
+                                on the map and TMDB for the 122 it has nothing on; a rating whose
+                                source is hidden is the same failure as a place without one. IMDb
+                                is unmarked because it is the default the filter above names. */}
+                            <span className="notable-rating">
+                              {rating.score.toFixed(1)}
+                              {rating.source !== "imdb" && (
+                                <small className="notable-rating-source">{RATING_LABELS[rating.source] ?? rating.source}</small>
+                              )}
+                            </span>
+                          </button>
+                          {/* A film seen only on a backlot is a different answer from one seen on
+                              the street, and it is said before anybody walks. */}
+                          {film.on_a_lot_only && <span className="notable-lot">studio lot</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {/* Every row here comes from the queue — the rows our sources name and nobody
+                      has checked. The panel's most prominent list was the one place the product
+                      made no claim about its own evidence, which is the same failure as the
+                      London cover strip in a new shape. */}
+                  <p className="notable-note">Named by our sources · not checked by us</p>
+                </section>
+              )}
+
+
+
+              {/* The map's own answer to "show me only what I have seen".
+                  This filter already existed and was correct, and it lived inside the
+                  account dialog — which an anonymous visitor could not open at all. A
+                  filter on what the map shows belongs beside the map, next to the works
+                  it filters. It appears only once there is a list to filter by; an empty
+                  toggle is a question the visitor cannot answer. */}
+              {/* Whether the reader's own list is loaded, said before anything else — the owner
+                  could not tell whether the map was showing his films or every film we hold, and
+                  nothing on screen answered it. It is stated when there is a list AND when there
+                  is not, because "no list yet" is the more confusing of the two silences. */}
+              {/* "Only my films" lives ON THE MAP now, and only there. It was in both places,
+                  which is not a fix — it is an admission that neither location was right. The map
+                  is where the filter's effect is visible, so that is where the switch belongs. */}
+
+              <div className="film-grid" aria-label="Selected stories">
+                {mapFilms.map((film) => {
+                  const selected = selectedFilms.includes(film.id);
+                  const poster = filmPosters[posterCacheKey(film)];
+
+                  return (
+                    // Two actions live here — filter the map, and open the film — so the
+                    // chip is a container rather than one button. Nesting a button inside a
+                    // button is invalid HTML and the inner click never arrives reliably.
+                    <div className={`film-chip${selected ? " is-selected" : ""}`} key={film.id}>
+                      <button
+                        className="film-chip-toggle"
+                        onClick={() => toggleFilm(film.id)}
+                        type="button"
+                        aria-pressed={selected}
+                      >
+                        {/* The initials tile is the fallback, not the default: books have no
+                            TMDB poster, and a lookup can fail. A broken <img> would be worse
+                            than the tile, so a load error falls back to it too. */}
+                        {poster && !brokenImages.has(poster.thumb) ? (
+                          <img
+                            alt=""
+                            aria-hidden="true"
+                            className="poster-tile poster-tile-art"
+                            loading="lazy"
+                            src={poster.thumb}
+                            // 28 px here, ~84 in the phone's scroller. Without `sizes` the
+                            // browser assumes the full viewport and takes the larger file on
+                            // every screen, which is the overspend wearing a srcset (#198).
+                            srcSet={poster.thumb_srcset ?? undefined}
+                            sizes={poster.thumb_srcset ? poster.thumb_sizes : undefined}
+                            onError={() => setBrokenImages((current) => new Set(current).add(poster.thumb))}
+                          />
+                        ) : (
+                          <span className="poster-tile" aria-hidden="true">{film.code}</span>
+                        )}
+                        <span>
+                          <strong>{film.title}</strong>
+                          <small>
+                            <WorkKindMark kind={film.kind} />
+                            {film.year ? ` · ${film.year}` : ""}
+                            {/* The reader's own score, on the chip. An order nobody can see the
+                                key for is indistinguishable from no order at all — and with the
+                                list sorted by rating this is the column being sorted. */}
+                            {(() => {
+                              const mine = libraryRating(film, library);
+                              return mine === null
+                                ? null
+                                : <span className="chip-rating">{" · "}{ratingLabel(mine)}</span>;
+                            })()}
+                          </small>
+                        </span>
+                      </button>
+                      {/* Only works with a TMDB id have a profile to open; a book chip would
+                          lead to an empty page, so it simply has no button. */}
+                      {film.tmdbId && (
+                        <button
+                          aria-label={`About ${film.title}`}
+                          className="film-chip-open"
+                          onClick={() => setProfileFilm(film)}
+                          type="button"
+                        >
+                          <Info size={15} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          ) : (
+            <div role="tabpanel" id="results-panel-places" aria-labelledby="results-tab-places">
+              <div className="location-list" aria-label="Map locations">
+                <div className="section-row">
+                  <p className="eyebrow">Locations</p>
+                  {/* Two numbers, because they answer two different questions (#160): how much
+                      is drawn, and how many works that came from. One number could not tell a
+                      thin catalogue from a viewport zoomed too far out. */}
+                  <span aria-live="polite">{viewCountLabel(inView)} in {cityName}</span>
+                </div>
+                {/* The distinction the panel could not make before: nothing here because we hold
+                    nothing, or nothing here because the map is somewhere else. */}
+                {locationsInView.length === 0 && visibleLocations.length > 0 && (
+                  <p className="location-empty" role="status">
+                    None of the {visibleLocations.length} places for the films you have selected are
+                    on screen. Zoom out or drag the map to find them.
+                  </p>
+                )}
+                {locationsInView.map((location) => (
+                  <div className="location-row" key={location.id}>
+                    <button type="button" onClick={() => setActiveLocation(location)}>
+                      <strong>{location.place}</strong>
+                      <span>
+                        <WorkKindMark kind={location.kind} />{" "}
+                        {location.film}
+                      </span>
+                    </button>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      onClick={() => addRouteStop(location)}
+                      aria-label={`Add ${location.place} to the route`}
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          )}
+        </div>
+
+        <section className="panel-zone panel-plan" aria-labelledby="panel-plan-title">
+          <h2 id="panel-plan-title" className="panel-zone-title">Plan</h2>
+          <section className="timed-tour-card" aria-labelledby="timed-tour-title">
+            <div className="timed-tour-heading">
+              <span className="timed-tour-icon" aria-hidden="true"><Clock3 size={18} /></span>
+              <div>
+                <p className="eyebrow">Area · {cityName}</p>
+                <strong id="timed-tour-title">Tour by time and place</strong>
+              </div>
+            </div>
+            <div className="budget-options" role="group" aria-label="Tour time budget">
+              {TOUR_BUDGETS.map((minutes) => (
+                <button
+                  className={tourBudget === minutes ? "is-selected" : ""}
+                  key={minutes}
+                  type="button"
+                  aria-pressed={tourBudget === minutes}
+                  disabled={timedTourStatus === "loading"}
+                  onClick={() => {
+                    setTourBudget(minutes);
+                    resetTimedTour();
+                  }}
+                >
+                  {minutes} min
+                </button>
               ))}
-            </select>
-          </label>
-          <button
-            className="timed-tour-button"
-            type="button"
-            onClick={buildTimedTour}
-            disabled={timedTourStatus === "loading" || visibleLocations.length < 3}
-          >
-            {timedTourStatus === "loading" ? (
-              <LoaderCircle className="loading-icon" size={17} />
-            ) : (
-              <Clock3 size={17} />
-            )}
-            {timedTourStatus === "loading" ? "Planning..." : "Generate nearby tour"}
-          </button>
-          {timedTourMessage && (
-            <p
-              className={`timed-tour-message${timedTourStatus === "error" ? " is-error" : ""}`}
-              role={timedTourStatus === "error" ? "alert" : "status"}
+            </div>
+            <label className="guide-language">
+              <span>Guide language</span>
+              <select
+                value={tourLanguage}
+                disabled={timedTourStatus === "loading"}
+                onChange={(event) => chooseTourLanguage(event.target.value)}
+              >
+                {GUIDE_LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.nativeName === language.name ? language.name : `${language.nativeName} · ${language.name}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="timed-tour-button"
+              type="button"
+              onClick={buildTimedTour}
+              disabled={timedTourStatus === "loading" || visibleLocations.length < 3}
             >
-              {timedTourMessage}
+              {timedTourStatus === "loading" ? (
+                <LoaderCircle className="loading-icon" size={17} />
+              ) : (
+                <Clock3 size={17} />
+              )}
+              {timedTourStatus === "loading" ? "Planning..." : "Generate nearby tour"}
+            </button>
+            {timedTourMessage && (
+              <p
+                className={`timed-tour-message${timedTourStatus === "error" ? " is-error" : ""}`}
+                role={timedTourStatus === "error" ? "alert" : "status"}
+              >
+                {timedTourMessage}
+              </p>
+            )}
+            {timedTour && (
+              <div className="timed-tour-result" aria-live="polite">
+                <div>
+                  <strong>{timedTour.guide.title}</strong>
+                  <p>{timedTour.guide.intro}</p>
+                </div>
+                <div className="timed-tour-metrics">
+                  <span>{timedTour.route.distanceKm.toFixed(1)} km</span>
+                  <span>{timedTour.route.durationMinutes} min</span>
+                  <span>{timedTour.stops.length} stops</span>
+                </div>
+                <ol>
+                  {timedTour.stops.map((stop) => {
+                    const record = tourAccess?.[stop.locationId ?? stop.id];
+                    return (
+                      <li key={stop.id}>
+                        <strong>{stop.place}</strong>
+                        <span>{stop.film}</span>
+                        {/* Per stop, not only in the summary: "2 of 4 unconfirmed" does
+                            not tell you WHICH two, and that is the whole question when
+                            you are standing at the bus stop deciding. */}
+                        <span className={`access-note${record && isRoutable(record) ? " is-known" : ""}`}>
+                          {accessNote(record)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+                <button className="start-tour-button" type="button" onClick={startTimedTour}>
+                  <Route size={17} />
+                  Start tour
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* "Tour by work" was removed. There were THREE ways to build a walk — by time,
+              by work, and by hand — at 2,024 px, 2,202 px and 2,529 px, with no guidance on
+              which to use and the manual one disabled without explanation. The route is the
+              product; splitting it three ways made the primary outcome the least legible
+              thing on the surface. One generator, by time and place, and the manual route
+              card below it. */}
+
+          {/* A walk that came back from this phone rather than from the network. Said out
+              loud, with its age: a route is a plan for an afternoon, and one restored
+              silently would be the product asserting where somebody is. */}
+          {restoredWalk && (
+            <p className="restored-walk" role="status">
+              <History size={14} aria-hidden="true" />
+              <span>Your walk from {walkAgeLabel(restoredWalk)}, kept on this phone</span>
+              <button type="button" onClick={() => {
+                clearWalk(window.localStorage);
+                setRestoredWalk(null);
+                setRouteStops([]);
+                invalidateRoute();
+              }}>Clear</button>
             </p>
           )}
-          {timedTour && (
-            <div className="timed-tour-result" aria-live="polite">
-              <div>
-                <strong>{timedTour.guide.title}</strong>
-                <p>{timedTour.guide.intro}</p>
-              </div>
-              <div className="timed-tour-metrics">
-                <span>{timedTour.route.distanceKm.toFixed(1)} km</span>
-                <span>{timedTour.route.durationMinutes} min</span>
-                <span>{timedTour.stops.length} stops</span>
-              </div>
+
+          {keptTiles && (
+            <p className="kept-offline" role="status">
+              <Download size={13} aria-hidden="true" />
+              {keptTiles.working && <span>Keeping this walk for offline…</span>}
+              {keptTiles.skipped === "save_data" && <span>Data saver is on, so the map was not kept for offline.</span>}
+              {keptTiles.reason === "no_tile_source" && <span>This basemap cannot be kept offline.</span>}
+              {keptTiles.reason === "unavailable" && <span>Could not keep the map for offline; the walk still works online.</span>}
+              {keptTiles.reason === null && (
+                <span>
+                  {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
+                  {" "}({corridorSizeLabel(keptTiles.kept)}) for this walk
+                  {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched`}
+                  {keptTiles.truncated && " — the route is long, so the start is kept"}
+                </span>
+              )}
+            </p>
+          )}
+
+          <div className="route-card">
+            <div>
+              <p className="eyebrow">Route</p>
+              <strong>{routeStops.length} / 5 stops</strong>
+              {/* The "+" that adds a stop lives on each row of the Places tab (UX-2), so
+                  an empty route says where to find it. */}
+              {routeStops.length === 0 && resultsTab !== "places" && (
+                <button type="button" className="route-card-hint" onClick={() => setResultsTab("places")}>
+                  Add stops from Places
+                </button>
+              )}
+            </div>
+            <button
+              className={`primary-button${routeResult ? " is-complete" : ""}`}
+              disabled={routeStops.length < 3 || routeStatus !== "idle"}
+              onClick={() => buildRoute()}
+              type="button"
+            >
+              <Route size={18} />
+              {routeStatus === "loading"
+                ? "Building..."
+                : routeStatus === "fallback"
+                  ? "Approximate route"
+                  : routeResult
+                  ? "Route ready"
+                  : "Build route"}
+            </button>
+          </div>
+
+          {routeStops.length >= 2 && (
+            <div className="route-export">
+              <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
+                <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
+              </a>
+              <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
+                <Download size={14} aria-hidden="true" />GPX
+              </button>
+            </div>
+          )}
+
+          {aiTour && (
+            <section className="ai-tour-result" aria-live="polite">
+              <p className="eyebrow">Stories at each stop</p>
               <ol>
-                {timedTour.stops.map((stop) => {
-                  const record = tourAccess?.[stop.locationId ?? stop.id];
+                {aiTour.stops.map((stop) => {
+                  const location = sourceLocations.find((item) => item.id === stop.locationId);
+
                   return (
-                    <li key={stop.id}>
-                      <strong>{stop.place}</strong>
-                      <span>{stop.film}</span>
-                      {/* Per stop, not only in the summary: "2 of 4 unconfirmed" does
-                          not tell you WHICH two, and that is the whole question when
-                          you are standing at the bus stop deciding. */}
-                      <span className={`access-note${record && isRoutable(record) ? " is-known" : ""}`}>
-                        {accessNote(record)}
-                      </span>
+                    <li key={stop.locationId}>
+                      <strong>{location?.place}</strong>
+                      <span>{stop.narration}</span>
                     </li>
                   );
                 })}
               </ol>
-              <button className="start-tour-button" type="button" onClick={startTimedTour}>
-                <Route size={17} />
-                Start tour
-              </button>
+            </section>
+          )}
+
+          {routeStops.length > 0 && (
+            <ol className="route-list">
+              {routeStops.map((stop, index) => (
+                <li key={stop.id}>
+                  <button type="button" onClick={() => setActiveLocation(stop)}>
+                    <span>{index + 1}</span>
+                    {stop.place}
+                  </button>
+                  <button className="icon-button" type="button" onClick={() => removeRouteStop(stop.id)} aria-label="Remove stop">
+                    <X size={15} />
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {routeStatus === "loading" && (
+            <p className="route-summary" role="status">
+              Building a walking route through {cityName}...
+            </p>
+          )}
+
+          {routeResult && (
+            <div
+              className={`route-summary${routeResult.source === "fallback" ? " is-fallback" : ""}`}
+              role="status"
+            >
+              <strong>
+                {routeResult.distanceKm.toFixed(1)} km on foot · {routeResult.durationMinutes} min
+              </strong>
+              {routeResult.source === "fallback" ? (
+                <span>{routeMessage}</span>
+              ) : (
+                <span>
+                  {aiTour?.timed
+                    ? "Nearby planner chose the stops · "
+                    : aiTour
+                      ? "AI chose the stop order · "
+                      : ""}
+                  Route follows mapped streets ·{" "}
+                  <a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noreferrer">
+                    OpenStreetMap routing
+                  </a>
+                  {" · "}
+                  <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">
+                    fix the map
+                  </a>
+                </span>
+              )}
             </div>
           )}
         </section>
 
-        {/* "Tour by work" was removed. There were THREE ways to build a walk — by time,
-            by work, and by hand — at 2,024 px, 2,202 px and 2,529 px, with no guidance on
-            which to use and the manual one disabled without explanation. The route is the
-            product; splitting it three ways made the primary outcome the least legible
-            thing on the surface. One generator, by time and place, and the manual route
-            card below it. */}
-
-        <div className="location-list" aria-label="Map locations">
-          <div className="section-row">
-            <p className="eyebrow">Locations</p>
-            {/* Two numbers, because they answer two different questions (#160): how much
-                is drawn, and how many works that came from. One number could not tell a
-                thin catalogue from a viewport zoomed too far out. */}
-            <span aria-live="polite">{viewCountLabel(inView)} in {cityName}</span>
-          </div>
-          {/* The distinction the panel could not make before: nothing here because we hold
-              nothing, or nothing here because the map is somewhere else. */}
-          {locationsInView.length === 0 && visibleLocations.length > 0 && (
-            <p className="location-empty" role="status">
-              None of the {visibleLocations.length} places for the films you have selected are
-              on screen. Zoom out or drag the map to find them.
-            </p>
-          )}
-          {locationsInView.map((location) => (
-            <div className="location-row" key={location.id}>
-              <button type="button" onClick={() => setActiveLocation(location)}>
-                <strong>{location.place}</strong>
-                <span>
-                  <WorkKindMark kind={location.kind} />{" "}
-                  {location.film}
-                </span>
-              </button>
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => addRouteStop(location)}
-                aria-label={`Add ${location.place} to the route`}
-              >
-                <Plus size={15} />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* A walk that came back from this phone rather than from the network. Said out
-            loud, with its age: a route is a plan for an afternoon, and one restored
-            silently would be the product asserting where somebody is. */}
-        {restoredWalk && (
-          <p className="restored-walk" role="status">
-            <History size={14} aria-hidden="true" />
-            <span>Your walk from {walkAgeLabel(restoredWalk)}, kept on this phone</span>
-            <button type="button" onClick={() => {
-              clearWalk(window.localStorage);
-              setRestoredWalk(null);
-              setRouteStops([]);
-              invalidateRoute();
-            }}>Clear</button>
-          </p>
-        )}
-
-        {keptTiles && (
-          <p className="kept-offline" role="status">
-            <Download size={13} aria-hidden="true" />
-            {keptTiles.working && <span>Keeping this walk for offline…</span>}
-            {keptTiles.skipped === "save_data" && <span>Data saver is on, so the map was not kept for offline.</span>}
-            {keptTiles.reason === "no_tile_source" && <span>This basemap cannot be kept offline.</span>}
-            {keptTiles.reason === "unavailable" && <span>Could not keep the map for offline; the walk still works online.</span>}
-            {keptTiles.reason === null && (
-              <span>
-                {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
-                {" "}({corridorSizeLabel(keptTiles.kept)}) for this walk
-                {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched`}
-                {keptTiles.truncated && " — the route is long, so the start is kept"}
-              </span>
-            )}
-          </p>
-        )}
-
-        <div className="route-card">
-          <div>
-            <p className="eyebrow">Route</p>
-            <strong>{routeStops.length} / 5 stops</strong>
-          </div>
-          <button
-            className={`primary-button${routeResult ? " is-complete" : ""}`}
-            disabled={routeStops.length < 3 || routeStatus !== "idle"}
-            onClick={() => buildRoute()}
-            type="button"
-          >
-            <Route size={18} />
-            {routeStatus === "loading"
-              ? "Building..."
-              : routeStatus === "fallback"
-                ? "Approximate route"
-                : routeResult
-                ? "Route ready"
-                : "Build route"}
-          </button>
-        </div>
-
-        {routeStops.length >= 2 && (
-          <div className="route-export">
-            <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
-              <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
-            </a>
-            <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
-              <Download size={14} aria-hidden="true" />GPX
-            </button>
-          </div>
-        )}
-
-        {aiTour && (
-          <section className="ai-tour-result" aria-live="polite">
-            <p className="eyebrow">Stories at each stop</p>
-            <ol>
-              {aiTour.stops.map((stop) => {
-                const location = sourceLocations.find((item) => item.id === stop.locationId);
-
-                return (
-                  <li key={stop.locationId}>
-                    <strong>{location?.place}</strong>
-                    <span>{stop.narration}</span>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-        )}
-
-        {routeStops.length > 0 && (
-          <ol className="route-list">
-            {routeStops.map((stop, index) => (
-              <li key={stop.id}>
-                <button type="button" onClick={() => setActiveLocation(stop)}>
-                  <span>{index + 1}</span>
-                  {stop.place}
-                </button>
-                <button className="icon-button" type="button" onClick={() => removeRouteStop(stop.id)} aria-label="Remove stop">
-                  <X size={15} />
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        {routeStatus === "loading" && (
-          <p className="route-summary" role="status">
-            Building a walking route through {cityName}...
-          </p>
-        )}
-
-        {routeResult && (
-          <div
-            className={`route-summary${routeResult.source === "fallback" ? " is-fallback" : ""}`}
-            role="status"
-          >
-            <strong>
-              {routeResult.distanceKm.toFixed(1)} km on foot · {routeResult.durationMinutes} min
-            </strong>
-            {routeResult.source === "fallback" ? (
-              <span>{routeMessage}</span>
-            ) : (
-              <span>
-                {aiTour?.timed
-                  ? "Nearby planner chose the stops · "
-                  : aiTour
-                    ? "AI chose the stop order · "
-                    : ""}
-                Route follows mapped streets ·{" "}
-                <a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noreferrer">
-                  OpenStreetMap routing
-                </a>
-                {" · "}
-                <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">
-                  fix the map
-                </a>
-              </span>
-            )}
-          </div>
-        )}
         {/* The layers console, behind a disclosure and closed by default.
 
             It was 45% of the panel — 1,220 px of 2,715 — and it was the FIRST thing a
@@ -4403,15 +4473,6 @@ export default function SceneMapApp() {
         </section>
         </details>
 
-        <p className="source-notices">
-          {/* Terms-required wording, shown once however many images are on screen. */}
-          {requiredNotices([normalizeAttribution({ source: "tmdb" })]).map((notice) => (
-            <span key={notice}>{notice}</span>
-          ))}
-          <span>
-            Ratings via OMDb. IMDb, Rotten Tomatoes and Metacritic are their owners&rsquo; marks.
-          </span>
-        </p>
       </aside>
 
       {activeLocation && section === "map" && (

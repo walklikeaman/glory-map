@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { Award, Check, Heart, LogIn, Map as MapIcon, MapPin, PlusCircle, Route, Trash2, User, X } from "lucide-react";
 
+import { normalizeAttribution, requiredNotices } from "../lib/attribution.mjs";
 import { achievementsOf, collectionOf, gloryOf, levelOf, toggleWant } from "../lib/place-marks.mjs";
 import { readReviewOutcomes } from "../lib/suggestion-review.mjs";
 import { SUGGESTION_STATUS, sendSuggestion, suggestionStatusLabel, unsentSuggestions, validateSuggestion } from "../lib/suggestions.mjs";
@@ -234,6 +235,19 @@ function ProfileView({ marks, accountUser, onOpenInterests, onOpenAccount }) {
         </button>
       </section>
       <p className="section-note">Kept on this device. {accountUser ? "" : "Signing in keeps your movie list, not these visits."}</p>
+      {/* The data credits, moved here from the bottom of the map panel (UX-2). TMDB's
+          terms ask for the notice in an About or Credits section, which this is. */}
+      <section className="section-block profile-about" aria-labelledby="profile-about-title">
+        <h3 id="profile-about-title">About</h3>
+        <p className="source-notices">
+          {requiredNotices([normalizeAttribution({ source: "tmdb" })]).map((notice) => (
+            <span key={notice}>{notice}</span>
+          ))}
+          <span>
+            Ratings via OMDb. IMDb, Rotten Tomatoes and Metacritic are their owners&rsquo; marks.
+          </span>
+        </p>
+      </section>
     </>
   );
 }
