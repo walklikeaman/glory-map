@@ -26,6 +26,8 @@ export const MEDIA_SOURCES = Object.freeze({
     // Letterboxd hands you a ZIP of several CSVs; IMDb hands you one CSV per list.
     archive: true,
     logoText: null,
+    // Where the service hands the file over, linked from the library panel.
+    exportUrl: "https://letterboxd.com/data/export/",
   }),
   imdb: Object.freeze({
     label: "IMDb",
@@ -35,6 +37,7 @@ export const MEDIA_SOURCES = Object.freeze({
     accept: ".csv,text/csv",
     archive: false,
     logoText: "IMDb",
+    exportUrl: "https://www.imdb.com/list/ratings",
   }),
   goodreads: Object.freeze({
     label: "Goodreads",
@@ -47,6 +50,40 @@ export const MEDIA_SOURCES = Object.freeze({
     // The only service here that lists books. Its rows are stamped as books so they are
     // matched against books, never against a film that happens to share the title.
     kind: "book",
+    exportUrl: "https://www.goodreads.com/review/import",
+  }),
+  netflix: Object.freeze({
+    label: "Netflix",
+    // The viewing history carries no ratings; the scale is only here to be declared.
+    scale: RATING_SCALE,
+    blurb: "Viewing history CSV, from your profile's Viewing activity",
+    accept: ".csv,text/csv",
+    archive: false,
+    logoText: "N",
+    exportUrl: "https://www.netflix.com/viewingactivity",
+    // "Sherlock: Season 1: A Study in Pink" is one row per episode; the series is the part
+    // before the first colon.
+    episodeTitles: true,
+  }),
+  other: Object.freeze({
+    label: "Other list",
+    // A list of the reader's own making: out of ten unless they say otherwise.
+    scale: RATING_SCALE,
+    blurb: "Your CSV or JSON: title, year, IMDb id, rating. Trakt exports work too",
+    accept: ".csv,.json,text/csv,application/json",
+    archive: false,
+    logoText: null,
+  }),
+  simkl: Object.freeze({
+    label: "Simkl",
+    // Whole numbers, 1 to 10.
+    scale: RATING_SCALE,
+    blurb: "Sign in. Brings your IMDb and Letterboxd too, if they are in Simkl",
+    accept: null,
+    archive: false,
+    logoText: "S",
+    // Not a file: the card starts "Sign in with Simkl" ([[simkl]] connector).
+    signIn: true,
   }),
 });
 

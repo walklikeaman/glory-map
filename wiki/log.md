@@ -7,6 +7,20 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | Connected services live on the account; Simkl sign-in, Netflix, own list
+**Scenario**: Nikita registered a Simkl app (PKCE, client id only, redirect `/auth/simkl` on
+glory-map.vercel.app, the old domain and localhost:3000) and asked that all connections be for
+signed-in users and attached to their account.
+**Decision**: connectors show only when signed in. The Letterboxd handle and the Simkl refresh
+token are stored in Supabase `user_metadata` (`letterboxd_handle`, `simkl_refresh_token`), not a new
+table, so no migration was needed; the auth listener ignores `USER_UPDATED` so a metadata write never
+re-runs library hydration. Simkl token exchange runs server-side (`/api/import/simkl`) because Simkl
+documents no CORS. Added Netflix viewing-history CSV (episodes collapse to series) and an "Other
+list" CSV/JSON source that also reads Trakt exports. Nikita declined scraping full Letterboxd
+profiles (ToS), so by-username stays RSS-only.
+**Caveat**: the refresh token rides in the JWT via user_metadata. Read-only scope; move it to a
+server table if more sensitive tokens arrive.
+
 ## [2026-11-07] decision | First run: "Filmed around you", then "add my films"
 **Scenario**: Nikita: the first launch should open where you are, say what was filmed
 nearby (Palermo → The Godfather, Taormina → the station scene), and only then offer to

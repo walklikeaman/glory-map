@@ -1997,6 +1997,45 @@ figcaption a {
   font-weight: 900;
 }
 
+.connector-logo.is-simkl {
+  color: #fff;
+  background: #0b0f14;
+  font-weight: 900;
+}
+
+.connect-gate {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.connect-gate svg {
+  flex: none;
+}
+
+.connector-exports {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.connector-exports a,
+.connector-exports .link-button {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .connector-logo.is-goodreads {
   color: #382110;
   background: #f4f1ea;

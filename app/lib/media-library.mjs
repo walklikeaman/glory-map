@@ -1,5 +1,5 @@
 import { normalizeWorkTitle } from "./content-graph.mjs";
-import { RATING_SCALE, isMediaSource, mediaSourceKind, storedScale, toTenPoint } from "./media-sources.mjs";
+import { RATING_SCALE, isMediaSource, mediaSource, mediaSourceKind, storedScale, toTenPoint } from "./media-sources.mjs";
 
 // Re-exported so callers that already think in terms of the library keep one import for
 // it. The definitions live in [[media-sources]], which is the only place that knows what
@@ -194,12 +194,14 @@ export function parseMediaCsv(text, source) {
     if (!rawTitle) return [];
     // Goodreads exports the want-to-read shelf too. The library is what you have read.
     if (firstValue(record, ["exclusive shelf"]) === "to-read") return [];
-    const title = kind === "book" ? bookTitle(rawTitle) : rawTitle;
+    const title = kind === "book"
+      ? bookTitle(rawTitle)
+      : mediaSource(source).episodeTitles ? seriesTitle(rawTitle) : rawTitle;
 
-    const imdbId = firstValue(record, ["const", "imdb id"]);
+    const imdbId = firstValue(record, ["const", "imdb id", "imdb_id", "imdbid", "imdb"]);
     // Converted to ten points here and nowhere else, so no caller ever has to ask which
     // service a number came from.
-    const rating = toTenPoint(numberValue(firstValue(record, ["rating", "your rating", "my rating"])), source);
+    const rating = toTenPoint(numberValue(firstValue(record, ["rating", "your rating", "my rating", "user_rating"])), source);
     // For a book, the year the work first came out, not the year of the edition on the shelf.
     const year = numberValue(firstValue(record, ["year", "release year", "original publication year", "year published"]));
     const watchedDate = firstValue(record, ["watched date", "date rated", "date read", "date"]);
@@ -220,6 +222,55 @@ export function parseMediaCsv(text, source) {
   });
 
   if (!movies.length) throw new Error(kind === "book" ? "No read books were found in this CSV" : "No movie titles were found in this CSV");
+  return movies;
+}
+
+// A streaming history names episodes, "Show: Season 2: Episode Title". The series is the
+// part before the first colon; a film title has no season marker and is kept whole, colon
+// and all ("Mission: Impossible").
+function seriesTitle(raw) {
+  const match = raw.match(/^(.+?):\s*(?:Season|Series|Part|Limited Series|Volume|Chapter|Book)\b/i);
+  return (match ? match[1] : raw).trim();
+}
+
+// A JSON list in whatever shape a tracker exports: an array of items, or an object whose
+// arrays are the lists (Trakt: [{ movie: { title, year, ids } }], Simkl: { movies: [...] }).
+export function parseMediaJson(text, source) {
+  if (!isMediaSource(source)) throw new Error("Unsupported media source");
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("This file is not valid JSON");
+  }
+  const items = Array.isArray(data)
+    ? data
+    : Object.values(data ?? {}).filter(Array.isArray).flat();
+
+  const movies = items.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const work = item.movie ?? item.show ?? item;
+    const title = String(work.title ?? work.name ?? "").trim();
+    if (!title) return [];
+    const yearNumber = Number(work.year ?? work.release_year);
+    const year = Number.isInteger(yearNumber) && yearNumber > 1800 ? yearNumber : null;
+    const imdbRaw = work.ids?.imdb ?? work.imdb_id ?? work.imdbId ?? work.imdb ?? item.imdb_id ?? null;
+    const imdbId = /^tt\d+$/.test(imdbRaw ?? "") ? imdbRaw : null;
+    const rating = toTenPoint(Number(item.rating ?? item.user_rating ?? work.rating), source);
+    return [{
+      id: imdbId || `${source}:${libraryKey({ title, year })}`,
+      title,
+      year,
+      rating,
+      ratingScale: RATING_SCALE,
+      watchedDate: item.watched_at ?? item.last_watched_at ?? item.rated_at ?? null,
+      url: null,
+      imdbId,
+      sources: [source],
+    }];
+  });
+
+  if (!movies.length) throw new Error("No titles were found in this JSON file");
   return movies;
 }
 
