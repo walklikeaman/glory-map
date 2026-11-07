@@ -22,6 +22,8 @@
 // stored fact says where it came from) and a work the graph already holds, chosen from the
 // candidates we gave the model; a verdict below the confidence bar is `unsure`.
 
+import { lookup } from "node:dns/promises";
+import { BlockList, isIP } from "node:net";
 import { z } from "zod";
 
 export const AI_VERDICTS = Object.freeze({ pass: "pass", reject: "reject", unsure: "unsure" });
@@ -136,7 +138,9 @@ const MAX_SOURCE_TEXT = 8000;
 const MAX_REDIRECTS = 3;
 
 // The server fetches a URL a stranger typed, so it refuses anything that is not a public
-// web host: no IP literals, no localhost, no internal names.
+// web host: no IP literals, no localhost, no internal names. `URL` already turns decimal,
+// octal and hex IPv4 forms into dotted quads; a trailing dot ("localhost.") is the same
+// host to DNS, so it is cut before the name checks.
 export function isPublicWebUrl(raw) {
   let url;
   try {
@@ -146,10 +150,36 @@ export function isPublicWebUrl(raw) {
   }
   if (!/^https?:$/.test(url.protocol) || url.username || url.password) return false;
   if (url.port && !["80", "443"].includes(url.port)) return false;
-  const host = url.hostname.toLowerCase();
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "");
   if (!host.includes(".") || /^[\d.]+$/.test(host) || host.includes(":") || host.startsWith("[")) return false;
   if (/(^|\.)(localhost|local|internal|intranet|lan|home|corp)$/.test(host)) return false;
   return true;
+}
+
+// A public-looking name can still point inside ("127.0.0.1.nip.io"), so every address the
+// name resolves to must be public too.
+const PRIVATE = new BlockList();
+for (const [net, bits] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["224.0.0.0", 3]]) {
+  PRIVATE.addSubnet(net, bits, "ipv4");
+}
+for (const [net, bits] of [["::", 127], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8], ["64:ff9b::", 96], ["2002::", 16]]) {
+  PRIVATE.addSubnet(net, bits, "ipv6");
+}
+
+export function isPrivateAddress(address) {
+  const ip = String(address ?? "").toLowerCase();
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+  if (mapped) return isPrivateAddress(mapped[1]);
+  const family = isIP(ip);
+  if (!family) return true;
+  return PRIVATE.check(ip, family === 4 ? "ipv4" : "ipv6");
+}
+
+const systemLookup = (host) => lookup(host, { all: true, verbatim: true });
+
+async function resolvesPublic(url, lookupImpl) {
+  const addresses = await lookupImpl(new URL(url).hostname);
+  return addresses.length > 0 && addresses.every(({ address }) => !isPrivateAddress(address));
 }
 
 export function pageText(html) {
@@ -175,11 +205,13 @@ export function mentions(text, name) {
 }
 
 // Returns { url, text } or { url, problem }. Never throws.
-export async function readSource(rawUrl, { place, fetchImpl = fetch, timeoutMs = 8000, userAgent = "GloryMap" } = {}) {
+export async function readSource(rawUrl, { place, fetchImpl = fetch, lookupImpl = systemLookup, timeoutMs = 8000, userAgent = "GloryMap" } = {}) {
   let url = rawUrl;
   try {
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      if (!isPublicWebUrl(url)) return { url, problem: "The source link is not a public web page." };
+      if (!isPublicWebUrl(url) || !(await resolvesPublic(url, lookupImpl))) {
+        return { url, problem: "The source link is not a public web page." };
+      }
       const response = await fetchImpl(url, {
         redirect: "manual",
         headers: { "User-Agent": userAgent, Accept: "text/html,text/plain" },

@@ -5,6 +5,7 @@ import {
   aiReviewInput,
   aiReviewSchema,
   decideFromAi,
+  isPrivateAddress,
   isPublicWebUrl,
   mentions,
   obviousJunk,
@@ -181,9 +182,26 @@ test("a weak rejection is not applied but is said", () => {
 
 test("only public web pages are fetched", () => {
   assert.equal(isPublicWebUrl("https://en.wikipedia.org/wiki/Leadenhall_Market"), true);
-  for (const url of ["http://127.0.0.1/", "http://localhost/", "http://[::1]/", "http://metadata.internal/", "ftp://a.b/", "https://a.b:8443/", "https://u:p@a.b/", "http://10.0.0.1/x"]) {
+  for (const url of ["http://127.0.0.1/", "http://localhost/", "http://[::1]/", "http://metadata.internal/", "ftp://a.b/", "https://a.b:8443/", "https://u:p@a.b/", "http://10.0.0.1/x",
+    "http://localhost./", "http://LOCALHOST../", "http://metadata.internal./", "http://127.0.0.1./", "http://0x7f.1/",
+    "http://2130706433/", "http://0177.0.0.1/", "http://[::ffff:127.0.0.1]/", "http://intranet./"]) {
     assert.equal(isPublicWebUrl(url), false, url);
   }
+  assert.equal(isPublicWebUrl("https://en.wikipedia.org./wiki/X"), true);
+});
+
+test("names that resolve to private addresses are refused", async () => {
+  for (const ip of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "::", "fd00::1", "fe80::1", "::ffff:127.0.0.1", "64:ff9b::7f00:1", "nonsense"]) {
+    assert.equal(isPrivateAddress(ip), true, ip);
+  }
+  for (const ip of ["93.184.216.34", "2606:2800:220:1::1"]) assert.equal(isPrivateAddress(ip), false, ip);
+
+  let fetched = false;
+  const fetchImpl = async () => { fetched = true; return page(200, "<p>Leadenhall</p>", { "content-type": "text/html" }); };
+  const toLoopback = async () => [{ address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 }];
+  assert.match((await readSource("https://127.0.0.1.nip.io/", { fetchImpl, lookupImpl: toLoopback })).problem, /not a public/);
+  assert.match((await readSource("https://nowhere.example/", { fetchImpl, lookupImpl: async () => [] })).problem, /not a public/);
+  assert.equal(fetched, false, "nothing is fetched from an inside address");
 });
 
 test("a page is read as text and checked for the place", () => {
@@ -192,6 +210,8 @@ test("a page is read as text and checked for the place", () => {
   assert.equal(mentions("Filmed in Borough.", "Leadenhall Market"), false);
   assert.equal(mentions("Café de Flore, Paris", "Cafe de Flore"), true);
 });
+
+const publicDns = async () => [{ address: "93.184.216.34", family: 4 }];
 
 function page(status, body = "", headers = {}) {
   return { status, ok: status >= 200 && status < 300, headers: { get: (name) => headers[name.toLowerCase()] ?? null }, text: async () => body };
@@ -204,17 +224,17 @@ test("the source is opened, redirects followed only to public hosts", async () =
     if (url === "http://example.com/hp") return page(301, "", { location: "https://example.com/hp" });
     return page(200, "<h1>Harry Potter at Leadenhall Market</h1>", { "content-type": "text/html" });
   };
-  const read = await readSource("http://example.com/hp", { place: "Leadenhall Market", fetchImpl });
+  const read = await readSource("http://example.com/hp", { place: "Leadenhall Market", fetchImpl, lookupImpl: publicDns });
   assert.equal(read.problem, undefined);
   assert.match(read.text, /Leadenhall/);
   assert.deepEqual(seen, ["http://example.com/hp", "https://example.com/hp"]);
 
   const toInternal = async () => page(302, "", { location: "http://169.254.169.254/latest" });
-  assert.match((await readSource("https://example.com/x", { fetchImpl: toInternal })).problem, /not a public/);
-  assert.match((await readSource("https://example.com/x", { fetchImpl: async () => page(404) })).problem, /HTTP 404/);
-  assert.match((await readSource("https://example.com/x", { fetchImpl: async () => { throw new Error("dns"); } })).problem, /could not be opened/);
+  assert.match((await readSource("https://example.com/x", { fetchImpl: toInternal, lookupImpl: publicDns })).problem, /not a public/);
+  assert.match((await readSource("https://example.com/x", { fetchImpl: async () => page(404), lookupImpl: publicDns })).problem, /HTTP 404/);
+  assert.match((await readSource("https://example.com/x", { fetchImpl: async () => { throw new Error("dns"); }, lookupImpl: publicDns })).problem, /could not be opened/);
   const elsewhere = async () => page(200, "<p>Borough Market</p>", { "content-type": "text/html" });
-  const read2 = await readSource("https://example.com/x", { place: "Leadenhall Market", fetchImpl: elsewhere });
+  const read2 = await readSource("https://example.com/x", { place: "Leadenhall Market", fetchImpl: elsewhere, lookupImpl: publicDns });
   assert.match(read2.problem, /does not mention/);
   assert.ok(read2.text, "the text still goes to the model");
 });
