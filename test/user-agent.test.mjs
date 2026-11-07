@@ -8,7 +8,7 @@ import { CONTACT_USER_AGENT, USER_AGENT, WIKIDATA_SPARQL } from "../app/lib/user
 
 test("both identities name the product, one version, and the site", () => {
   for (const agent of [USER_AGENT, CONTACT_USER_AGENT]) {
-    assert.match(agent, /^GloryMap\/1\.1 \(https:\/\/codex-hackathon-starter\.vercel\.app\//);
+    assert.match(agent, /^GloryMap\/1\.1 \(https:\/\/glory-map\.vercel\.app\//);
   }
   assert.match(CONTACT_USER_AGENT, /@/);
   assert.equal(USER_AGENT.includes("@"), false, "the owner's address goes only where it already went");

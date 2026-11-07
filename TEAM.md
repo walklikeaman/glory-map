@@ -8,7 +8,7 @@ each of you just needs to install a couple of things and paste one prompt into t
 - **Shared repository:** https://github.com/walklikeaman/glory-map
 - **Supabase** (database + auth) — the team's shared project, up and running.
 - **Vercel** — linked to the repository: any branch push auto-deploys to the web.
-  The live app is already up: https://codex-hackathon-starter.vercel.app
+  The live app is already up: https://glory-map.vercel.app
 - The Supabase keys are baked into the repository — nothing to fill in.
 
 ## From you — one time

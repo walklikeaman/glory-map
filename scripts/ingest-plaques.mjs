@@ -21,7 +21,7 @@ import process from "node:process";
 import { matchPlaque, PLAQUE_SOURCE_KIND } from "../app/lib/plaque-source.mjs";
 
 const DUMP_URL = "https://openplaques.s3.eu-west-2.amazonaws.com/open-plaques-all-2025-12-14.csv";
-const USER_AGENT = "GloryMap/1.1 (https://codex-hackathon-starter.vercel.app/; nakonechnyi.n@gmail.com)";
+const USER_AGENT = "GloryMap/1.1 (https://glory-map.vercel.app/; nakonechnyi.n@gmail.com)";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry");

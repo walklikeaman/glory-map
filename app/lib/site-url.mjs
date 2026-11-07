@@ -10,4 +10,4 @@
 // explicit variable, for anybody serving this somewhere else.
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
-  "https://codex-hackathon-starter.vercel.app";
+  "https://glory-map.vercel.app";

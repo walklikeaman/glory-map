@@ -28,7 +28,7 @@ import { z } from "zod";
 import { metresApart, namesMatch, normalizePlaceName } from "../app/lib/place-dedup.mjs";
 import { sceneNote } from "../app/lib/place-note.mjs";
 
-const BASE = (process.env.GLORYMAP_URL ?? "https://codex-hackathon-starter.vercel.app")
+const BASE = (process.env.GLORYMAP_URL ?? "https://glory-map.vercel.app")
   .replace(/\/+$/, "");
 const TIMEOUT_MS = 20_000;
 

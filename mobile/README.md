@@ -1,7 +1,7 @@
 # GloryMap for iPhone
 
 A native iOS app (Capacitor 8) that opens the live GloryMap site
-(`https://codex-hackathon-starter.vercel.app`) inside a native shell. Every
+(`https://glory-map.vercel.app`) inside a native shell. Every
 merge to `main` reaches the app on its next launch; no rebuild is needed for web
 changes. Rebuild only when something in this folder changes.
 

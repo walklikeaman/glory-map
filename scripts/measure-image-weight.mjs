@@ -32,7 +32,7 @@ import {
 const args = process.argv.slice(2);
 const ORIGIN = args.includes("--origin")
   ? args[args.indexOf("--origin") + 1]
-  : "https://codex-hackathon-starter.vercel.app";
+  : "https://glory-map.vercel.app";
 
 // Contactable, because that is what Wikimedia asks of anything fetching originals — and
 // this script is the only thing here that still does.
