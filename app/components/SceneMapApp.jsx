@@ -82,6 +82,7 @@ import { defaultChapter, trailChapters } from "../lib/trail-chapters.mjs";
 import { ALL_CITIES } from "../lib/city-gazetteer.mjs";
 import { normalizePlaceName } from "../lib/place-dedup.mjs";
 import { parseLetterboxdArchive } from "../lib/letterboxd-archive.mjs";
+import { letterboxdHandleFrom } from "../lib/connectors/letterboxd-rss.mjs";
 import { libraryImportSummary, libraryNoun, matchLibrary } from "../lib/library-match.mjs";
 import { emailLinkMessage, signInEmail } from "../lib/email-sign-in.mjs";
 import {
@@ -299,6 +300,9 @@ const FilmsInView = memo(function FilmsInView({ films, mode, onMode, onHighlight
 
 const londonCenter = [51.5094, -0.1183];
 const GUEST_LIBRARY_KEY = "scenemap-library";
+// The Letterboxd username a reader linked, kept on this device so new watches are pulled
+// in every time the app opens.
+const LETTERBOXD_HANDLE_KEY = "glorymap-letterboxd-handle";
 
 // Read, and put on the ten-point scale on the way out. A library saved before the scale
 // was settled holds Letterboxd half-stars, and a 4.5 read against a bar that now means
@@ -1313,6 +1317,10 @@ export default function SceneMapApp() {
   const [library, setLibrary] = useState(() => readStoredLibrary(GUEST_LIBRARY_KEY));
   const [libraryQuery, setLibraryQuery] = useState("");
   const [importMessage, setImportMessage] = useState("");
+  const [letterboxdInput, setLetterboxdInput] = useState("");
+  const [linkedLetterboxd, setLinkedLetterboxd] = useState(null);
+  const [letterboxdSyncing, setLetterboxdSyncing] = useState(false);
+  const letterboxdAutoSynced = useRef(false);
 
   const [recreateLocation, setRecreateLocation] = useState(null);
   const [shotsVersion, setShotsVersion] = useState(0);
@@ -1320,6 +1328,20 @@ export default function SceneMapApp() {
   useEffect(() => {
     localStorage.setItem(libraryStorageKey, JSON.stringify(library));
   }, [library, libraryStorageKey]);
+
+  // Once per visit, after the account has decided which library is ours: an earlier merge
+  // would be replaced by the account's copy and lost.
+  useEffect(() => {
+    if (letterboxdAutoSynced.current) return;
+    if (accountStatus === "loading" || accountStatus === "authorizing") return;
+    letterboxdAutoSynced.current = true;
+    let stored = null;
+    try { stored = letterboxdHandleFrom(localStorage.getItem(LETTERBOXD_HANDLE_KEY)); } catch { /* private mode */ }
+    if (!stored) return;
+    setLinkedLetterboxd(stored);
+    syncLetterboxd(stored, { quiet: true });
+    // syncLetterboxd only touches state setters, so this runs on the status alone.
+  }, [accountStatus]);
 
   // A real Letterboxd export, seeded once in development so the map can be tested against
   // an actual library without importing it every time.
@@ -2442,6 +2464,51 @@ export default function SceneMapApp() {
     resetAiTour();
     setRouteStops((current) => current.filter((stop) => stop.id !== locationId));
     invalidateRoute();
+  }
+
+  // Pull a public profile's recent films and merge them into the list. The merge is a
+  // functional update, so it lands on whatever library the account sync settled on.
+  async function syncLetterboxd(handle, { quiet = false } = {}) {
+    setLetterboxdSyncing(true);
+    try {
+      const response = await fetch(`/api/import/letterboxd-feed?handle=${encodeURIComponent(handle)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Letterboxd could not be reached.");
+      const movies = Array.isArray(payload.movies) ? payload.movies : [];
+      setLibrary((current) => mergeLibraries(current, movies));
+      if (!quiet) {
+        setMineOnly(true);
+        setImportMessage(movies.length
+          ? `Linked ${payload.handle}. ${movies.length} recent films from Letterboxd are in your list, and new ones will arrive each time you open GloryMap.`
+          : `Linked ${payload.handle}, but the profile has no logged films yet. Log a film on Letterboxd and it will show up here.`);
+      }
+      return payload.handle;
+    } catch (error) {
+      if (!quiet) setImportMessage(error instanceof Error ? error.message : "Letterboxd could not be reached.");
+      return null;
+    } finally {
+      setLetterboxdSyncing(false);
+    }
+  }
+
+  async function linkLetterboxd(event) {
+    event.preventDefault();
+    const handle = letterboxdHandleFrom(letterboxdInput);
+    if (!handle) {
+      setImportMessage("Enter your Letterboxd username, the part after letterboxd.com/.");
+      return;
+    }
+    const linked = await syncLetterboxd(handle);
+    if (!linked) return;
+    setLinkedLetterboxd(linked);
+    setLetterboxdInput("");
+    try { localStorage.setItem(LETTERBOXD_HANDLE_KEY, linked); } catch { /* linked for this visit */ }
+  }
+
+  function unlinkLetterboxd() {
+    setLinkedLetterboxd(null);
+    try { localStorage.removeItem(LETTERBOXD_HANDLE_KEY); } catch { /* nothing stored */ }
+    setImportMessage("Letterboxd unlinked. The films already in your list stay there.");
   }
 
   function selectConnector(connector) {
@@ -4981,6 +5048,41 @@ export default function SceneMapApp() {
                 </button>
               ))}
             </div>
+
+            {/* The live link: a public profile's RSS feed, by username. The ZIP above fills
+                the whole history once; this keeps new watches coming. */}
+            {linkedLetterboxd ? (
+              <div className="letterboxd-link is-linked">
+                <span>
+                  <strong>Letterboxd linked: {linkedLetterboxd}</strong>
+                  <small>New films you log arrive each time you open GloryMap.</small>
+                </span>
+                <button type="button" onClick={() => syncLetterboxd(linkedLetterboxd)} disabled={letterboxdSyncing}>
+                  {letterboxdSyncing ? <LoaderCircle className="spin" size={15} /> : "Sync now"}
+                </button>
+                <button type="button" className="is-quiet" onClick={unlinkLetterboxd}>Unlink</button>
+              </div>
+            ) : (
+              <form className="letterboxd-link" onSubmit={linkLetterboxd}>
+                <label htmlFor="letterboxd-handle">
+                  <strong>Link Letterboxd by username</strong>
+                  <small>No file needed. Your profile must be public; we read its recent diary.</small>
+                </label>
+                <input
+                  id="letterboxd-handle"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="username or letterboxd.com/username"
+                  value={letterboxdInput}
+                  onChange={(event) => setLetterboxdInput(event.target.value)}
+                />
+                <button type="submit" disabled={letterboxdSyncing || !letterboxdInput.trim()}>
+                  {letterboxdSyncing ? <LoaderCircle className="spin" size={15} /> : <Link2 size={15} />}
+                  Link
+                </button>
+              </form>
+            )}
 
             {importMessage && <p className="import-message" role="status"><CheckCircle2 size={16} />{importMessage}</p>}
 
