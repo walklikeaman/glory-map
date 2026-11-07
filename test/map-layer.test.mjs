@@ -43,11 +43,13 @@ test("an approximate point is drawn as a region, never as a doorstep", () => {
   const style = badgeStyle("approximate");
   assert.ok(style.radius >= 12);
   assert.ok(style.dashArray);
-  assert.match(style.hint, /city or country/i);
+  assert.match(style.hint, /city/i);
+  // Plain words (2026-11-07): "Approximate · 4 works" told a reader on a phone nothing.
+  assert.doesNotMatch(style.label, /approximate/i);
 });
 
 test("a studio says the story is set elsewhere", () => {
-  assert.match(badgeStyle("studio").hint, /elsewhere/i);
+  assert.match(badgeStyle("studio").hint, /somewhere else/i);
 });
 
 test("badgeStyle falls back instead of throwing on an unknown badge", () => {
@@ -123,14 +125,14 @@ test("viewportQuery returns null for unusable bounds instead of a bad request", 
 });
 
 test("pointSummary reads as a plain sentence about the claim", () => {
-  assert.equal(pointSummary({ badge: "studio", work_count: 1 }), "Studio · 1 work");
-  assert.equal(pointSummary({ badge: "exact", work_count: 3 }), "Filmed here · 3 works");
+  assert.equal(pointSummary({ badge: "studio", work_count: 1 }), "Filmed in a studio · 1 film");
+  assert.equal(pointSummary({ badge: "exact", work_count: 3 }), "Filmed right here · 3 films");
   assert.equal(pointSummary(null), "");
 });
 
 test("an unconfirmed spot says so in the popup instead of a raw precision", async () => {
   const { pointHint } = await import("../app/lib/map-layer.mjs");
-  assert.equal(pointSummary({ badge: "unconfirmed", work_count: 1 }), "Spot unconfirmed · 1 work");
+  assert.equal(pointSummary({ badge: "unconfirmed", work_count: 1 }), "Spot not checked yet · 1 film");
   assert.match(pointHint({ badge: "unconfirmed" }), /not confirmed/);
   assert.doesNotMatch(pointHint({ badge: "exact" }), /Wikidata/, "most exact pins never came from Wikidata");
   assert.equal(pointHint(null), "");
@@ -207,4 +209,20 @@ test("the same view in float noise is the same query", () => {
   const second = viewportQuery(bounds(-118.34739809570293, 34.02769589291046, -118.2238019042968, 34.091692026504774), 13, { candidates: true });
   assert.equal(first, second);
   assert.equal(new URLSearchParams(first).get("west"), "-118.3474");
+});
+
+test("zoomed out, the queue's bubbles are drawn too, not only the checked places'", async () => {
+  const { bubbleFeatures } = await import("../app/lib/map-layer.mjs");
+  const at = (lng, lat) => ({ type: "Point", coordinates: [lng, lat] });
+  const bubbles = bubbleFeatures(
+    [{ geometry: at(34.78, 32.08), properties: { cluster: true, point_count: 2, has_studio: false } }],
+    [
+      { geometry: at(34.8, 32.1), properties: { cluster: true, candidate: true, point_count: 40 } },
+      { geometry: at(34.9, 32.2), properties: { cluster: true, candidate: true, point_count: 0 } },
+    ],
+  );
+  assert.equal(bubbles.length, 2, "an empty cell draws nothing");
+  assert.deepEqual(bubbles.map((b) => b.properties.count), [2, 40]);
+  assert.deepEqual(bubbles.map((b) => b.properties.checked), [true, false]);
+  assert.deepEqual(bubbleFeatures(), []);
 });

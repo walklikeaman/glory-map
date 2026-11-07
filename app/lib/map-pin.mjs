@@ -103,11 +103,13 @@ export function pinIconKey(options = {}) {
 // What the legend says. Written as sentences rather than labels because a legend of nouns
 // — "Exact", "Approximate", "Studio" — is what the reader could not decode.
 export const PIN_LEGEND = Object.freeze([
-  { kind: PIN_KIND.place, checked: true, text: "A place we checked. You can go and stand here." },
-  { kind: PIN_KIND.place, checked: false, text: "A source named it. Nobody has checked it yet." },
-  { kind: PIN_KIND.studio, checked: false, text: "Inside a studio lot — the camera was here, the scene is set elsewhere." },
-  { kind: "count", checked: false, text: "A number means several films at one address. Click to see them." },
+  { kind: PIN_KIND.place, checked: true, text: "A filled pin: a place we checked. You can go and stand here." },
+  { kind: PIN_KIND.place, checked: false, text: "A ring or a small dot: a source says a film was shot here. Nobody has checked it yet." },
+  { kind: PIN_KIND.studio, checked: false, text: "Violet: a film studio. The camera was here, but the story is set somewhere else." },
+  { kind: "count", checked: false, text: "A number means several places or films close together. Tap it to zoom in." },
   // The big dashed ring. It has always meant something and nothing ever said what, so it
   // read as a decoration that occasionally swallowed the screen.
-  { kind: "area", checked: false, text: "A dashed ring means we only know the city or region — not a doorway." },
+  { kind: "area", checked: false, text: "A dashed ring means we only know the city or area, not the street." },
+  // The reader's own position and search radius, drawn blue so it never reads as a place.
+  { kind: "you", checked: false, text: "The blue dot is you. The blue circle is the area searched around you." },
 ]);

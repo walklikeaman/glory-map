@@ -14,11 +14,30 @@ import { circleFeature } from "../../lib/geo-circle.mjs";
 import {
   CLUSTERED, UNCLUSTERED,
   pinCirclePaint, pinClusterCirclePaint, pinClusterLabelLayout, pinClusterLabelPaint, pinClusterSource,
-  pinFeature, pinLabelLayout, pinLabelPaint,
+  pinFeature, pinLabelLayout, pinLabelPaint, pinNameTextField,
 } from "../../lib/pin-style.mjs";
 import { claimClick, useGeoJsonLayer, useMapCanvas } from "./MapCanvas.jsx";
 
 const EMPTY = { type: "FeatureCollection", features: [] };
+
+// How far from a pin a tap still counts, in pixels. An unchecked pin below z16 is a dot
+// 8 px across, and a fingertip is about 40: hit-testing the exact pixel under the tap made
+// "I tap the point and nothing happens" the normal case on a phone.
+export const TAP_SLOP_PX = 18;
+
+// The feature nearest the tap, among those within TAP_SLOP_PX of it.
+export function nearestHit(map, point, layers) {
+  const box = [[point.x - TAP_SLOP_PX, point.y - TAP_SLOP_PX], [point.x + TAP_SLOP_PX, point.y + TAP_SLOP_PX]];
+  let best = null;
+  let bestDistance = Infinity;
+  for (const feature of map.queryRenderedFeatures(box, { layers })) {
+    if (feature.geometry?.type !== "Point") continue;
+    const at = map.project(feature.geometry.coordinates);
+    const distance = Math.hypot(at.x - point.x, at.y - point.y);
+    if (distance < bestDistance) { best = feature; bestDistance = distance; }
+  }
+  return best;
+}
 
 // **Every component in this file takes `[lat, lng]`, and converts.**
 //
@@ -99,7 +118,7 @@ export function PinLayer({
         type: "symbol",
         ...pinsOnly,
         layout: {
-          "text-field": ["get", "placeLabel"],
+          "text-field": pinNameTextField(),
           "text-size": 11,
           "text-font": ["Noto Sans Bold"],
           // Below the pin, so it never lands on the count the pin already carries.
@@ -137,7 +156,7 @@ export function PinLayer({
       // Only the layers that exist: an empty list would query every layer on the map.
       const layers = hitLayers.filter((layer) => map.getLayer(layer));
       if (!layers.length) return;
-      const hit = map.queryRenderedFeatures(event.point, { layers })[0];
+      const hit = nearestHit(map, event.point, layers);
       if (!hit) return;
       // Tell the map's own background handler to stand down: this click was answered.
       claimClick(event);
@@ -177,7 +196,10 @@ export function PinLayer({
 // Drawn as a polygon in real coordinates rather than a pixel radius, because the number it
 // carries is a DISTANCE. A pixel radius would hold the ring the same size on screen while
 // the city under it grew and shrank, and the ring would stop meaning anything.
-export function AreaLayer({ id = "areas", areas }) {
+// `color` and `dashed` exist for the one ring that is NOT vagueness: the reader's own search
+// radius. Drawn in the same dashed amber it read as "a city we only half know", and on a
+// phone in Tel Aviv it was the biggest unexplained shape on the screen.
+export function AreaLayer({ id = "areas", areas, color = "#f7b733", dashed = true }) {
   const data = useMemo(() => collection(
     (areas ?? []).map((area) => circleFeature(toLngLat(area.position), area.radiusMeters, {
       id: area.id ?? "", active: Boolean(area.active),
@@ -192,7 +214,7 @@ export function AreaLayer({ id = "areas", areas }) {
         id: `${id}-fill`,
         type: "fill",
         paint: {
-          "fill-color": "#f7b733",
+          "fill-color": color,
           // The selected area is filled more strongly — the same distinction the Leaflet
           // ring made, and the only thing that answers "which of these did I click?".
           "fill-opacity": ["case", ["to-boolean", ["get", "active"]], 0.12, 0.06],
@@ -202,12 +224,12 @@ export function AreaLayer({ id = "areas", areas }) {
         id: `${id}-outline`,
         type: "line",
         paint: {
-          "line-color": "#f7b733",
+          "line-color": color,
           "line-opacity": 0.55,
           "line-width": ["case", ["to-boolean", ["get", "active"]], 2, 1],
           // The dash is the whole point: a solid ring would read as a boundary we know,
           // and we do not know one. It is vagueness drawn honestly.
-          "line-dasharray": [3, 3],
+          ...(dashed ? { "line-dasharray": [3, 3] } : {}),
         },
       },
     ],

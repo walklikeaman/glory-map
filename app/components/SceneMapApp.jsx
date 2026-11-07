@@ -3444,6 +3444,8 @@ export default function SceneMapApp() {
                   <li key={row.text}>
                     {row.kind === "area" ? (
                       <span aria-hidden="true" className="legend-area" />
+                    ) : row.kind === "you" ? (
+                      <span aria-hidden="true" className="legend-you"><span className="user-dot" /></span>
                     ) : row.kind === "count" ? (
                       <span
                         aria-hidden="true"
@@ -3545,6 +3547,8 @@ export default function SceneMapApp() {
             <>
               <AreaLayer
                 id="nearby-radius"
+                color="#5aa9ff"
+                dashed={false}
                 areas={[{ id: "nearby", position: userPosition, radiusMeters: nearbyRadius }]}
               />
               <MapMarker

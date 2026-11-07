@@ -251,3 +251,17 @@ test("a cluster of unchecked reports is hollow; one holding a checked place is f
   assert.equal(stroke({ ...queue, checked: true, highlighted: true }), PIN_SELECTED_RING);
   assert.equal(stroke({ ...queue, selected: true }), PIN_SELECTED_RING);
 });
+
+test("a pin's title is its film, with how many more it hides, else the place", async () => {
+  const { pinTitle, pinFeature, pinNameTextField, TITLES_FROM_ZOOM } = await import("../app/lib/pin-style.mjs");
+  assert.equal(pinTitle({ films: [{ title: "Munich" }], work_count: 1, name: "Jaffa" }), "Munich");
+  assert.equal(pinTitle({ films: [{ title: "Munich" }, { title: "Fauda" }], work_count: 5 }), "Munich +4");
+  assert.equal(pinTitle({ name: "Tel Aviv" }), "Tel Aviv");
+  assert.equal(pinTitle({}), "");
+  assert.equal(pinFeature({ geometry: { type: "Point", coordinates: [0, 0] }, properties: { name: "Haifa" } }).properties.title, "Haifa");
+  // Ranked names show at every zoom; every other pin's title from street zoom.
+  const field = pinNameTextField();
+  assert.equal(field[0], "step");
+  assert.deepEqual(field[2], ["get", "placeLabel"]);
+  assert.equal(field[3], TITLES_FROM_ZOOM);
+});
