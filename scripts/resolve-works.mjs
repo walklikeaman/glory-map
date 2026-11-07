@@ -52,7 +52,19 @@ async function workIds() {
 // Wikimedia answers a batch job's anonymous User-Agent with 429 and the one carrying the
 // owner's contact with 200 (measured 07.11 from the cloud egress), so the batch says who
 // it is — the policy asks exactly that of bulk clients.
+// The resolver retries a 429 once after 750 ms, which suits a reader waiting on one film
+// and not a batch job: here a refusal is waited out for as long as Wikimedia asks.
+async function patientFetch(url, options, attempt = 1) {
+  const response = await fetch(url, options);
+  if (response.status !== 429 || attempt > 6) return response;
+  const wait = (Number(response.headers.get("retry-after")) || 20) * 1000 * attempt;
+  console.log(`  waiting ${wait / 1000}s (429)`);
+  await sleep(wait);
+  return patientFetch(url, options, attempt + 1);
+}
+
 const handle = createResolveHandler({
+  fetchImpl: patientFetch,
   resolveUserId: async () => "catalogue-import",
   resolvePlaces: (works, options) => resolveWorkPlaces(works, { ...options, userAgent: CONTACT_USER_AGENT }),
 });
