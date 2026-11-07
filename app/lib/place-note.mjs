@@ -68,18 +68,20 @@ function squash(value) {
 
 // "West Smithfield, London" and "West Smithfield, London." are the same heading, and a
 // note that only repeats the heading is not a note.
+function normalisePlace(value) {
+  return squash(value).toLowerCase().replace(/[.,;:'"“”‘’]/g, "").trim();
+}
+
 function sameAsPlace(segment, placeName) {
-  const normalise = (value) => squash(value).toLowerCase().replace(/[.,;:'"“”‘’]/g, "").trim();
-  const left = normalise(segment);
-  const right = normalise(placeName);
+  const left = normalisePlace(segment);
+  const right = normalisePlace(placeName);
   if (!left || !right) return false;
   return left === right || right.includes(left) || left.includes(right);
 }
 
 function onlyThePlace(note, placeName) {
-  const normalise = (value) => squash(value).toLowerCase().replace(/[.,;:'"“”‘’]/g, "").trim();
-  const left = normalise(note);
-  const right = normalise(placeName);
+  const left = normalisePlace(note);
+  const right = normalisePlace(placeName);
   return Boolean(left && right) && (left === right || right.includes(left));
 }
 

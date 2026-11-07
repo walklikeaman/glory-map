@@ -50,13 +50,14 @@ function defaultCreateReader(env) {
 
   // PostgREST puts `in.(…)` into the URL, so long lists go in slices.
   const inSlices = async (table, columns, column, values) => {
-    const out = [];
-    for (let i = 0; i < values.length; i += 120) {
-      const { data, error } = await client.from(table).select(columns).in(column, values.slice(i, i + 120));
+    const slices = [];
+    for (let i = 0; i < values.length; i += 120) slices.push(values.slice(i, i + 120));
+    const pages = await Promise.all(slices.map(async (slice) => {
+      const { data, error } = await client.from(table).select(columns).in(column, slice);
       if (error) throw new Error(`${table} failed: ${error.message}`);
-      out.push(...(data ?? []));
-    }
-    return out;
+      return data ?? [];
+    }));
+    return pages.flat();
   };
 
   return {
@@ -87,16 +88,31 @@ function defaultCreateReader(env) {
 // display-language.mjs). Best effort by design: if either lookup fails — the translations
 // table not yet migrated, a slow works query — the map still draws, in the original
 // language and without posters, rather than going blank over a nicety.
-export async function localise(reader, { rows, candidateRows }, logError = () => {}) {
-  const all = [...(rows ?? []), ...(candidateRows ?? [])];
+// A lookup that hangs is a failure too: the map waits this long for it, then draws without.
+const LOOKUP_TIMEOUT_MS = 1500;
+
+function bestEffort(promise, label, logError, timeoutMs) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => { logError(`${label} timed out`, { timeoutMs }); resolve([]); }, timeoutMs);
+  });
+  const settled = promise.then(
+    (value) => value ?? [],
+    (error) => { logError(`${label} failed`, { message: error?.message }); return []; },
+  );
+  return Promise.race([settled, timeout]).finally(() => clearTimeout(timer));
+}
+
+export async function localise(reader, groups, logError = () => {}, { timeoutMs = LOOKUP_TIMEOUT_MS } = {}) {
+  const all = Object.values(groups).flatMap((list) => list ?? []);
   const strings = stringsToLookUp(all);
-  const workIds = workIdsOf(candidateRows);
+  const workIds = workIdsOf(groups.candidateRows);
   const [works, english] = await Promise.all([
     workIds.length && reader.works
-      ? reader.works(workIds).catch((error) => { logError("Map works lookup failed", { message: error?.message }); return []; })
+      ? bestEffort(reader.works(workIds), "Map works lookup", logError, timeoutMs)
       : [],
     strings.length && reader.translations
-      ? reader.translations(strings.map(textKey)).catch((error) => { logError("Map translations lookup failed", { message: error?.message }); return []; })
+      ? bestEffort(reader.translations(strings.map(textKey)), "Map translations lookup", logError, timeoutMs)
       : [],
   ]);
   const options = {
@@ -105,10 +121,7 @@ export async function localise(reader, { rows, candidateRows }, logError = () =>
     posterUrl: (path) => tmdbUrlForSurface(path, "pointFilmPoster"),
     imdbUrl,
   };
-  return {
-    rows: localiseMapRows(rows, options),
-    candidateRows: localiseMapRows(candidateRows, options),
-  };
+  return Object.fromEntries(Object.entries(groups).map(([key, list]) => [key, localiseMapRows(list, options)]));
 }
 
 export function createMapPointsHandler({
@@ -181,9 +194,11 @@ export function createMapPointsHandler({
         });
       }
 
-      const readable = await localise(reader, { rows, candidateRows }, logError);
+      const readable = await localise(reader, { rows, fictional, nearest, candidateRows }, logError);
 
-      return Response.json(buildMapResponse(query, readable.rows, fictional, nearest, readable.candidateRows), {
+      return Response.json(buildMapResponse(
+        query, readable.rows, readable.fictional, readable.nearest, readable.candidateRows,
+      ), {
         headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
       });
     } catch (error) {

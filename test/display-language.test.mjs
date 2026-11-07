@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
-  englishFirst, isEnglishSource, localiseMapRows, needsEnglish, servedNote, sourceLanguage,
+  englishFirst, localiseMapRows, needsEnglish, servedNote, sourceLanguage,
   stringsToLookUp, textKey, workIdsOf,
 } from "../app/lib/display-language.mjs";
 import { describedFilms, sourceLinkLabel } from "../app/lib/place-note.mjs";
@@ -37,10 +37,7 @@ test("English leads and the original is kept, only when we hold a rendering", ()
   assert.deepEqual(englishFirst("Jaffa", english), { text: "Jaffa", original: null });
 });
 
-test("English Wikipedia and non-Wikipedia sources count as English; others name their language", () => {
-  assert.equal(isEnglishSource("https://en.wikipedia.org/wiki/X"), true);
-  assert.equal(isEnglishSource("https://moviemaps.org/x"), true);
-  assert.equal(isEnglishSource("https://he.wikipedia.org/w/index.php?title=X"), false);
+test("a non-English Wikipedia names its language; English and other sites name none", () => {
   assert.equal(sourceLanguage("https://he.wikipedia.org/wiki/X"), "he");
   assert.equal(sourceLanguage("https://en.wikipedia.org/wiki/X"), null);
   assert.equal(sourceLanguage("not a url"), null);
@@ -75,7 +72,6 @@ test("a row gets English names and notes, a poster and the film's IMDb page", ()
   const [film] = row.films;
   assert.equal(film.place_name, "Jaffa");
   assert.equal(film.note, "Most of the film was shot in Israel");
-  assert.equal(film.note_original, "מרבית צילומי הסרט נעשו בישראל");
   assert.equal(film.imdb_url, "imdb:tt0094666");
   assert.equal(film.poster, "poster:/p.jpg");
   assert.equal(film.source_lang, "he");
@@ -119,7 +115,7 @@ function reader(overrides = {}) {
     candidatePoints: async () => [jaffaRow],
     candidateClusters: async () => [],
     fictional: async () => [],
-    nearest: async () => [],
+    nearest: async () => [{ place_id: "p", name: "יפו", lat: 32.05, lng: 34.75, distance_m: 4000 }],
     works: async () => [{ id: "w1", imdb_id: "tt0094666", poster_path: "/p.jpg" }],
     translations: async () => [{ source_md5: textKey("יפו"), english: "Jaffa" }],
     ...overrides,
@@ -163,4 +159,24 @@ test("a note that mentions the place is kept; only a note that IS the place is d
   assert.equal(film.note, "The film was shot in Jerusalem, Bethlehem, Ramla and Jaffa");
   const [bare] = describedFilms([{ work_id: "w", title: "T", note: "Jaffa." }], { placeName: "Old Jaffa" });
   assert.equal(bare.note, null);
+});
+
+test("the nearest-place hint is in English too", async () => {
+  const handler = createMapPointsHandler({ createReader: () => reader({ candidatePoints: async () => [] }) });
+  const body = await (await handler(new Request(VIEW))).json();
+  assert.equal(body.nearest[0].name, "Jaffa");
+});
+
+test("a lookup that hangs is given up on, and the map still answers", async () => {
+  const { localise } = await import("../app/api/map/points/route.js");
+  const logged = [];
+  const out = await localise(
+    reader({ translations: () => new Promise(() => {}) }),
+    { candidateRows: [jaffaRow] },
+    (label) => logged.push(label),
+    { timeoutMs: 20 },
+  );
+  assert.equal(out.candidateRows[0].place_name, "יפו");
+  assert.equal(out.candidateRows[0].films[0].imdb_url, "https://www.imdb.com/title/tt0094666/");
+  assert.deepEqual(logged, ["Map translations lookup timed out"]);
 });

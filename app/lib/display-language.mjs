@@ -69,18 +69,6 @@ export function workIdsOf(rows) {
   return [...out];
 }
 
-// A source in English reads before the same claim in another language. Used when two
-// rows about one film at one place disagree only in where they came from.
-export function isEnglishSource(url) {
-  try {
-    const host = new URL(url).hostname;
-    const wiki = host.match(/^([a-z-]+)\.(?:m\.)?wikipedia\.org$/);
-    return wiki ? wiki[1] === "en" : true;
-  } catch {
-    return false;
-  }
-}
-
 // The language a Wikipedia source is written in, for the link's label — "Wikipedia (he)"
 // tells a reader before they tap that the page will not be in English.
 export function sourceLanguage(url) {
@@ -117,7 +105,6 @@ export function localiseMapRows(rows, { works = new Map(), english = new Map(), 
         if (work?.imdb_id) extra.imdb_url = imdbUrl(work.imdb_id);
         if (work?.poster_path) extra.poster = posterUrl(work.poster_path);
         if (film?.source_url) extra.source_lang = sourceLanguage(film.source_url);
-        if (note.original) extra.note_original = note.original;
         return Object.fromEntries(Object.entries({
           ...film,
           place_name: name.text ?? film?.place_name,

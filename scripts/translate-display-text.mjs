@@ -82,7 +82,11 @@ const todo = [...wanted.entries()].filter(([md5]) => !done.has(md5)).slice(0, LI
 console.log(`${wanted.size} non-Latin strings in view, ${done.size} already rendered, ${todo.length} to do`);
 if (todo.length === 0) process.exit(0);
 
-const runtime = createModelClient(process.env, { tier: TIERS.CAREFUL });
+// Haiku unless told otherwise: this is a rendering job, and the cost line below is priced for it.
+const runtime = createModelClient(
+  { ...process.env, ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || "claude-haiku-5-5" },
+  { tier: TIERS.CAREFUL },
+);
 if (runtime?.provider !== "anthropic") {
   console.error("Set ANTHROPIC_API_KEY (in the cloud: ANTHROPIC_API_KEY=$GLORYMAP_ANTHROPIC_KEY).");
   process.exit(1);
@@ -118,7 +122,8 @@ for (let start = 0; start < todo.length; start += BATCH) {
   for (const item of result.parsed.items) {
     const entry = batch[item.id];
     const english = item.english.trim();
-    if (!entry || !english || needsEnglish(english)) continue;
+    // A repeated id would put one key twice into the upsert, and Postgres refuses the batch.
+    if (!entry || !english || needsEnglish(english) || rendered.some((row) => row.source_md5 === entry[0])) continue;
     rendered.push({ source_md5: entry[0], source: entry[1].text, english, method: `claude:${result.model}` });
   }
 }
