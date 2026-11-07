@@ -21,8 +21,10 @@ A hint in a non-Latin script is ignored. Rows still land `pending`.
 **Result**: `--only he --again` over 636 works read 216 sections and queued 167 places, 90 of them
 with a point; candidates in Israel went from 43 to 94. A one-off re-geocode put points on 71 of 261
 older pointless Israeli rows. Haiku cost about $0.09.
-**Open**: Haiku often returns the English name for a Hebrew quote ("Jerusalem" for ירושלים), and
-75 such places were dropped as `quote_is_about_elsewhere`.
+**Then**: Haiku often returned the English name for a Hebrew quote ("Jerusalem" for ירושלים), and
+75 places were dropped as `quote_is_about_elsewhere`. The prompt now says the name is copied in the
+article's own script and never translated. The rerun dropped 2 that way, and the totals became 253
+places queued, 136 with a point, and 116 candidates in Israel. Two runs cost about $0.19 together.
 
 ## [2026-11-07] incident | Phone map: pins vanished on zoom-out, taps did nothing
 **Scenario**: Nikita tried the iPhone app in Tel Aviv: pins disappear when zooming out, a tap on a
