@@ -496,3 +496,21 @@ test("above the API's batch ceiling the builder refuses, and says so by its type
   assert.equal(buildEntitiesUrl([]), null);
   assert.equal(MAX_ENTITIES_PER_REQUEST, 50);
 });
+
+test("Hebrew: an Israeli work reads its Hebrew article, and the production heading is found", () => {
+  // Shtisel, as read 07.11.2026: the location prose sits under "יצירת הסדרה".
+  const entity = {
+    sitelinks: { enwiki: { title: "Shtisel" }, hewiki: { title: "שטיסל" } },
+    claims: { P364: [{ mainsnak: { datavalue: { value: { id: "Q9288" } } } }] },
+  };
+  assert.deepEqual(preferredLanguages(entity), ["he"]);
+  assert.deepEqual(languagesForWork(entity), ["en", "he"]);
+  const toc = { sections: [
+    { line: "עלילה", index: "1", hLevel: 2 },
+    { line: "יצירת הסדרה", index: "2", hLevel: 2 },
+    { line: "אתרי צילום", index: "3", hLevel: 3 },
+  ] };
+  assert.equal(chooseSection(toc, "he").line, "יצירת הסדרה");
+  // Beaufort has only "רקע", and that is still read.
+  assert.equal(chooseSection({ sections: [{ line: "רקע", index: "1" }] }, "he").line, "רקע");
+});

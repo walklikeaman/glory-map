@@ -239,6 +239,10 @@ export function groupByName(bindings) {
       // One entity comes back once per (P31 x ancestor) pair; the extra rows carry the rest
       // of its chain and nothing else.
       if (row?.ancLabel?.value) already.chain.add(row.ancLabel.value);
+      if (row?.countryLabel?.value) {
+        already.countries.add(row.countryLabel.value);
+        already.chain.add(row.countryLabel.value);
+      }
       if (typeLabel) already.types.add(typeLabel);
       continue;
     }
@@ -252,6 +256,11 @@ export function groupByName(bindings) {
       exact_label: row?.exact?.value === "true",
       country: row?.countryLabel?.value ?? null,
       chain: new Set([row?.ancLabel?.value, row?.countryLabel?.value].filter(Boolean)),
+      // Every P17, because a place can have more than one. Jerusalem's are Israel and
+      // Palestine, and `country` holds whichever row arrived first: on 07.11.2026 that was
+      // Palestine, so a hint of "Israel" refused the city itself and left a village in
+      // Thuringia as the "ambiguous" answer. Tiberias and the Dead Sea went the same way.
+      countries: new Set([row?.countryLabel?.value].filter(Boolean)),
       // Every P31, not only the first row's. An entity comes back once per type and the
       // one that arrives first is arbitrary — Honolulu is a "county seat" on one row and a
       // "consolidated city-county" on another, and a rule reading only one of them is a
@@ -413,9 +422,15 @@ export function contradictsArea(place, area, knownCountries = []) {
   // The country test first: it works even on a thin chain, and it is the one that caught
   // Bognor.
   const claimed = areaNamesCountry(area, knownCountries);
-  if (claimed && place?.country && String(place.country).toLowerCase() !== claimed.toLowerCase()) {
+  const countries = [...(place?.countries ?? []), place?.country].filter(Boolean).map((c) => String(c).toLowerCase());
+  if (claimed && countries.length && !countries.includes(claimed.toLowerCase())) {
     return true;
   }
+
+  // The chain is labelled in English. A hint written in another script — "ירושלים, ישראל"
+  // from a Hebrew article — shares no letters with it, so every word would "disagree" and
+  // every candidate would be refused. Such a hint cannot judge, and says nothing.
+  if (!/\p{Script=Latin}/u.test(String(area ?? ""))) return false;
 
   // Then the chain, which is what a city-level hint needs. New-York resolved to Niu-York in
   // Ukraine on a hint of "New York"; no country is named there, so nothing above could see
@@ -496,6 +511,10 @@ export function isFarFromHintTown(place, townCandidates, area, farKm = FAR_FROM_
   return Number.isFinite(nearest) && nearest > farKm;
 }
 
+function countriesOf(candidate) {
+  return [...new Set([candidate?.country, ...(candidate?.countries ?? [])].filter(Boolean).map(String))];
+}
+
 export function chooseCandidate(candidates, { near = null, area = null } = {}) {
   const all = (Array.isArray(candidates) ? candidates : []).filter(Boolean);
   if (all.length === 0) return { place: null, reason: "no_candidate", candidates: [] };
@@ -504,7 +523,18 @@ export function chooseCandidate(candidates, { near = null, area = null } = {}) {
   // This is evidence rather than a preference, and it is what separates the city of
   // Istanbul from a pub called Istanbul Grill.
   const exact = all.filter((candidate) => candidate.exact_label);
-  const list = exact.length > 0 ? exact : all;
+  const labelled = exact.length > 0 ? exact : all;
+  // **A country the prose names refuses every candidate outside it — before the choice,
+  // not only after.** The hint still cannot pick: it removes, and what is left must win on
+  // the same rules as before. Without this, "Jerusalem, Israel" stayed ambiguous because a
+  // town of 4,405 in New York has a population too, and Tiberias and the Dead Sea went the
+  // same way (07.11.2026). Only an explicitly named country does this; a city or county in
+  // the hint keeps its old, refuse-only role.
+  const claimed = area ? areaNamesCountry(area, [...new Set(all.flatMap(countriesOf))]) : null;
+  const inClaimed = claimed
+    ? labelled.filter((candidate) => countriesOf(candidate).some((c) => c.toLowerCase() === claimed.toLowerCase()))
+    : [];
+  const list = inClaimed.length > 0 ? inClaimed : labelled;
 
   if (list.length === 1) {
     return refuseIfElsewhere({ place: list[0], reason: exact.length > 0 && all.length > 1 ? "exact_label" : "unique", candidates: all }, area, all);
@@ -544,7 +574,7 @@ function refuseIfElsewhere(decision, area, all) {
   if (!decision.place) return decision;
   // A region has no point to stand on, however confidently it was identified.
   if (isAreaNotAPoint(decision.place)) return { place: null, reason: "area_not_a_point", candidates: all };
-  const known = [...new Set(all.map((candidate) => candidate.country).filter(Boolean))];
+  const known = [...new Set(all.flatMap((candidate) => [candidate.country, ...(candidate.countries ?? [])]).filter(Boolean))];
   if (!contradictsArea(decision.place, area, known)) return decision;
   return { place: null, reason: "contradicts_area", candidates: all };
 }

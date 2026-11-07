@@ -31,6 +31,7 @@ import {
   cleanWikitext,
   languagesForWork,
   MAX_LANGUAGES_PER_WORK,
+  SUPPORTED_LANGUAGES,
   isRetryableApiError,
   isQueryServiceLag,
   withoutMaxlag,
@@ -93,6 +94,9 @@ const TRANSIENT_EXTRACTION = new Set(["request_failed", "rate_limited"]);
 const OUTAGE_AFTER_FAILURES = 6;
 const OUTAGE_PROBE_MS = 30_000;
 const LANGUAGES = Number.parseInt(arg("languages", ""), 10) || MAX_LANGUAGES_PER_WORK;
+// Read one edition only — `--only he --again` revisits works whose English article was
+// already read, now that the Hebrew one is reachable (07.11.2026).
+const ONLY = arg("only", null);
 
 const headers = { "User-Agent": USER_AGENT, "Accept-Encoding": "gzip" };
 
@@ -287,7 +291,9 @@ async function main() {
     if (quotaSpent) break;
     console.log(`\n${work.title}`);
     const entity = entities.entities?.[work.wikidata_id];
-    const languages = languagesForWork(entity, { limit: LANGUAGES });
+    const languages = ONLY
+      ? languagesForWork(entity, { limit: SUPPORTED_LANGUAGES.length }).filter((code) => code === ONLY)
+      : languagesForWork(entity, { limit: LANGUAGES });
     if (languages.length === 0) {
       console.log("   no article in any edition we read — skipped");
       // A real verdict, not a failure: the article does not exist in any edition we read,
@@ -399,7 +405,9 @@ async function main() {
       }
       credits.set(language, wikipediaAttribution({ title, revid, language }));
       console.log(`   ${language}: ${result.accepted.length} accepted, ${fresh} new`
-        + (result.rejected.length ? `, ${result.rejected.length} dropped` : ""));
+        + (result.rejected.length
+          ? `, ${result.rejected.length} dropped (${result.rejected.map((row) => `${row.place_name}: ${row.reason}`).join("; ")})`
+          : ""));
     }
 
     // **Stamped only when every edition was actually read.**

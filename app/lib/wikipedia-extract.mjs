@@ -253,15 +253,28 @@ const ROLE_EVIDENCE = Object.freeze({
 // confidently-wrong shape; what remains is why every row still lands `pending`.
 const NOT_YET_DONE = /\b(may|might|could|would|plan(s|ned|ning)?|intend(s|ed)?|hope[sd]?|expect(s|ed)?|plann?ing to|will (be )?(take|film|shoot|move)|plans? to|plan for|scout(ing|ed)?|plann?ed to|plann?ed for|considering|considered|rumou?r(ed|s)?|report(s|ed|edly)? (that )?(filming|shooting|production)|keen on|in talks|approached|proposed|due to (film|shoot|begin)|is (set|slated|expected) to)\b/i;
 
+// **Hebrew, which the English word lists above cannot see.** The first Hebrew run (07.11.2026)
+// dropped every place with `quote_does_not_support_role`: "הסרט צולם בעכו" says it was shot in
+// Acre, and `\b(film|shot)` reads nothing in it. `\b` is ASCII-only in JavaScript, and Hebrew
+// glues its prepositions and the article onto the word (בצילומים, והצילומים), so these are
+// stems matched anywhere in the word. Future forms open with י/ת (יצולם, תצולם), and the intent
+// list catches them before the role list is asked.
+const HEBREW_ROLE_EVIDENCE = Object.freeze({
+  filming_location: /(צולם|צולמ|צילום|צילומ|הסרטה|הוסרט|אולפן|אולפנ|לוקיישן|סט )/u,
+  author_place: /(כתב|נכתב|כתיב|השראה|בהשראת|מבוסס|על בסיס|חיבר|חובר)/u,
+});
+const HEBREW_NOT_YET_DONE = /(יצולם|יצולמו|תצולם|תצולמנה|יצלמו|נצלם|מתוכנן|תוכנן|תוכננו|תכננו|שקלו|נשקל|ייתכן|עשוי|עשויים|אמור ל|אמורים ל|צפוי|צפויים|שמועה|שמועות)/u;
+
 export function sentenceClaimsIntentNotFact(sentence) {
-  return NOT_YET_DONE.test(String(sentence ?? ""));
+  const text = String(sentence ?? "");
+  return NOT_YET_DONE.test(text) || HEBREW_NOT_YET_DONE.test(text);
 }
 
 export function sentenceSupportsRole(sentence, relation) {
   const pattern = ROLE_EVIDENCE[relation];
   if (!pattern) return false;
   const text = String(sentence ?? "");
-  if (!pattern.test(text)) return false;
+  if (!pattern.test(text) && !HEBREW_ROLE_EVIDENCE[relation]?.test(text)) return false;
   // A plan, a rumour, a scouting trip — production vocabulary, no production.
   return !sentenceClaimsIntentNotFact(text);
 }
