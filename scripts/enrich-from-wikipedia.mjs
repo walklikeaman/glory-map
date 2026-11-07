@@ -22,8 +22,11 @@ import {
   articleTitleFromEntity,
   buildEntitiesUrl,
   MAX_ENTITIES_PER_REQUEST,
+  buildRawUrl,
   buildSectionUrl,
   buildTocUrl,
+  sectionFromWikitext,
+  tocFromWikitext,
   chooseSection,
   cleanWikitext,
   languagesForWork,
@@ -51,6 +54,13 @@ import { createModelClient, createThrottle, dailyQuotaSpent, parseStructured } f
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Tokens a paid provider reported, printed at the end so a run's cost is in front of
+// whoever decides on the next, bigger one.
+const spent = { input: 0, output: 0, calls: 0 };
+process.on("exit", () => {
+  if (spent.calls) console.log(`\nmodel usage: ${spent.calls} calls, ${spent.input} input + ${spent.output} output tokens`);
+});
+
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
   return index === -1 ? fallback : (process.argv[index + 1] ?? true);
@@ -64,6 +74,12 @@ const KIND = arg("kind", null);
 // Re-read works that have already been attempted. For when the extractor itself has
 // changed and the old verdicts are worth revisiting — not for ordinary runs.
 const AGAIN = process.argv.includes("--again");
+// Only the works one ingest created — `--source wikidata` reads the Israeli catalogue
+// (scripts/ingest-country-works.mjs) without touching the 6,000 harvested before it.
+const SOURCE = arg("source", null);
+// Read articles through `index.php?action=raw` instead of the action API, which answers the
+// cloud egress with 429 on every call (07.11.2026). See buildRawUrl.
+const RAW = process.argv.includes("--raw");
 
 // The exit status that tells scripts/enrich-loop.sh "the model's daily allowance is spent —
 // start again after it resets", as distinct from a crash (1) or a finished catalogue (0).
@@ -79,6 +95,42 @@ const OUTAGE_PROBE_MS = 30_000;
 const LANGUAGES = Number.parseInt(arg("languages", ""), 10) || MAX_LANGUAGES_PER_WORK;
 
 const headers = { "User-Agent": USER_AGENT, "Accept-Encoding": "gzip" };
+
+// The latest revision of an article, from the query service's MediaWiki bridge — the one
+// Wikimedia path that answers when the action API does not.
+async function latestRevision(title, language) {
+  const safe = title.replace(/["\\]/g, "");
+  const query = `SELECT ?rev WHERE { SERVICE wikibase:mwapi {
+    bd:serviceParam wikibase:endpoint "${language}.wikipedia.org"; wikibase:api "Generator";
+      mwapi:generator "allpages"; mwapi:gapfrom "${safe}"; mwapi:gapto "${safe}"; mwapi:prop "info" .
+    ?rev wikibase:apiOutput "@lastrevid" . } }`;
+  const response = await fetch(`https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}`, {
+    headers: { ...headers, Accept: "application/sparql-results+json" },
+  });
+  if (!response.ok) throw new Error(`query service HTTP ${response.status}`);
+  const rev = (await response.json()).results.bindings[0]?.rev?.value;
+  if (!rev) throw new Error("missingtitle: no such article (or a redirect)");
+  return rev;
+}
+
+// The `--raw` stand-in for the two parse calls: one raw read, pinned to that revision.
+async function rawArticle(title, language) {
+  const revid = await latestRevision(title, language);
+  let response;
+  // The page path is limited too, only more loosely: a burst of reads earns a 429 with a
+  // Retry-After, and waiting it out is enough.
+  for (let attempt = 1; ; attempt += 1) {
+    response = await fetch(buildRawUrl(title, revid, language), { headers });
+    if (response.status !== 429 || attempt > MAX_RETRY_ATTEMPTS) break;
+    const wait = retryAfterMs(response, 30_000) * attempt;
+    console.log(`   waiting ${wait / 1000}s (429)`);
+    await sleep(wait);
+  }
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const wikitext = await response.text();
+  await sleep(MIN_REQUEST_GAP_MS);
+  return { revid: Number(revid), wikitext, tocdata: tocFromWikitext(wikitext) };
+}
 
 async function wikimedia(url, attempt = 1) {
   const response = await fetch(url, { headers });
@@ -173,6 +225,7 @@ async function main() {
   if (!AGAIN) query = query.is("wikipedia_enriched_at", null);
   if (ONE_WORK) query = query.eq("id", ONE_WORK);
   if (KIND) query = query.eq("kind", KIND);
+  if (SOURCE) query = query.eq("source", SOURCE);
   const { data: works, error } = await query.limit(LIMIT);
   if (error) throw new Error(error.message);
   if (!works?.length) { console.log("Nothing to enrich."); return; }
@@ -265,7 +318,9 @@ async function main() {
 
       let toc;
       try {
-        toc = await wikimedia(buildTocUrl(title, language));
+        toc = RAW
+          ? await rawArticle(title, language).then((article) => ({ parse: { ...article } }))
+          : await wikimedia(buildTocUrl(title, language));
       } catch (failure) {
         console.log(`   ${language}: ${failure.message}`);
         unreadEdition = true;
@@ -281,7 +336,9 @@ async function main() {
       // would have thrown out of the loop and ended a two-day run on whatever work it hit.
       let raw;
       try {
-        raw = await wikimedia(buildSectionUrl(title, section.index, language));
+        raw = RAW
+          ? { parse: { wikitext: sectionFromWikitext(toc.parse.wikitext, section.index) } }
+          : await wikimedia(buildSectionUrl(title, section.index, language));
       } catch (failure) {
         console.log(`   ${language}: section ${failure.message}`);
         unreadEdition = true;
@@ -327,6 +384,11 @@ async function main() {
         continue;
       }
 
+      if (extraction.usage) {
+        spent.input += extraction.usage.input_tokens ?? 0;
+        spent.output += extraction.usage.output_tokens ?? 0;
+        spent.calls += 1;
+      }
       const result = acceptExtraction(extraction.parsed, { prose, article: { title, revid } });
       let fresh = 0;
       for (const location of result.accepted) {

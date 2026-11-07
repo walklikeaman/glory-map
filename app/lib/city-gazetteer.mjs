@@ -121,6 +121,13 @@ const CITIES = [
   { name: "Hope", country: "Canada", lat: 49.3697, lng: -121.4339 },
   { name: "Dallas", country: "USA", lat: 32.7831, lng: -96.7969 },
   { name: "Jamestown", country: "USA", lat: 37.8661, lng: -120.5035 },
+  // Added by hand, 07.11.2026, with the Israeli catalogue (scripts/ingest-country-works.mjs).
+  // None could clear rule 1 — the harvested sources barely reach Israel — so the anchors
+  // are each city's own Wikidata coordinate (P625), not a median of our rows. They sit
+  // 54 km (Tel Aviv–Jerusalem) and 81 km (Tel Aviv–Haifa) apart, so rule 6 holds.
+  { name: "Tel Aviv", country: "Israel", lat: 32.08, lng: 34.78, byHand: true },
+  { name: "Jerusalem", country: "Israel", lat: 31.7767, lng: 35.2342, byHand: true },
+  { name: "Haifa", country: "Israel", lat: 32.8192, lng: 34.9992, byHand: true },
 ];
 
 // The same slugifier the work URL uses, so "Almería" and "Montréal" lose their accents

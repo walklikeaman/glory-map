@@ -306,7 +306,11 @@ async function parseWithClaude({ runtime, schema, instructions, input, maxTokens
     };
   }
 
-  return { ok: true, parsed: validated.data, model: message.model, servedBy: "anthropic", fenced: false };
+  return {
+    ok: true, parsed: validated.data, model: message.model, servedBy: "anthropic", fenced: false,
+    // Paid calls are budgeted per run; the caller adds these up to report what a run cost.
+    usage: message.usage ?? null,
+  };
 }
 
 // Free endpoints are shared and rate-limited per account, so pacing belongs to the

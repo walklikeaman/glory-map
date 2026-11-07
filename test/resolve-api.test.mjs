@@ -48,9 +48,19 @@ function recordingWriter({ existingEvidence = [] } = {}) {
       calls.places = rows;
       return rows.map((row) => ({ id: `place-${row.wikidata_id}`, wikidata_id: row.wikidata_id }));
     },
-    upsertLinks: async (rows) => {
+    // Stands in for the write_resolved_links RPC: link + its evidence in one call, and
+    // evidence already stored for the link (same method and source) is not counted again.
+    writeLinks: async (rows) => {
       calls.links = rows;
-      return rows.map((row, i) => ({ id: `link-${i}`, ...row }));
+      return rows.map((row, i) => ({
+        id: `link-${i}`,
+        work_id: row.work_id,
+        place_id: row.place_id,
+        relation_kind: row.relation_kind,
+        evidence_inserted: row.evidence.filter((e) => !existingEvidence.some((x) =>
+          x.subject_type === "link" && x.subject_id === `link-${i}`
+          && x.method === e.method && x.source_ref === e.source_ref)).length,
+      }));
     },
     loadEvidence: async () => existingEvidence,
     insertEvidence: async (rows) => { calls.evidence = rows; },
@@ -111,22 +121,17 @@ test("resolve write-through persists places, links and evidence at both grains",
   assert.equal(fiction.place_class, "fictional");
   assert.equal(fiction.lat, null);
 
-  // Every evidence row carries a real uuid subject, and both grains are present.
-  assert.deepEqual(
-    [...new Set(writer.calls.evidence.map((e) => e.subject_type))].sort(),
-    ["link", "place"],
-  );
+  // Place evidence carries a real uuid subject and is written on its own.
+  assert.deepEqual([...new Set(writer.calls.evidence.map((e) => e.subject_type))], ["place"]);
   assert.ok(writer.calls.evidence.every((e) => typeof e.subject_id === "string" && e.subject_id.length > 0));
   assert.ok(writer.calls.evidence.every((e) => !("subject_ref" in e)));
 
-  // The link rows are keyed to the work and the resolved place uuid — and they spell out
-  // the whole conflict target (#129). A row that leaves `scene_id` or `about` to the
-  // column default is a row whose identity is decided somewhere other than here, and the
-  // upsert that used to name three columns has been raising 42P10 in production since the
-  // unique constraint was split into partial indexes.
+  // A link travels WITH its evidence. The link trigger is checked at commit and every
+  // PostgREST request commits, so a link sent without its evidence in the same call was
+  // refused — every batch, 05.08 to 07.11.2026.
   assert.deepEqual(writer.calls.links[0], {
     work_id: WORK_ID, place_id: "place-Q100", relation_kind: "filming_location", confidence: 0.9,
-    scene_id: null, about: null,
+    evidence: [{ method: "wikidata_statement", source_url: "u", source_ref: "Q1/P915/Q100", agrees: true }],
   });
   assert.deepEqual(body.resolved[0].places.map((p) => p.wikidata_id), ["Q100", "Q200"]);
 });
@@ -187,6 +192,6 @@ test("resolve never writes evidence whose subject was not persisted", async () =
   const body = await (await handler(resolveRequest({ work_ids: [WORK_ID] }))).json();
 
   assert.equal(writer.calls.links.length, 1); // the Q200 link is dropped
-  assert.ok(writer.calls.evidence.every((e) => e.subject_id === "place-Q100" || e.subject_id === "link-0"));
+  assert.ok(writer.calls.evidence.every((e) => e.subject_id === "place-Q100"));
   assert.equal(body.evidence_inserted, 2);
 });

@@ -474,3 +474,57 @@ export function wikipediaAttribution({ title, revid, modified = false, language 
     notice: `Source: Wikipedia (${edition}), "${title}" — ${WIKIPEDIA_LICENSE.name}${modified ? " (modified)" : ""}`,
   };
 }
+
+// **The page-view path, for when the action API refuses.** Measured 07.11.2026 from the
+// cloud egress: every `w/api.php` and `rest_v1` call answers 429 at once, while
+// `w/index.php?action=raw` answers 200. The raw wikitext is the same text `action=parse`
+// returns a section of, so the table of contents and the section are rebuilt from it here.
+//
+// Pinned by `oldid`, so the text read is exactly the revision the permalink cites. The
+// revision id comes from the Wikidata query service's MediaWiki bridge (`@lastrevid`),
+// which is not rate-limited the same way.
+export function buildRawUrl(title, revid, language = "en") {
+  if (typeof title !== "string" || !title.trim()) return null;
+  if (!SUPPORTED_LANGUAGES.includes(language)) return null;
+  const url = new URL(`https://${language}.wikipedia.org/w/index.php`);
+  url.searchParams.set("title", title.trim());
+  url.searchParams.set("action", "raw");
+  if (/^\d+$/.test(String(revid ?? ""))) url.searchParams.set("oldid", String(revid));
+  return url.toString();
+}
+
+const HEADING = /^(={2,6})\s*(.+?)\s*\1\s*$/;
+
+// Headings of a wikitext, numbered the way MediaWiki numbers sections: 1 is the first
+// heading, 0 the lead. Only `== … ==` lines count; a heading inside a comment does not
+// exist for the parser either, so comments are dropped first.
+function headingLines(wikitext) {
+  const lines = String(wikitext ?? "").replace(/<!--[\s\S]*?-->/g, "").split("\n");
+  const headings = [];
+  lines.forEach((text, at) => {
+    const match = HEADING.exec(text.trim());
+    if (match) headings.push({ at, level: match[1].length, line: match[2].replace(/'''?/g, "").trim() });
+  });
+  return { lines, headings };
+}
+
+// The shape `chooseSection` reads from `action=parse&prop=tocdata`.
+export function tocFromWikitext(wikitext) {
+  const { headings } = headingLines(wikitext);
+  return {
+    sections: headings.map((heading, position) => ({
+      index: String(position + 1), line: heading.line, hLevel: heading.level,
+    })),
+  };
+}
+
+// Section `index` with its subsections, heading included — what `prop=wikitext&section=`
+// returns — so `cleanWikitext` sees the same input either way.
+export function sectionFromWikitext(wikitext, index) {
+  const { lines, headings } = headingLines(wikitext);
+  const position = Number(index) - 1;
+  const start = headings[position];
+  if (!start) return "";
+  const next = headings.slice(position + 1).find((heading) => heading.level <= start.level);
+  return lines.slice(start.at, next ? next.at : lines.length).join("\n");
+}
