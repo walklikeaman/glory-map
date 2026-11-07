@@ -15,6 +15,21 @@ tests and Vercel never see it.
   near you, the walk), photos (upload a shot) and microphone.
 - An offline page (`www/index.html`) with a retry button when there is no network.
 
+## One command: build and install from the Mac mini
+
+On a Mac where Xcode is already signed in to the Apple ID (the Mac mini), and the
+iPhone is paired by cable or Wi-Fi:
+
+```bash
+cd mobile && npm run iphone
+```
+
+It pulls main, syncs Capacitor, builds with automatic signing (team `NM3FPYR56P`),
+installs on "Oz iPhone Pro" and launches the app. No Xcode window, no prompts.
+Override with `DEVICE_NAME`, `DEVICE_ID`, `TEAM_ID`. Run it at least once every 7
+days: a free Apple ID's signing expires after a week. Note: on the MacBook Pro with
+Xcode 27, the terminal build did not see the GUI sign-in ("No Accounts").
+
 ## Put it on your iPhone (free, with a Mac)
 
 You need a Mac with Xcode (free from the App Store) and your Apple ID. No paid

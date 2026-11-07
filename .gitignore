@@ -68,3 +68,6 @@ public/maplibre-gl-shared.mjs
 data/pin-audit/nominatim-cache.json
 data/pin-audit/verdicts.json
 data/tmdb-match/rollback-*.json
+
+# iOS DerivedData from mobile/scripts/install-iphone.sh
+mobile/build/
