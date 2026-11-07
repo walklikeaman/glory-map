@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { citySlugFromName, mapUrlQuery, readMapUrl } from "../app/lib/map-url.mjs";
+import { citySlugFromName, locateOnOpen, mapUrlQuery, readMapUrl } from "../app/lib/map-url.mjs";
 
 const q = (s) => new URLSearchParams(s);
 
@@ -85,4 +85,11 @@ test("a name is joined to the gazetteer only when we hold that city", () => {
 test("a view with no coordinate produces no query at all", () => {
   assert.equal(mapUrlQuery({}), "");
   assert.equal(mapUrlQuery({ lat: null, lng: null }), "");
+});
+
+test("the map asks for the reader's position only when the address named nowhere", () => {
+  assert.equal(locateOnOpen(readMapUrl(new URLSearchParams(""))), true);
+  assert.equal(locateOnOpen(readMapUrl(new URLSearchParams("imdb=8&kind=film"))), true);
+  assert.equal(locateOnOpen(readMapUrl(new URLSearchParams("city=los-angeles"))), false);
+  assert.equal(locateOnOpen(readMapUrl(new URLSearchParams("lat=51.5&lng=-0.12"))), false);
 });

@@ -408,7 +408,12 @@ export function FlyTo({ position, zoom }) {
   useEffect(() => {
     const lngLat = toLngLat(position);
     if (!map || !lngLat) return;
-    map.flyTo({ center: lngLat, zoom, animate: true });
+    // Across a country the flight is seconds of blur, and the map searches nothing until
+    // it lands: opening in London and locating the reader in Tel Aviv took nine seconds
+    // to show a pin. Far away, it jumps; nearby, it still flies.
+    const far = map.getCenter().distanceTo({ lng: lngLat[0], lat: lngLat[1] }) > 200_000;
+    if (far) map.jumpTo({ center: lngLat, zoom });
+    else map.flyTo({ center: lngLat, zoom, animate: true });
   }, [map, position?.[0], position?.[1], zoom]);
 
   return null;
