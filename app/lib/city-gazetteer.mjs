@@ -125,9 +125,9 @@ const CITIES = [
   // None could clear rule 1 — the harvested sources barely reach Israel — so the anchors
   // are each city's own Wikidata coordinate (P625), not a median of our rows. They sit
   // 54 km (Tel Aviv–Jerusalem) and 81 km (Tel Aviv–Haifa) apart, so rule 6 holds.
-  { name: "Tel Aviv", country: "Israel", lat: 32.08, lng: 34.78, byHand: true },
-  { name: "Jerusalem", country: "Israel", lat: 31.7767, lng: 35.2342, byHand: true },
-  { name: "Haifa", country: "Israel", lat: 32.8192, lng: 34.9992, byHand: true },
+  { name: "Tel Aviv", country: "Israel", anchor: "wikidata", lat: 32.08, lng: 34.78, byHand: true },
+  { name: "Jerusalem", country: "Israel", anchor: "wikidata", lat: 31.7767, lng: 35.2342, byHand: true },
+  { name: "Haifa", country: "Israel", anchor: "wikidata", lat: 32.8192, lng: 34.9992, byHand: true },
 ];
 
 // The same slugifier the work URL uses, so "Almería" and "Montréal" lose their accents
