@@ -112,3 +112,11 @@ test("zoomForRadius maps the selectable radii to sensible zoom levels", () => {
   assert.equal(zoomForRadius(1000), 14);
   assert.equal(zoomForRadius(3000), 13);
 });
+
+test("a browse keeps the places already on the map instead of replacing them", async () => {
+  const { mergeBrowsed } = await import("../app/lib/nearby.mjs");
+  const a = { id: "a" }, b = { id: "b" }, b2 = { id: "b", fresh: true }, c = { id: "c" };
+  assert.deepEqual(mergeBrowsed([a, b], [b2, c]), [b2, c, a]);
+  assert.deepEqual(mergeBrowsed(null, [a]), [a]);
+  assert.deepEqual(mergeBrowsed([a, b], [c], 2), [c, a], "capped, newest first");
+});

@@ -74,7 +74,10 @@ export function PinLayer({
     (features ?? []).map((feature) => {
       const shaped = pinFeature(feature);
       if (!shaped?.geometry) return null;
-      const key = `${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}`;
+      // A caller's own key wins. The searched places carry their location id, and onSelect
+      // looks them up by it; overwriting it with the coordinate made every filled pin from
+      // the browse untappable ("the plain yellow dots don't open", 2026-11-07).
+      const key = feature.properties?.key ?? `${feature.geometry.coordinates[1]},${feature.geometry.coordinates[0]}`;
       return {
         ...shaped,
         properties: {
@@ -153,6 +156,8 @@ export function PinLayer({
     const hitLayers = [...clusterLayers, circleId, labelId, nameId];
 
     const pick = (event) => {
+      // One tap opens one thing: a pin layer drawn on the same spot already answered it.
+      if (event?.originalEvent?._glorymapHandled) return;
       // Only the layers that exist: an empty list would query every layer on the map.
       const layers = hitLayers.filter((layer) => map.getLayer(layer));
       if (!layers.length) return;

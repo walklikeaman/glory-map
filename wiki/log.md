@@ -7,6 +7,17 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] incident | Filled yellow pins never opened; browsed places vanished on zoom
+**Scenario**: after #361 Nikita reported (Jaffa, iPhone) that plain yellow dots don't open (rings
+do) and the yellow "district" dots disappear when zooming in and out.
+**Causes**: (1) `PinLayer` overwrote every feature's `key` with its coordinate, but the browsed
+places layer (`searched-places`, the filled pins from `/api/locations`) looks its locations up by
+id, so no tap on a filled pin ever matched. (2) Every map move REPLACED the browsed set with the
+new 30 results, so pins and city rings came and went with the zoom.
+**Fix**: a caller's own `key` wins; a browse now merges into what is drawn (`mergeBrowsed`, newest
+first, capped at 300), a new city or title still replaces it; one tap opens one layer's pin.
+Playwright over Jaffa, z10..z16: every pin in view opens, browsed pins stay at every zoom.
+
 ## [2026-11-07] decision | Hebrew Wikipedia; a named country now removes rivals in the geocoder
 **Scenario**: Nikita allowed he.wikipedia.org in the cloud network. The first 10-work test accepted
 nothing, for three separate reasons. (1) `he` wasn't in the section tables. (2) The role and intent
