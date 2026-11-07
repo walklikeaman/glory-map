@@ -96,7 +96,7 @@ import { createCoalescingRunner } from "../lib/coalesce.mjs";
 import { WALKING_SPEED_KMH, haversineKm, isLatLng } from "../lib/geo.mjs";
 import { libraryEntryFor, libraryRating, mergeLibraries, parseMediaCsv, upgradeLibraryScale, workIsInLibrary } from "../lib/media-library.mjs";
 import { MEDIA_SOURCES, mediaSource, mediaSourceLabel } from "../lib/media-sources.mjs";
-import { citySlugFromName, mapUrlQuery, readMapUrl } from "../lib/map-url.mjs";
+import { citySlugFromName, locateOnOpen, mapUrlQuery, readMapUrl } from "../lib/map-url.mjs";
 import { workPath } from "../lib/work-url.mjs";
 import { commonsSrcSetForSurface, sizesForSurface } from "../lib/image-budget.mjs";
 import {
@@ -3031,17 +3031,41 @@ export default function SceneMapApp() {
     setCitySearchStatus("Finding your location...");
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        setUserPosition([coords.latitude, coords.longitude]);
-        setUserIsDemo(false);
-        setNearbyStatus("ready");
-        setNearbyMessage("");
-        selectTourArea([coords.latitude, coords.longitude], "Your location");
+        showReaderPosition(coords);
         setCitySearchStatus("");
       },
       () => setCitySearchStatus("Location access was not granted"),
       { enableHighAccuracy: false, maximumAge: 300_000, timeout: 8_000 },
     );
   }
+
+  function showReaderPosition(coords) {
+    setUserPosition([coords.latitude, coords.longitude]);
+    setUserIsDemo(false);
+    setNearbyStatus("ready");
+    setNearbyMessage("");
+    selectTourArea([coords.latitude, coords.longitude], "Your location");
+  }
+
+  // The map opens where the reader is standing (Nikita, 2026-11-07), unless the address
+  // named a place. The browser asks once; a refusal, a timeout or no GPS leaves the
+  // default city on screen and says nothing — the locate button is still there.
+  // `viewNow` is read when the fix arrives, not when it was asked for: a reader who has
+  // already opened a pin or picked a city in those seconds keeps what they chose.
+  const viewNow = useRef({});
+  viewNow.current = { cityName, activeLocation, show: showReaderPosition };
+  useEffect(() => {
+    if (!locateOnOpen(opened) || typeof navigator === "undefined" || !navigator.geolocation) return;
+    const startCity = viewNow.current.cityName;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const { cityName: city, activeLocation: open, show } = viewNow.current;
+        if (city === startCity && !open) show(coords);
+      },
+      () => {},
+      { enableHighAccuracy: false, maximumAge: 600_000, timeout: 10_000 },
+    );
+  }, []);
 
   async function searchWork(event) {
     event.preventDefault();

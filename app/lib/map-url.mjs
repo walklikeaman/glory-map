@@ -74,6 +74,13 @@ export function readMapUrl(searchParams) {
   return { source: "point", slug: null, name: null, lat, lng, zoom: zoom ?? 13 };
 }
 
+// Whether the map should ask for the reader's position as it opens. Only when the address
+// named nowhere: a shared link to Los Angeles must open on Los Angeles, not on the person
+// who clicked it. `opened` is what readMapUrl returned.
+export function locateOnOpen(opened) {
+  return opened == null;
+}
+
 // The query string for a view, so the address bar always describes what is on screen.
 //
 // The city slug wins when the centre is the city's own anchor — that is what a reader

@@ -7,6 +7,18 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | The map opens where the reader is standing
+**Scenario**: Nikita: "запускать карту в том месте, где мы находимся, запросить доступ к GPS".
+**Decision**: on open the app asks for the position once and centres on it, unless the
+URL names a place (`?city=` / `?lat=&lng=`): a shared link opens where it points. A
+refusal, a timeout or no GPS leaves London and says nothing; the locate button stays.
+A fix that lands after the reader opened a pin or picked a city is dropped.
+**Gotcha**: a cross-country `flyTo` (London → Tel Aviv) took ~9 s, and the map searched
+nothing until it landed, while the interrupted pan reported London in between. `FlyTo`
+now jumps when the target is over 200 km away. iOS: `NSLocationWhenInUseUsageDescription`
+was already in `mobile/ios/App/App/Info.plist`; the WKWebView may ask a second time for
+the site itself (a native Geolocation plugin would fix that, not done).
+
 ## [2026-11-07] decision | First run cut down: one welcome for guests, a poster deck after sign-in (UX-9)
 **Object**: `app/lib/onboarding.mjs`, `app/components/Onboarding.jsx`, the sign-in hydration in `SceneMapApp.jsx`.
 **Scenario**: Nikita tried the iPhone app. Four intro screens and a 60-card, four-way deck (Like / Already know / Save / Not interested) were too much. He missed the Skip button, didn't notice the swipes, and couldn't tell what his answers did. After he signed in he was shown the whole tour again.
