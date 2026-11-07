@@ -22,7 +22,8 @@ test("every registered service declares a usable scale", () => {
     assert.ok(source.scale > 0, `${id} has no scale`);
     assert.ok(source.scale <= RATING_SCALE, `${id} rates finer than the library can hold`);
     assert.ok(source.label, `${id} has no label`);
-    assert.ok(source.accept.includes(".csv"), `${id} cannot take a CSV`);
+    // A sign-in service takes no file at all.
+    if (!source.signIn) assert.ok(source.accept.includes(".csv"), `${id} cannot take a CSV`);
   }
 });
 

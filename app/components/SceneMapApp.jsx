@@ -86,6 +86,8 @@ import { ALL_CITIES } from "../lib/city-gazetteer.mjs";
 import { normalizePlaceName } from "../lib/place-dedup.mjs";
 import { parseLetterboxdArchive } from "../lib/letterboxd-archive.mjs";
 import { letterboxdHandleFrom } from "../lib/connectors/letterboxd-rss.mjs";
+import { createPkcePair, randomToken, simklAuthorizeUrl, simklRedirectUri } from "../lib/connectors/simkl.mjs";
+import { SIMKL_IMPORT_KEY, SIMKL_PKCE_KEY } from "../lib/simkl-session.mjs";
 import { libraryImportSummary, libraryNoun, matchLibrary } from "../lib/library-match.mjs";
 import { emailLinkMessage, signInEmail } from "../lib/email-sign-in.mjs";
 import {
@@ -96,7 +98,7 @@ import { externalPlaceLinks } from "../lib/place-links.mjs";
 import { loadCloudLibrary, saveCloudLibrary } from "../lib/cloud-library.mjs";
 import { createCoalescingRunner } from "../lib/coalesce.mjs";
 import { WALKING_SPEED_KMH, haversineKm, isLatLng } from "../lib/geo.mjs";
-import { libraryEntryFor, libraryRating, mergeLibraries, parseMediaCsv, upgradeLibraryScale, workIsInLibrary } from "../lib/media-library.mjs";
+import { libraryEntryFor, libraryRating, mergeLibraries, parseMediaCsv, parseMediaJson, upgradeLibraryScale, workIsInLibrary } from "../lib/media-library.mjs";
 import { MEDIA_SOURCES, mediaSource, mediaSourceLabel } from "../lib/media-sources.mjs";
 import { citySlugFromName, locateOnOpen, mapUrlQuery, readMapUrl } from "../lib/map-url.mjs";
 import { workPath } from "../lib/work-url.mjs";
@@ -303,9 +305,6 @@ const FilmsInView = memo(function FilmsInView({ films, mode, onMode, onHighlight
 
 const londonCenter = [51.5094, -0.1183];
 const GUEST_LIBRARY_KEY = "scenemap-library";
-// The Letterboxd username a reader linked, kept on this device so new watches are pulled
-// in every time the app opens.
-const LETTERBOXD_HANDLE_KEY = "glorymap-letterboxd-handle";
 
 // Read, and put on the ten-point scale on the way out. A library saved before the scale
 // was settled holds Letterboxd half-stars, and a 4.5 read against a bar that now means
@@ -1333,9 +1332,15 @@ export default function SceneMapApp() {
   const [libraryQuery, setLibraryQuery] = useState("");
   const [importMessage, setImportMessage] = useState("");
   const [letterboxdInput, setLetterboxdInput] = useState("");
-  const [linkedLetterboxd, setLinkedLetterboxd] = useState(null);
   const [letterboxdSyncing, setLetterboxdSyncing] = useState(false);
-  const letterboxdAutoSynced = useRef(false);
+  const connectionsSyncedFor = useRef(null);
+  // Connected services live on the account (Supabase user metadata), so they follow the
+  // reader to every device and are only offered once somebody is signed in.
+  const connections = accountUser?.user_metadata ?? {};
+  const linkedLetterboxd = letterboxdHandleFrom(connections.letterboxd_handle ?? null);
+  const simklToken = typeof connections.simkl_refresh_token === "string" ? connections.simkl_refresh_token : null;
+  const simklLinked = Boolean(simklToken);
+  const [simklSyncing, setSimklSyncing] = useState(false);
 
   const [recreateLocation, setRecreateLocation] = useState(null);
   const [shotsVersion, setShotsVersion] = useState(0);
@@ -1344,19 +1349,16 @@ export default function SceneMapApp() {
     localStorage.setItem(libraryStorageKey, JSON.stringify(library));
   }, [library, libraryStorageKey]);
 
-  // Once per visit, after the account has decided which library is ours: an earlier merge
-  // would be replaced by the account's copy and lost.
+  // Once per signed-in account per visit, after the account has decided which library is
+  // ours: an earlier merge would be replaced by the account's copy and lost.
   useEffect(() => {
-    if (letterboxdAutoSynced.current) return;
-    if (accountStatus === "loading" || accountStatus === "authorizing") return;
-    letterboxdAutoSynced.current = true;
-    let stored = null;
-    try { stored = letterboxdHandleFrom(localStorage.getItem(LETTERBOXD_HANDLE_KEY)); } catch { /* private mode */ }
-    if (!stored) return;
-    setLinkedLetterboxd(stored);
-    syncLetterboxd(stored, { quiet: true });
-    // syncLetterboxd only touches state setters, so this runs on the status alone.
-  }, [accountStatus]);
+    if (accountStatus !== "signed_in" || !accountUser) return;
+    if (connectionsSyncedFor.current === accountUser.id) return;
+    connectionsSyncedFor.current = accountUser.id;
+    applySimklOnOpen();
+    if (linkedLetterboxd) syncLetterboxd(linkedLetterboxd, { quiet: true });
+    // The sync helpers only touch state setters, so this runs on the account alone.
+  }, [accountStatus, accountUser]);
 
   // A real Letterboxd export, seeded once in development so the map can be tested against
   // an actual library without importing it every time.
@@ -1466,7 +1468,13 @@ export default function SceneMapApp() {
     }
 
     supabase.auth.getSession().then(({ data }) => applySession(data.session));
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      // A metadata write (a connected service) is the same person with the same library;
+      // re-hydrating would race the merge that wrote it.
+      if (event === "USER_UPDATED") {
+        if (session?.user) setAccountUser(session.user);
+        return;
+      }
       queueMicrotask(() => applySession(session));
     });
 
@@ -2542,15 +2550,106 @@ export default function SceneMapApp() {
     }
     const linked = await syncLetterboxd(handle);
     if (!linked) return;
-    setLinkedLetterboxd(linked);
     setLetterboxdInput("");
-    try { localStorage.setItem(LETTERBOXD_HANDLE_KEY, linked); } catch { /* linked for this visit */ }
+    await saveConnections({ letterboxd_handle: linked });
   }
 
-  function unlinkLetterboxd() {
-    setLinkedLetterboxd(null);
-    try { localStorage.removeItem(LETTERBOXD_HANDLE_KEY); } catch { /* nothing stored */ }
+  async function unlinkLetterboxd() {
+    await saveConnections({ letterboxd_handle: null });
     setImportMessage("Letterboxd unlinked. The films already in your list stay there.");
+  }
+
+  // Write connected services onto the account. The returned user replaces ours directly;
+  // the auth listener ignores USER_UPDATED, so this never re-runs the library hydration.
+  async function saveConnections(patch) {
+    if (!supabase || !accountUser) return;
+    const { data, error } = await supabase.auth.updateUser({ data: patch });
+    if (error) {
+      setImportMessage("The connection could not be saved to your account. Try again.");
+      return;
+    }
+    if (data?.user) setAccountUser(data.user);
+  }
+
+  function simklSummary(count) {
+    return count
+      ? `Simkl connected. ${count} watched films and series are in your list, and new ones arrive each time you open GloryMap.`
+      : "Simkl connected, but nothing is marked as watched there yet. Import your IMDb or Letterboxd into Simkl and it will show up here.";
+  }
+
+  // Coming back from simkl.com the callback page has left the films and the token in
+  // sessionStorage; otherwise a token on the account means "pull new watches quietly".
+  function applySimklOnOpen() {
+    let pending = null;
+    try {
+      pending = JSON.parse(sessionStorage.getItem(SIMKL_IMPORT_KEY) || "null");
+      sessionStorage.removeItem(SIMKL_IMPORT_KEY);
+    } catch { /* private mode */ }
+    if (pending && Array.isArray(pending.movies)) {
+      setLibrary((current) => mergeLibraries(current, pending.movies));
+      setMineOnly(true);
+      setImportMessage(simklSummary(pending.movies.length));
+      setAccountOpen(true);
+      if (pending.refreshToken) saveConnections({ simkl_refresh_token: pending.refreshToken });
+    } else if (simklToken) {
+      syncSimkl({ quiet: true });
+    }
+  }
+
+  async function startSimklSignIn() {
+    setImportMessage("Opening Simkl…");
+    try {
+      const { verifier, challenge } = await createPkcePair();
+      const state = randomToken(16);
+      sessionStorage.setItem(SIMKL_PKCE_KEY, JSON.stringify({ verifier, state }));
+      window.location.assign(simklAuthorizeUrl({
+        redirectUri: simklRedirectUri(window.location.origin),
+        state,
+        codeChallenge: challenge,
+      }));
+    } catch {
+      setImportMessage("This browser cannot start the Simkl sign-in. Try another browser.");
+    }
+  }
+
+  async function syncSimkl({ quiet = false } = {}) {
+    const token = simklToken;
+    if (!token) return;
+    setSimklSyncing(true);
+    try {
+      const response = await fetch("/api/import/simkl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: token }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        // Revoked on simkl.com, or 180 days passed: the token is dead, so forget it.
+        await saveConnections({ simkl_refresh_token: null });
+      }
+      if (!response.ok) throw new Error(payload?.error || "Simkl could not be reached.");
+      if (payload.refreshToken && payload.refreshToken !== token) {
+        await saveConnections({ simkl_refresh_token: payload.refreshToken });
+      }
+      const movies = Array.isArray(payload.movies) ? payload.movies : [];
+      setLibrary((current) => mergeLibraries(current, movies));
+      if (!quiet) setImportMessage(simklSummary(movies.length));
+    } catch (error) {
+      if (!quiet) setImportMessage(error instanceof Error ? error.message : "Simkl could not be reached.");
+    } finally {
+      setSimklSyncing(false);
+    }
+  }
+
+  async function unlinkSimkl() {
+    await saveConnections({ simkl_refresh_token: null });
+    setImportMessage("Simkl disconnected. The films already in your list stay there.");
+  }
+
+  function openConnector(id) {
+    if (!mediaSource(id)?.signIn) return selectConnector(id);
+    if (simklLinked) return syncSimkl();
+    return startSimklSignIn();
   }
 
   function selectConnector(connector) {
@@ -2648,9 +2747,12 @@ export default function SceneMapApp() {
         throw new Error(`${mediaSourceLabel(pendingConnector) ?? "This service"} exports a CSV, not a ZIP.`);
       }
 
+      const isJson = file.name.toLowerCase().endsWith(".json") || file.type === "application/json";
       const imported = isZip
         ? await parseLetterboxdArchive(await file.arrayBuffer(), file.size)
-        : parseMediaCsv(await file.text(), pendingConnector);
+        : isJson
+          ? parseMediaJson(await file.text(), pendingConnector)
+          : parseMediaCsv(await file.text(), pendingConnector);
       const nextLibrary = mergeLibraries(library, imported);
       const inCity = films.filter((film) => workIsInLibrary(film, nextLibrary)).length;
       setLibrary(nextLibrary);
@@ -5076,7 +5178,7 @@ export default function SceneMapApp() {
             </div>
 
             <p className="account-copy">
-              Import your official account export. Sign in to keep the normalized movie list in your private account and access it on another device.
+              Sign in, then connect the services you watch with or upload their exports. Your list and your connections stay in your private account, on every device.
             </p>
 
             <div className="account-auth">
@@ -5136,20 +5238,50 @@ export default function SceneMapApp() {
               onChange={importLibrary}
             />
 
+            {!accountUser ? (
+              <p className="connect-gate">
+                <Link2 size={16} />
+                Sign in above to connect Letterboxd, IMDb, Simkl, Netflix or your own list. Connections are kept in your account, on every device.
+              </p>
+            ) : (<>
             {/* One card per service in [[media-sources]]. A new connector is a row there,
                 not another block here that could disagree with the parser about what the
                 service is called or what it hands you. */}
             <div className="connector-list">
               {Object.entries(MEDIA_SOURCES).map(([id, source]) => (
-                <button className="connector-card" key={id} type="button" onClick={() => selectConnector(id)}>
+                <button
+                  className="connector-card"
+                  key={id}
+                  type="button"
+                  onClick={() => openConnector(id)}
+                  disabled={source.signIn && simklSyncing}
+                >
                   <span className={`connector-logo is-${id}`}>
                     {source.logoText ?? <Film size={20} />}
                   </span>
-                  <span><strong>{source.label}</strong><small>{source.blurb}</small></span>
-                  <Link2 size={18} />
+                  <span>
+                    <strong>{source.signIn && simklLinked ? `${source.label} connected` : source.label}</strong>
+                    <small>{source.signIn && simklLinked ? "Tap to sync now" : source.blurb}</small>
+                  </span>
+                  {source.signIn && simklSyncing ? <LoaderCircle className="spin" size={18} /> : <Link2 size={18} />}
                 </button>
               ))}
             </div>
+            <p className="connector-exports">
+              Where to get the files:{" "}
+              {Object.entries(MEDIA_SOURCES).filter(([, source]) => source.exportUrl).map(([id, source], index) => (
+                <span key={id}>
+                  {index > 0 && " · "}
+                  <a href={source.exportUrl} target="_blank" rel="noreferrer">{source.label}</a>
+                </span>
+              ))}
+              {simklLinked && (
+                <>
+                  {" · "}
+                  <button type="button" className="link-button" onClick={unlinkSimkl}>Disconnect Simkl</button>
+                </>
+              )}
+            </p>
 
             {/* The live link: a public profile's RSS feed, by username. The ZIP above fills
                 the whole history once; this keeps new watches coming. */}
@@ -5185,6 +5317,7 @@ export default function SceneMapApp() {
                 </button>
               </form>
             )}
+            </>)}
 
             {importMessage && <p className="import-message" role="status"><CheckCircle2 size={16} />{importMessage}</p>}
 

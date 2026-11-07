@@ -47,7 +47,8 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] #97 story trail: the numbered polyline on the map
 - [ ] #96 / #190 ambient audio that reads place_class
 - [x] #92 Letterboxd linked by username (public RSS, re-syncs on open) (PR #349)
-- [ ] #92 connectors: Trakt (needs a Trakt client id), Simkl, Kinopoisk, Open Library, Last.fm
+- [x] #92 Simkl sign-in, Netflix CSV, own CSV/JSON list; connections only for signed-in users, kept on the account (PR #357)
+- [ ] #92 connectors: Trakt, Kinopoisk, Open Library, Last.fm
 - [ ] #95 growth: budgeted web search + GeoCLIP grounding
 - [ ] #47 Wikipedia-prose enrichment (spike)
 - [ ] Recreate 2.0: #51 edge-ghost, #52 compass, #53 AI coach, #54 share diptych
