@@ -74,3 +74,20 @@ export function zoomForRadius(radiusMeters) {
 
   return 13;
 }
+
+// How many browsed places the map keeps at once. Each move asks /api/locations for 30, so
+// this is roughly the last ten views.
+export const BROWSE_KEEP = 300;
+
+// What the map holds after a browse answer arrives: the new places first, then the ones
+// already on the map, deduped by id. The browse used to REPLACE the set on every move, so
+// zooming in or out made the yellow dots and the city rings vanish and come back (reported
+// on the iPhone, 2026-11-07). Places the reader has already seen stay put; the cap keeps a
+// long pan from growing without end.
+export function mergeBrowsed(previous, next, keep = BROWSE_KEEP) {
+  const merged = new Map();
+  for (const location of [...(next ?? []), ...(previous ?? [])]) {
+    if (location?.id != null && !merged.has(location.id)) merged.set(location.id, location);
+  }
+  return [...merged.values()].slice(0, keep);
+}
