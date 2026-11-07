@@ -56,7 +56,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 // OpenRouter attributes traffic by these and shows the app on its site. Neither is a
 // secret; both are ordinary courtesy.
 const APP_HEADERS = {
-  "HTTP-Referer": "https://codex-hackathon-starter.vercel.app",
+  "HTTP-Referer": "https://glory-map.vercel.app",
   "X-Title": "GloryMap",
 };
 

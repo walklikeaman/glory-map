@@ -25,7 +25,7 @@ The database and deploy are already set up — no keys to fill in, no Vercel to 
 | Item                          | Link / status                                               |
 | ----------------------------- | ------------------------------------------------------------ |
 | Shared repository (code)      | https://github.com/walklikeaman/glory-map      |
-| Live app (deploy)             | https://codex-hackathon-starter.vercel.app — already live   |
+| Live app (deploy)             | https://glory-map.vercel.app — already live   |
 | Supabase (database + auth)    | shared team project, connected in prod ✅                    |
 | Vercel (publishing)           | linked to the repo: **any push = auto-deploy to the web**   |
 | Supabase keys                 | baked into the repo, nothing to fill in                     |

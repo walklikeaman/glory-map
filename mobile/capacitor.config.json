@@ -3,7 +3,7 @@
   "appName": "GloryMap",
   "webDir": "www",
   "server": {
-    "url": "https://codex-hackathon-starter.vercel.app",
+    "url": "https://glory-map.vercel.app",
     "errorPath": "index.html"
   },
   "ios": {

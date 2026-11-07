@@ -8,7 +8,7 @@
 // further than it already went.
 
 const PRODUCT = "GloryMap/1.1";
-const SITE = "https://codex-hackathon-starter.vercel.app/";
+const SITE = "https://glory-map.vercel.app/";
 
 export const USER_AGENT = `${PRODUCT} (${SITE})`;
 export const CONTACT_USER_AGENT = `${PRODUCT} (${SITE}; nakonechnyi.n@gmail.com)`;

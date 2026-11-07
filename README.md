@@ -6,7 +6,7 @@ Every day, we watch films, follow series for years, and get lost in books that s
 
 GloryMap turns that connection into a real journey.
 
-[🌍 Explore the GloryMap demo](https://codex-hackathon-starter.vercel.app)
+[🌍 Explore the GloryMap demo](https://glory-map.vercel.app)
 
 ## 💭 The problem
 
@@ -236,13 +236,13 @@ npm run build
 
 Open the demo, connect your story collection, choose a city, and see where your favorite worlds meet the real one.
 
-### [🌍 Launch the live demo →](https://codex-hackathon-starter.vercel.app)
+### [🌍 Launch the live demo →](https://glory-map.vercel.app)
 
 ## ✅ What judges can test today
 
 No account or credentials are required for the deployed application.
 
-1. Open the [live demo](https://codex-hackathon-starter.vercel.app).
+1. Open the [live demo](https://glory-map.vercel.app).
 2. Search for a city, or keep London selected.
 3. Explore the visible pins or search for a film, series, or book.
 4. Open a location card to inspect its story context, source, and imagery.

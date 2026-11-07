@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base="https://codex-hackathon-starter.vercel.app"
+          base="https://glory-map.vercel.app"
           status="$(curl -sS --max-time 30 -o /tmp/home.html -w '%{http_code}' "$base/")"
           echo "GET / -> ${status}"
           test "${status}" = "200"
