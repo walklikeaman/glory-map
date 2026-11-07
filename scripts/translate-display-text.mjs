@@ -1,22 +1,25 @@
 #!/usr/bin/env node
-// English renderings for every non-Latin name and scene note the map shows.
+// English for every non-Latin place name (and, on request, scene note) the map shows.
 //
-//   ANTHROPIC_API_KEY=$GLORYMAP_ANTHROPIC_KEY ANTHROPIC_MODEL=claude-haiku-5-5 \
-//     node scripts/translate-display-text.mjs --limit 10          # try 10, print them
-//   ... --limit 10 --write                                         # and store them
-//   ... --write                                                    # everything missing
+//   node scripts/translate-display-text.mjs --limit 10            # try 10 names, print them
+//   ... --write                                                    # every missing name, stored
 //   ... --bbox 34.2,29.4,35.9,33.4                                  # only inside a box
+//   ANTHROPIC_API_KEY=$GLORYMAP_ANTHROPIC_KEY ... --notes --write   # also translate notes
 //
-// Reads the queue rows the map draws (location_submissions with a point, not rejected,
-// not yet promoted) and the checked places, keeps the strings written in a non-Latin
-// script that have no rendering yet, and asks Claude for English in batches. Writes go to
-// `text_translations` with the service key; /api/map/points reads them. See
-// app/lib/display-language.mjs for why this is done ahead of time and not per request.
+// Names are never translated: each is looked up on Wikidata in its own language, near its
+// pin, and the entity's English label is stored (free, no model). A name Wikidata does not
+// know stays in its own script. Scene notes have no canonical English, so they are only
+// rendered by Claude when --notes is passed. Reads the queue rows the map draws and the
+// checked places; writes `text_translations` with the service key; /api/map/points reads
+// them. See app/lib/display-language.mjs.
 
 import process from "node:process";
 import { z } from "zod";
 
-import { needsEnglish, servedNote, textKey } from "../app/lib/display-language.mjs";
+import {
+  englishNameFromWikidata, needsEnglish, searchLanguage, servedNote, textKey,
+} from "../app/lib/display-language.mjs";
+import { CONTACT_USER_AGENT } from "../app/lib/user-agent.mjs";
 import { createModelClient, parseStructured, TIERS } from "../app/lib/model-client.mjs";
 
 const args = process.argv.slice(2);
@@ -24,6 +27,7 @@ const flag = (name) => args.includes(name);
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
 
 const WRITE = flag("--write");
+const NOTES = flag("--notes");
 const LIMIT = option("--limit") ? Number(option("--limit")) : Infinity;
 const BBOX = option("--bbox")?.split(",").map(Number) ?? null;
 const BATCH = 25;
@@ -63,16 +67,18 @@ const queue = await readAll(
 );
 const places = await readAll("places?select=name,lat,lng&order=id.asc");
 
-// kind is what the model is told the string is; a name and a sentence want different care.
+// A name keeps the first pin it was seen at, which is where Wikidata must agree it is.
 const wanted = new Map();
-const want = (text, kind) => {
-  if (needsEnglish(text) && !wanted.has(textKey(text))) wanted.set(textKey(text), { text, kind });
+const want = (text, kind, row) => {
+  if (needsEnglish(text) && !wanted.has(textKey(text))) {
+    wanted.set(textKey(text), { text, kind, at: { lat: row.lat, lng: row.lng } });
+  }
 };
 for (const row of queue.filter(inBox)) {
-  want(row.place_name, "place name");
-  want(servedNote(row.source_sentence), "scene note");
+  want(row.place_name, "place name", row);
+  if (NOTES) want(servedNote(row.source_sentence), "scene note", row);
 }
-for (const row of places.filter(inBox)) want(row.name, "place name");
+for (const row of places.filter(inBox)) want(row.name, "place name", row);
 
 // Before the migration the table is missing; a dry run can still show what it would write.
 const done = new Set((await readAll("text_translations?select=source_md5&order=source_md5.asc")
@@ -82,25 +88,47 @@ const todo = [...wanted.entries()].filter(([md5]) => !done.has(md5)).slice(0, LI
 console.log(`${wanted.size} non-Latin strings in view, ${done.size} already rendered, ${todo.length} to do`);
 if (todo.length === 0) process.exit(0);
 
+const rendered = [];
+
+// --- Names: Wikidata's English label, never a translation ---------------------------
+async function wikidata(params) {
+  const response = await fetch(`https://www.wikidata.org/w/api.php?${new URLSearchParams({ ...params, format: "json" })}`, {
+    headers: { "User-Agent": CONTACT_USER_AGENT },
+  });
+  if (!response.ok) throw new Error(`wikidata ${response.status}`);
+  return response.json();
+}
+
+let unmatched = 0;
+for (const [md5, item] of todo.filter(([, entry]) => entry.kind === "place name")) {
+  const lang = searchLanguage(item.text);
+  const search = await wikidata({ action: "wbsearchentities", search: item.text, language: lang, uselang: "en", limit: 7 });
+  const hits = search.search ?? [];
+  const entities = hits.length
+    ? (await wikidata({
+      action: "wbgetentities", ids: hits.map((hit) => hit.id).join("|"),
+      props: "labels|claims", languages: `${lang}|en`,
+    })).entities
+    : {};
+  const found = englishNameFromWikidata(item.text, item.at, hits, entities);
+  if (!found) { unmatched += 1; console.log(`${item.text}  →  (no match, stays as is)`); continue; }
+  rendered.push({ source_md5: md5, source: item.text, english: found.english, source_lang: lang, method: `wikidata:${found.id}` });
+}
+console.log(`names: ${rendered.length} matched on Wikidata, ${unmatched} left in their own script`);
+
+// --- Notes: only when asked, by Claude ----------------------------------------------
+const notes = todo.filter(([, entry]) => entry.kind === "scene note");
 // Haiku unless told otherwise: this is a rendering job, and the cost line below is priced for it.
-const runtime = createModelClient(
+const runtime = notes.length === 0 ? null : createModelClient(
   { ...process.env, ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || "claude-haiku-5-5" },
   { tier: TIERS.CAREFUL },
 );
-if (runtime?.provider !== "anthropic") {
+if (notes.length > 0 && runtime?.provider !== "anthropic") {
   console.error("Set ANTHROPIC_API_KEY (in the cloud: ANTHROPIC_API_KEY=$GLORYMAP_ANTHROPIC_KEY).");
   process.exit(1);
 }
 
-const INSTRUCTIONS = `You render text from a film-locations map into English for English-speaking visitors.
-
-Each item is either a "place name" or a "scene note".
-
-Place names: give the name an English-language map, guidebook or English Wikipedia uses (רחוב רוטשילד → "Rothschild Boulevard", יפו → "Jaffa", מלון המלך דוד → "King David Hotel", הכותל המערבי → "Western Wall"). Translate generic words (street, hotel, museum, beach, desert, kibbutz stays "Kibbutz"). Only transliterate when no English name exists. Keep it short: the name only, no explanation, no quotes.
-
-Scene notes: translate faithfully and plainly into English, one or two sentences, keeping film titles and proper names as they are known in English. Do not add facts.
-
-Return one entry per item, with the same id.`;
+const INSTRUCTIONS = `You translate scene notes from a film-locations map into English for English-speaking visitors: faithfully and plainly, one or two sentences, keeping film titles and place names as they are known in English. Do not add facts. Return one entry per item, with the same id.`;
 
 const Schema = z.object({
   items: z.array(z.object({ id: z.number().int(), english: z.string() })),
@@ -108,10 +136,9 @@ const Schema = z.object({
 
 let tokensIn = 0;
 let tokensOut = 0;
-const rendered = [];
-for (let start = 0; start < todo.length; start += BATCH) {
-  const batch = todo.slice(start, start + BATCH);
-  const input = JSON.stringify(batch.map(([, item], index) => ({ id: index, kind: item.kind, text: item.text })));
+for (let start = 0; start < notes.length; start += BATCH) {
+  const batch = notes.slice(start, start + BATCH);
+  const input = JSON.stringify(batch.map(([, item], index) => ({ id: index, text: item.text })));
   const result = await parseStructured({ runtime, schema: Schema, schemaName: "renderings", instructions: INSTRUCTIONS, input });
   if (!result.ok) {
     console.error(`batch at ${start} failed: ${result.reason} ${result.detail ?? ""}`);
@@ -124,13 +151,13 @@ for (let start = 0; start < todo.length; start += BATCH) {
     const english = item.english.trim();
     // A repeated id would put one key twice into the upsert, and Postgres refuses the batch.
     if (!entry || !english || needsEnglish(english) || rendered.some((row) => row.source_md5 === entry[0])) continue;
-    rendered.push({ source_md5: entry[0], source: entry[1].text, english, method: `claude:${result.model}` });
+    rendered.push({ source_md5: entry[0], source: entry[1].text, english, source_lang: searchLanguage(entry[1].text), method: `claude:${result.model}` });
   }
 }
 
 for (const row of rendered) console.log(`${row.source.slice(0, 60)}  →  ${row.english.slice(0, 90)}`);
 const cost = (tokensIn * PRICE_IN + tokensOut * PRICE_OUT) / 1e6;
-console.log(`${rendered.length} rendered, ${tokensIn} in / ${tokensOut} out tokens, about $${cost.toFixed(3)}`);
+console.log(`${rendered.length} rendered${notes.length ? `, notes cost ${tokensIn} in / ${tokensOut} out tokens, about $${cost.toFixed(3)}` : ""}`);
 
 if (!WRITE) {
   console.log("Dry run: nothing written. Add --write to store them.");
