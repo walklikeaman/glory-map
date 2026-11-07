@@ -7,6 +7,20 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | Linking Letterboxd / IMDb accounts: RSS by username now, Trakt/Simkl later
+**Scenario**: Nikita asked for a way to connect Letterboxd or IMDb beyond file export.
+**Findings**: Letterboxd API is private, approval-only. IMDb has no user API; ratings/watchlist
+export needs the user's login, and scraping is against its Conditions of Use. Letterboxd's public
+RSS (`letterboxd.com/{user}/rss/`) is official, carries `tmdb:movieId`, but only the recent diary.
+Trakt and Simkl have real OAuth APIs and import from Letterboxd/IMDb, so they are the only "real
+account link" path for IMDb; Trakt's terms say personal non-commercial use, Simkl is free under
+$150/month revenue (OAuth PKCE, needs a client id registered by the owner).
+**Decision**: shipped "Link Letterboxd by username" (PR #349): `GET /api/import/letterboxd-feed`,
+handle kept in localStorage, quiet re-sync once per visit after the account settles. ZIP stays the
+first full fill. Not verified against live Letterboxd from Vercel (cloud proxy blocks it); the UI
+falls back to "upload the ZIP" if Letterboxd refuses.
+**Next**: a Simkl or Trakt OAuth connector if Nikita registers an app (covers IMDb too).
+
 ## [2026-11-06] decision | Native iPhone app: a Capacitor shell over the live site
 **Object**: `mobile/` (own `package.json`, Capacitor 8 iOS project, SPM, no CocoaPods).
 **Scenario**: Nikita wants a real iPhone app, not "add to Home Screen".
