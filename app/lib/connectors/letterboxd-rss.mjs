@@ -7,12 +7,25 @@
 // server route fetches the feed with a browser User-Agent (Letterboxd 403s a
 // bare server request) and hands the XML string here.
 
+import { RATING_SCALE, toTenPoint } from "../media-sources.mjs";
+
 const HANDLE_PATTERN = /^[A-Za-z0-9_]{1,40}$/;
 
 // Letterboxd handles are alphanumerics/underscores. Reject anything else so the
 // route never interpolates junk into the feed URL.
 export function isLetterboxdHandle(value) {
   return typeof value === "string" && HANDLE_PATTERN.test(value);
+}
+
+// What a person types: "dave", "@dave", or their profile link pasted from the browser
+// ("https://letterboxd.com/dave/films/"). Returns the bare handle, or null.
+export function letterboxdHandleFrom(input) {
+  if (typeof input !== "string") return null;
+  let value = input.trim();
+  const fromUrl = value.match(/^(?:https?:\/\/)?(?:www\.)?letterboxd\.com\/([^/?#]+)/i);
+  if (fromUrl) value = fromUrl[1];
+  value = value.replace(/^@/, "");
+  return isLetterboxdHandle(value) ? value : null;
 }
 
 export function letterboxdRssUrl(handle) {
@@ -65,4 +78,21 @@ export function parseLetterboxdRss(xml) {
   }
 
   return films;
+}
+
+// The feed's films in the shape the personal library holds (the same rows a Letterboxd
+// CSV import produces), so `mergeLibraries` treats a synced profile and an uploaded
+// export as one source.
+export function libraryFromLetterboxdFeed(films) {
+  return films.map((film) => ({
+    id: `letterboxd:tmdb:${film.tmdbId}`,
+    title: film.title,
+    year: film.year,
+    rating: toTenPoint(film.rating, "letterboxd"),
+    ratingScale: RATING_SCALE,
+    watchedDate: film.watchedDate,
+    url: null,
+    imdbId: null,
+    sources: ["letterboxd"],
+  }));
 }

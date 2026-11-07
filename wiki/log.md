@@ -13,6 +13,19 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 **Decision**: a guest sees ONE welcome screen ("the map shows all of them; sign in to pick your own films"), with Skip pinned in the top corner. Picking films belongs to an account: after sign-in with an empty library the deck is offered once per device (`deckOffered`). The deck now has two answers, right = "On my map" and left = "Not for me", spelled out under the card and on two big buttons, and it deals 20 posters, not 60. A signed-in reader with a library opens on "Only my films" once per page load; a guest keeps the whole map.
 **Why the tour repeated**: the email link and Google sign-in open in Safari (see the iPhone app entry), a separate storage with no first-run record. The welcome now holds back when storage has a Supabase session (`sb-*-auth-token`) or the URL carries `code=` / `access_token=` / `token_hash=`, and a welcome still open when the session arrives is closed.
 **Kept**: old records with "known"/"saved" answers still count as "mine".
+## [2026-11-07] decision | Linking Letterboxd / IMDb accounts: RSS by username now, Trakt/Simkl later
+**Scenario**: Nikita asked for a way to connect Letterboxd or IMDb beyond file export.
+**Findings**: Letterboxd API is private, approval-only. IMDb has no user API; ratings/watchlist
+export needs the user's login, and scraping is against its Conditions of Use. Letterboxd's public
+RSS (`letterboxd.com/{user}/rss/`) is official, carries `tmdb:movieId`, but only the recent diary.
+Trakt and Simkl have real OAuth APIs and import from Letterboxd/IMDb, so they are the only "real
+account link" path for IMDb; Trakt's terms say personal non-commercial use, Simkl is free under
+$150/month revenue (OAuth PKCE, needs a client id registered by the owner).
+**Decision**: shipped "Link Letterboxd by username" (PR #349): `GET /api/import/letterboxd-feed`,
+handle kept in localStorage, quiet re-sync once per visit after the account settles. ZIP stays the
+first full fill. Not verified against live Letterboxd from Vercel (cloud proxy blocks it); the UI
+falls back to "upload the ZIP" if Letterboxd refuses.
+**Next**: a Simkl or Trakt OAuth connector if Nikita registers an app (covers IMDb too).
 
 ## [2026-11-06] decision | Native iPhone app: a Capacitor shell over the live site
 **Object**: `mobile/` (own `package.json`, Capacitor 8 iOS project, SPM, no CocoaPods).
