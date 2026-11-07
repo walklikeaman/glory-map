@@ -7,6 +7,23 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] incident | Israel on the map; /api/resolve had written no links since 05.08
+**Scenario**: Nikita is in Israel and asked for Israeli films and points. Israel had one pin, and
+it was Petra, which is in Jordan. Only 12 of 942 Israeli or shot-in-Israel works were in `works`.
+**Done**: `scripts/ingest-country-works.mjs --country Q801 --category ...` added 879 works
+(`source='wikidata'`, undo: delete by source). `scripts/resolve-works.mjs` runs the
+`/api/resolve` handler over them. Result: 23 verified points in Israel and 43 candidates. Tel Aviv,
+Jerusalem and Haifa are in the gazetteer at their Wikidata coordinate (`anchor: "wikidata"`), and
+the city page says so.
+**Incident**: `work_place_links_require_evidence` is a deferred constraint trigger. The route sent
+links and their evidence in two PostgREST requests, which means two transactions, so every batch
+failed at commit after its places had been upserted. Fixed by the RPC `write_resolved_links`
+(migration 20261107000000), the same fix `promote_place` made for the review queue.
+**Gotchas (cloud egress)**: en.wikipedia `w/api.php` and rest_v1 answer 429, but `index.php?action=raw`
+works, so use `enrich-from-wikipedia.mjs --raw`. Wikimedia answers 429 to the plain UA and 200 to
+`CONTACT_USER_AGENT`. he.wikipedia.org is not on the allowlist, and that is where most Israeli
+filming detail lives.
+
 ## [2026-11-07] decision | Connected services live on the account; Simkl sign-in, Netflix, own list
 **Scenario**: Nikita registered a Simkl app (PKCE, client id only, redirect `/auth/simkl` on
 glory-map.vercel.app, the old domain and localhost:3000) and asked that all connections be for

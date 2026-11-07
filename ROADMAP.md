@@ -57,7 +57,7 @@ Build order (each step unblocks the next):
 
 - ~~**Step 0**~~ ✅ `content_graph` migration + `grounding.mjs`
 - 🟡 **Step 1** — Letterboxd RSS + import route + ID cross-walk **done**; Trakt / Kinopoisk / Goodreads / Open Library / Last.fm remain
-- ~~**Step 2**~~ ✅ Location Resolution Engine MVP (Wikidata Stage 0 + P31 classification, persist/dedup)
+- ~~**Step 2**~~ ✅ Location Resolution Engine MVP (Wikidata Stage 0 + P31 classification, persist/dedup); 07.11 links and their evidence are written in one transaction, and a country catalogue can be ingested and resolved from the shell (Israel first)
 - ~~**Step 3**~~ ✅ map reads from the graph: `place_class`+confidence inline, PostGIS bbox/cluster RPC, canvas markers
 - **Step 4** — growth (gated): budgeted web_search + one deferred GeoCLIP + Mapillary/Commons grounding module
 - 🟡 **Step 5** — TTS cache **done**; geo-trigger logic **done**; ambient audio reading `place_class` still to wire

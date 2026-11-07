@@ -92,6 +92,8 @@ export function createDirectoryCityHandler({
             lat: city.lat,
             lng: city.lng,
             radius_km: radiusKm,
+            // Where the centre came from, so the page does not claim to have measured it.
+            anchor: city.anchor ?? null,
           },
           works: rows.map((row) => ({
             id: row.work_id,
