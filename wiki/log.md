@@ -7,6 +7,16 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | Place names come from Wikidata, not from a translator
+**Scenario**: Nikita answered the translation question with "сравнивай названия на IMDb, не переводи".
+**Decision**: names are not machine-translated. `translate-display-text.mjs` looks each name up on
+Wikidata in its own language, keeps a hit within 25 km of the pin (exact label first), and stores
+its English label (`method = wikidata:Q…`). IMDb itself is not read: the cloud cannot reach it and
+its terms forbid copying its data; Wikidata's English labels are the names English Wikipedia and
+IMDb location lists use. Israel: 86 of 87 names matched, $0. Scene notes are only translated with
+`--notes` (Claude), so Hebrew notes stay Hebrew until Nikita says otherwise.
+Migration `20261107190000` applied to prod with his yes.
+
 ## [2026-11-07] decision | Pin cards: IMDb first, posters, English names over the original
 **Scenario**: in Jaffa Nikita saw a card titled "יפו", Hebrew notes, and a Wikipedia link as the
 only way to the film. He wants the film's own page (IMDb) first, a poster, and every non-Latin

@@ -116,3 +116,54 @@ export function localiseMapRows(rows, { works = new Map(), english = new Map(), 
     return out;
   });
 }
+
+// ---------------------------------------------------------------------------------------
+// Place names are NOT translated. Nikita, 2026-11-07: "сравнивай названия, не переводи" —
+// a place has an English name already, and a model's guess at it ("Mount of Olives
+// Cemetery", "Rothschild Road") is worse than none. So a name is looked up as an entity
+// on Wikidata, in its own language, and the entity's English label is used — the same
+// name English Wikipedia and IMDb's location lists use. IMDb itself is not read: its
+// terms forbid copying its data, and the cloud cannot reach it. Notes are sentences with
+// no such canonical form; they are only rendered when a run asks for it (--notes).
+
+const SEARCH_LANGUAGE = [
+  [/\p{Script=Hebrew}/u, "he"], [/\p{Script=Arabic}/u, "ar"], [/\p{Script=Cyrillic}/u, "ru"],
+  [/\p{Script=Greek}/u, "el"], [/[\p{Script=Hiragana}\p{Script=Katakana}]/u, "ja"],
+  [/\p{Script=Hangul}/u, "ko"], [/\p{Script=Han}/u, "zh"], [/\p{Script=Thai}/u, "th"],
+  [/\p{Script=Armenian}/u, "hy"], [/\p{Script=Georgian}/u, "ka"], [/\p{Script=Devanagari}/u, "hi"],
+];
+
+export function searchLanguage(text) {
+  for (const [pattern, lang] of SEARCH_LANGUAGE) if (pattern.test(String(text ?? ""))) return lang;
+  return null;
+}
+
+function kmBetween(a, b) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 12_742 * Math.asin(Math.sqrt(h));
+}
+
+// The English label of the search hit that IS this place: it must have a coordinate within
+// `maxKm` of our pin (two Jaffas, two Allenby Streets), and a hit whose own-language label
+// is exactly the name beats one that only matched an alias. `hits` are search results in
+// rank order; `entities` is wbgetentities output with labels (name's language + en) and
+// claims. Null when nothing qualifies — then the name stays as it is.
+export function englishNameFromWikidata(name, at, hits, entities, { maxKm = 25 } = {}) {
+  const lang = searchLanguage(name);
+  const qualified = [];
+  for (const [rank, hit] of (Array.isArray(hits) ? hits : []).entries()) {
+    const entity = entities?.[hit?.id];
+    const english = entity?.labels?.en?.value?.trim();
+    const value = entity?.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
+    if (!english || needsEnglish(english) || !value) continue;
+    const km = kmBetween(at, { lat: value.latitude, lng: value.longitude });
+    if (!(km <= maxKm)) continue;
+    const exact = entity?.labels?.[lang]?.value?.trim() === String(name).trim();
+    qualified.push({ id: hit.id, english, km, exact, rank });
+  }
+  qualified.sort((a, b) => Number(b.exact) - Number(a.exact) || a.rank - b.rank);
+  return qualified[0] ? { english: qualified[0].english, id: qualified[0].id } : null;
+}

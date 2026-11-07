@@ -180,3 +180,26 @@ test("a lookup that hangs is given up on, and the map still answers", async () =
   assert.equal(out.candidateRows[0].films[0].imdb_url, "https://www.imdb.com/title/tt0094666/");
   assert.deepEqual(logged, ["Map translations lookup timed out"]);
 });
+
+test("a name is searched in its own language", async () => {
+  const { searchLanguage } = await import("../app/lib/display-language.mjs");
+  assert.equal(searchLanguage("הר הזיתים"), "he");
+  assert.equal(searchLanguage("Красная площадь"), "ru");
+  assert.equal(searchLanguage("東京タワー"), "ja");
+  assert.equal(searchLanguage("Jaffa"), null);
+});
+
+test("Wikidata gives the English name only for a hit at this place, an exact label first", async () => {
+  const { englishNameFromWikidata } = await import("../app/lib/display-language.mjs");
+  const at = { lat: 31.778, lng: 35.244 };
+  const hits = [{ id: "Q1" }, { id: "Q2" }, { id: "Q3" }];
+  const coord = (lat, lng) => ({ P625: [{ mainsnak: { datavalue: { value: { latitude: lat, longitude: lng } } } }] });
+  const entities = {
+    Q1: { labels: { en: { value: "Mount of Olives (Kentucky)" }, he: { value: "הר הזיתים" } }, claims: coord(37.5, -85.3) },
+    Q2: { labels: { en: { value: "Mount of Olives Jewish Cemetery" }, he: { value: "בית הקברות בהר הזיתים" } }, claims: coord(31.776, 35.241) },
+    Q3: { labels: { en: { value: "Mount of Olives" }, he: { value: "הר הזיתים" } }, claims: coord(31.778, 35.244) },
+  };
+  assert.deepEqual(englishNameFromWikidata("הר הזיתים", at, hits, entities), { english: "Mount of Olives", id: "Q3" });
+  assert.equal(englishNameFromWikidata("הר הזיתים", { lat: 0.5, lng: 0.5 }, hits, entities), null);
+  assert.equal(englishNameFromWikidata("הר הזיתים", at, [], {}), null);
+});
