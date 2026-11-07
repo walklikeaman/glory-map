@@ -2,22 +2,47 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  CHOICE, choiceForSwipe, CHOICES, decide, emptyOnboarding, INTRO, libraryFromDecisions, loadOnboarding,
-  ONBOARDING_KEY, orderDeck, remainingCards, saveOnboarding, shouldOfferOnboarding, undoLast,
+  CHOICE, choiceForSwipe, CHOICES, decide, DECK_SIZE, emptyOnboarding, libraryFromDecisions, loadOnboarding,
+  looksSignedIn, ONBOARDING_KEY, orderDeck, remainingCards, saveOnboarding, shouldOfferDeck, shouldOfferOnboarding,
+  undoLast, WELCOME,
 } from "../app/lib/onboarding.mjs";
 import { mergeLibraries, workIsInLibrary } from "../app/lib/media-library.mjs";
 
 const film = (id, title, year) => ({ id, title, year, kind: "film" });
 const book = (id, title) => ({ id, title, year: 1890, kind: "book" });
 
-test("four short screens: the map of stories, what is near, tours, check-ins", () => {
-  assert.deepEqual(INTRO.map((screen) => screen.id), ["map", "nearby", "tours", "checkins"]);
+test("a guest gets one welcome screen that says the map shows everything", () => {
+  assert.match(WELCOME.text, /shows all of them/);
+  assert.match(WELCOME.text, /Sign in/);
 });
 
-test("it opens by itself only for somebody new", () => {
+test("the welcome opens by itself only for a new guest", () => {
   assert.equal(shouldOfferOnboarding(null, 0), true);
   assert.equal(shouldOfferOnboarding(null, 2422), false, "an imported library has said enough");
   assert.equal(shouldOfferOnboarding(emptyOnboarding(), 0), false, "seen once, even if skipped");
+  assert.equal(shouldOfferOnboarding(null, 0, true), false, "a signed-in reader is not toured again");
+});
+
+test("an account is recognised before the session loads: a stored session or a sign-in return", () => {
+  const storage = (keys) => Object.fromEntries(keys.map((key) => [key, "x"]));
+  assert.equal(looksSignedIn(storage(["sb-quvxxqxowathrcyshhwj-auth-token"]), "https://glory.map/"), true);
+  assert.equal(looksSignedIn(storage(["scenemap-library"]), "https://glory.map/"), false);
+  assert.equal(looksSignedIn({}, "https://glory.map/?code=abc"), true);
+  assert.equal(looksSignedIn({}, "https://glory.map/#access_token=abc&type=magiclink"), true);
+  assert.equal(looksSignedIn(null, "https://glory.map/?city=london"), false);
+});
+
+test("the poster deck is offered once, to an account with an empty library", () => {
+  assert.equal(shouldOfferDeck(null, 0), true);
+  assert.equal(shouldOfferDeck(emptyOnboarding(), 0), true, "a guest who saw the welcome still gets the deck after sign-in");
+  assert.equal(shouldOfferDeck({ ...emptyOnboarding(), deckOffered: true }, 0), false, "never twice");
+  assert.equal(shouldOfferDeck(null, 12), false, "a library already says which films are theirs");
+});
+
+test("the deck is short: twenty posters at most", () => {
+  const cards = Array.from({ length: 60 }, (_, i) => film(`f${i}`, `F${i}`, 2000));
+  assert.equal(DECK_SIZE, 20);
+  assert.equal(orderDeck(cards).length, 20);
 });
 
 test("a book is dealt every sixth card, and none is lost", () => {
@@ -71,11 +96,12 @@ test("the choices survive a reload; broken storage reads as no record", () => {
   assert.equal(ONBOARDING_KEY, "scenemap-onboarding");
 });
 
-test("a swipe answers by its direction, once it goes far enough", () => {
+test("two answers, like a dating app: right puts it on the map, left skips", () => {
   assert.equal(choiceForSwipe(120, 10), CHOICE.like);
   assert.equal(choiceForSwipe(-120, 30), CHOICE.skip);
-  assert.equal(choiceForSwipe(20, -140), CHOICE.known);
-  assert.equal(choiceForSwipe(-10, 130), CHOICE.saved);
+  assert.equal(choiceForSwipe(20, -140), null, "an up or down drag is not an answer");
   assert.equal(choiceForSwipe(40, -30), null, "a nudge is not an answer");
-  assert.deepEqual(CHOICES.map((choice) => choice.key), ["ArrowLeft", "ArrowDown", "ArrowUp", "ArrowRight"]);
+  assert.deepEqual(CHOICES.map((choice) => [choice.id, choice.swipe, choice.key]), [
+    [CHOICE.skip, "left", "ArrowLeft"], [CHOICE.like, "right", "ArrowRight"],
+  ]);
 });

@@ -5556,7 +5556,7 @@ figcaption a {
   .film-chip small { margin-bottom: 0; font-size: 0.7rem; }
 }
 
-/* --- The first run (#15): four screens, then the deck ------------------------------- */
+/* --- The first run (#15): a welcome for a guest, a poster deck once signed in -------- */
 .onboarding {
   position: fixed;
   inset: 0;
@@ -5569,6 +5569,7 @@ figcaption a {
 }
 
 .onboarding-panel {
+  position: relative;
   display: grid;
   gap: 14px;
   width: min(440px, 100%);
@@ -5580,7 +5581,32 @@ figcaption a {
   background: var(--panel-solid);
 }
 
-.onboarding-panel h2 { margin: 0; font-size: 1.4rem; }
+.onboarding-panel h2 { margin: 0; padding-right: 72px; font-size: 1.4rem; }
+
+/* Skip, always in the same corner and always visible: the owner looked for it and missed
+   it at the bottom of the screen. */
+.onboarding-skip {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.onboarding-stack { display: grid; gap: 8px; }
+.onboarding-stack .wide-button,
+.onboarding-stack .ghost-button { min-height: 48px; justify-content: center; }
 .onboarding-text { margin: 0; color: var(--muted); line-height: 1.55; }
 
 .onboarding-dots { display: flex; gap: 6px; }
@@ -5602,8 +5628,24 @@ figcaption a {
 .deck-stage {
   display: grid;
   place-items: center;
+  gap: 10px;
   min-height: 360px;
 }
+
+/* Which way is which, written under the card so the swipe is not a secret. */
+.deck-hints {
+  display: flex;
+  justify-content: space-between;
+  width: min(280px, 100%);
+}
+.deck-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: color 120ms;
+}
+.deck-hint.is-left.is-on { color: #e2725b; }
+.deck-hint.is-right.is-on { color: var(--green); }
 
 .deck-card {
   position: relative;
@@ -5641,8 +5683,6 @@ figcaption a {
 
 .deck-card.is-like { border-color: var(--green); }
 .deck-card.is-skip { border-color: #e2725b; }
-.deck-card.is-known,
-.deck-card.is-saved { border-color: var(--accent); }
 
 .deck-card-stamp {
   position: absolute;
@@ -5657,25 +5697,28 @@ figcaption a {
   font-weight: 700;
   white-space: nowrap;
 }
+.deck-card-stamp.is-like { background: var(--green); color: #0b0d0d; }
+.deck-card-stamp.is-skip { background: #e2725b; color: #0b0d0d; }
 
 .deck-buttons {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .deck-button {
   display: grid;
   justify-items: center;
   gap: 4px;
-  min-height: 60px;
+  min-height: 64px;
   padding: 8px 4px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1.2;
   text-align: center;
   cursor: pointer;
@@ -5684,14 +5727,17 @@ figcaption a {
 .deck-button:disabled { opacity: 0.4; cursor: default; }
 .deck-button.is-like { color: var(--green); }
 .deck-button.is-skip { color: #e2725b; }
-.deck-button.is-known,
-.deck-button.is-saved { color: var(--accent); }
 .deck-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media (max-height: 700px) {
   .deck-stage { min-height: 260px; }
   .deck-card img, .deck-card-blank { width: 140px; height: 210px; }
   .deck-card { width: 160px; }
+}
+
+@media (max-width: 380px) {
+  .deck-card { width: 180px; }
+  .deck-card img, .deck-card-blank { width: 160px; height: 240px; }
 }
 
 /* The moderator's queue of readers' suggestions (#48), at /review. */

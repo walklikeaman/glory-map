@@ -7,6 +7,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | First run cut down: one welcome for guests, a poster deck after sign-in (UX-9)
+**Object**: `app/lib/onboarding.mjs`, `app/components/Onboarding.jsx`, the sign-in hydration in `SceneMapApp.jsx`.
+**Scenario**: Nikita tried the iPhone app. Four intro screens and a 60-card, four-way deck (Like / Already know / Save / Not interested) were too much. He missed the Skip button, didn't notice the swipes, and couldn't tell what his answers did. After he signed in he was shown the whole tour again.
+**Decision**: a guest sees ONE welcome screen ("the map shows all of them; sign in to pick your own films"), with Skip pinned in the top corner. Picking films belongs to an account: after sign-in with an empty library the deck is offered once per device (`deckOffered`). The deck now has two answers, right = "On my map" and left = "Not for me", spelled out under the card and on two big buttons, and it deals 20 posters, not 60. A signed-in reader with a library opens on "Only my films" once per page load; a guest keeps the whole map.
+**Why the tour repeated**: the email link and Google sign-in open in Safari (see the iPhone app entry), a separate storage with no first-run record. The welcome now holds back when storage has a Supabase session (`sb-*-auth-token`) or the URL carries `code=` / `access_token=` / `token_hash=`, and a welcome still open when the session arrives is closed.
+**Kept**: old records with "known"/"saved" answers still count as "mine".
 ## [2026-11-07] decision | Linking Letterboxd / IMDb accounts: RSS by username now, Trakt/Simkl later
 **Scenario**: Nikita asked for a way to connect Letterboxd or IMDb beyond file export.
 **Findings**: Letterboxd API is private, approval-only. IMDb has no user API; ratings/watchlist

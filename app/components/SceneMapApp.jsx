@@ -54,7 +54,8 @@ import StoryTrail from "./StoryTrail.jsx";
 import { AppNav, SectionSheet } from "./AppSections.jsx";
 import Onboarding from "./Onboarding.jsx";
 import {
-  decide, emptyOnboarding, libraryFromDecisions, loadOnboarding, saveOnboarding, shouldOfferOnboarding, undoLast,
+  decide, emptyOnboarding, libraryFromDecisions, loadOnboarding, looksSignedIn, saveOnboarding, shouldOfferDeck,
+  shouldOfferOnboarding, undoLast,
 } from "../lib/onboarding.mjs";
 import { loadSuggestions, saveSuggestions } from "../lib/suggestions.mjs";
 import WalkControls from "./WalkControls.jsx";
@@ -1243,10 +1244,10 @@ export default function SceneMapApp() {
   const [section, setSection] = useState("map");
   const [suggestions, setSuggestions] = useState([]);
   useEffect(() => { setSuggestions(loadSuggestions(window.localStorage)); }, []);
-  // The first run (#15). Offered by itself only to somebody new — no record of it, and no
-  // library anywhere on this device — and from the profile any time after.
+  // The first run (#15). A new guest gets one welcome screen; somebody signed in with an
+  // empty library is offered the poster deck once; both open from the profile any time.
   const [onboarding, setOnboarding] = useState(emptyOnboarding);
-  const [onboardingOpen, setOnboardingOpen] = useState(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(null); // null | "welcome" | "deck"
   useEffect(() => {
     const record = loadOnboarding(window.localStorage);
     if (record) setOnboarding(record);
@@ -1259,7 +1260,9 @@ export default function SceneMapApp() {
       // Storage refused: nothing is known about a library, so nothing is offered.
       return;
     }
-    if (shouldOfferOnboarding(record, stored)) setOnboardingOpen("intro");
+    if (shouldOfferOnboarding(record, stored, looksSignedIn(window.localStorage, window.location.href))) {
+      setOnboardingOpen("welcome");
+    }
   }, []);
 
   function updateOnboarding(next) {
@@ -1416,6 +1419,7 @@ export default function SceneMapApp() {
         localStorage.removeItem(GUEST_LIBRARY_KEY);
         setLibraryStorageKey(userStorageKey);
         setLibrary(mergedLibrary);
+        onSignedIn(mergedLibrary.length);
         setAccountStatus("signed_in");
         setCloudReady(true);
         setCloudStatus("Synced to your account");
@@ -1425,6 +1429,27 @@ export default function SceneMapApp() {
         setLibrary(mergeLibraries(cachedAccountLibrary, guestLibrary));
         setAccountStatus("error");
         setCloudStatus("Cloud sync is unavailable. Your library is still saved on this device.");
+      }
+    }
+
+    // Signed in, the map is about the reader's own films: with a library it opens on
+    // "Only my films" (once per load, so switching it off sticks), and with none yet the
+    // poster deck is offered — once on this device. A welcome still open from before
+    // the session was known is closed; the owner was shown the tour again after sign-in.
+    let shownMine = false;
+    function onSignedIn(libraryCount) {
+      if (libraryCount > 0 && !shownMine) {
+        shownMine = true;
+        setMineOnly(true);
+      }
+      const record = loadOnboarding(window.localStorage) ?? emptyOnboarding();
+      if (shouldOfferDeck(record, libraryCount)) {
+        const next = { ...record, done: true, deckOffered: true };
+        setOnboarding(next);
+        saveOnboarding(window.localStorage, next);
+        setOnboardingOpen("deck");
+      } else {
+        setOnboardingOpen((open) => (open === "welcome" ? null : open));
       }
     }
 
@@ -5185,9 +5210,11 @@ export default function SceneMapApp() {
       <AppNav section={section} onSection={setSection} />
       {onboardingOpen && (
         <Onboarding
+          key={onboardingOpen}
+          mode={onboardingOpen}
           state={onboarding}
           center={mapCenter}
-          startAt={onboardingOpen}
+          onSignIn={supabase && !accountUser ? () => { finishOnboarding(); setAccountOpen(true); } : null}
           onDecide={(card, choice) => updateOnboarding(decide(onboarding, card, choice))}
           onUndo={() => updateOnboarding(undoLast(onboarding))}
           onFinish={finishOnboarding}

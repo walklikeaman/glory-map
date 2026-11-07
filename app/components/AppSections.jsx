@@ -227,11 +227,11 @@ function ProfileView({ marks, accountUser, onOpenInterests, onOpenAccount }) {
         )}
       </section>
       <section className="section-block">
-        <h3>Your interests</h3>
-        <p className="section-note">Swipe through the best-known stories on the map; what you like fills &ldquo;Only my films&rdquo;.</p>
+        <h3>Your films</h3>
+        <p className="section-note">Swipe through posters: right puts a film on your map, left skips it. &ldquo;Only my films&rdquo; then shows just those.</p>
         <button type="button" className="ghost-button" onClick={onOpenInterests}>
           <Heart size={16} aria-hidden="true" />
-          Pick your interests
+          Pick my films
         </button>
       </section>
       <p className="section-note">Kept on this device. {accountUser ? "" : "Signing in keeps your movie list, not these visits."}</p>
