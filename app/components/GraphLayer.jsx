@@ -12,52 +12,47 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { workPath } from "../lib/work-url.mjs";
-import { candidateSummary, pointFilmLine, pointHint, pointSummary, viewportQuery } from "../lib/map-layer.mjs";
+import { bubbleFeatures, candidateSummary, pointFilmLine, pointHint, pointSummary, viewportQuery } from "../lib/map-layer.mjs";
+import { placePath } from "../lib/place-url.mjs";
 import { describedFilms, listingLine, sourceLabel } from "../lib/place-note.mjs";
 import { useGeoJsonLayer, useMapCanvas, claimClick } from "./map/MapCanvas.jsx";
-import { MapPopup, PinLayer } from "./map/layers.jsx";
+import { MapPopup, PinLayer, nearestHit } from "./map/layers.jsx";
 
 const REFRESH_DEBOUNCE_MS = 300;
 
-// How far a cluster bubble grows with what it holds. Logarithmic for the same reason the
-// pins are: linear saturates at once and draws 50 places the same as 5,000.
-function clusterRadius(count) {
-  const n = Number(count);
-  if (!Number.isFinite(n) || n <= 1) return 14;
-  return Math.round(Math.min(30, 14 + Math.log10(n) * 8));
-}
+// The bubbles the database returns when the viewport is too wide for places: the checked
+// places' and the queue's, from `bubbleFeatures`. The source clusters them once more, so a
+// cell holding both is one bubble whose number is their sum. Filled when a checked place is
+// inside, hollow when it is all unchecked reports, violet with a studio lot.
+const BUBBLE_TOTAL = ["case", ["has", "point_count"], ["get", "total"], ["get", "count"]];
 
-// The bubbles the database returns when the viewport is too wide for places. Amber unless
-// the bubble holds a studio lot, which keeps the one colour distinction the pins make.
 function ClusterLayer({ features, onZoomInto }) {
   const map = useMapCanvas();
 
-  const data = useMemo(() => ({
-    type: "FeatureCollection",
-    features: (features ?? []).map((feature) => ({
-      type: "Feature",
-      geometry: feature.geometry,
-      properties: {
-        count: feature.properties?.point_count ?? 0,
-        label: String(feature.properties?.point_count ?? 0),
-        radius: clusterRadius(feature.properties?.point_count),
-        ring: feature.properties?.has_studio ? "#b98cff" : "#f7b733",
-      },
-    })),
-  }), [features]);
+  const data = useMemo(() => ({ type: "FeatureCollection", features: features ?? [] }), [features]);
 
   useGeoJsonLayer({
     id: "graph-clusters",
     data,
+    source: {
+      cluster: true,
+      clusterRadius: 44,
+      clusterProperties: {
+        total: ["+", ["get", "count"]],
+        checked: ["any", ["get", "checked"]],
+        studio: ["any", ["get", "studio"]],
+      },
+    },
     layers: [
       {
         id: "graph-clusters-circles",
         type: "circle",
         paint: {
-          "circle-radius": ["get", "radius"],
-          "circle-color": "#16130c",
-          "circle-opacity": 0.78,
-          "circle-stroke-color": ["get", "ring"],
+          // Same growth curve as the pins' bubbles in pin-style.mjs.
+          "circle-radius": ["min", 30, ["+", 14, ["*", 8, ["log10", ["max", 1, BUBBLE_TOTAL]]]]],
+          "circle-color": ["case", ["get", "checked"], ["case", ["get", "studio"], "#b98cff", "#f7b733"], "#16130c"],
+          "circle-opacity": ["case", ["get", "checked"], 0.92, 0.8],
+          "circle-stroke-color": ["case", ["get", "checked"], "rgba(255, 255, 255, 0.85)", ["get", "studio"], "#b98cff", "#f7b733"],
           "circle-stroke-width": 2,
         },
       },
@@ -65,12 +60,13 @@ function ClusterLayer({ features, onZoomInto }) {
         id: "graph-clusters-labels",
         type: "symbol",
         layout: {
-          "text-field": ["get", "label"],
+          "text-field": ["to-string", BUBBLE_TOTAL],
           "text-size": 12,
           "text-font": ["Noto Sans Bold"],
           "text-allow-overlap": true,
+          "text-ignore-placement": true,
         },
-        paint: { "text-color": "#f7e2b0" },
+        paint: { "text-color": ["case", ["get", "checked"], "#16130c", "#f7e2b0"] },
       },
     ],
   });
@@ -83,7 +79,7 @@ function ClusterLayer({ features, onZoomInto }) {
     const layers = ["graph-clusters-circles", "graph-clusters-labels"];
 
     const pick = (event) => {
-      const hit = map.queryRenderedFeatures(event.point, { layers })[0];
+      const hit = nearestHit(map, event.point, layers);
       if (!hit) return;
       claimClick(event);
       zoomRef.current?.(hit.geometry.coordinates);
@@ -106,6 +102,43 @@ function ClusterLayer({ features, onZoomInto }) {
   }, [map]);
 
   return null;
+}
+
+// The films behind a checked place, for its popup. The map response carries only a count
+// for these (the queue rows carry their films), and a popup that says "4 films" without
+// naming one left the reader on a phone with nothing to tap.
+function PlaceFilms({ placeId }) {
+  const [films, setFilms] = useState(null);
+
+  useEffect(() => {
+    if (!placeId) return undefined;
+    const controller = new AbortController();
+    setFilms(null);
+    fetch(`/api/place?id=${encodeURIComponent(placeId)}`, { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        const seen = new Set();
+        setFilms((body?.facts ?? []).filter((fact) => {
+          if (fact.subject_type !== "work" || !fact.subject_id || seen.has(fact.subject_id)) return false;
+          seen.add(fact.subject_id);
+          return true;
+        }));
+      })
+      .catch((error) => { if (error?.name !== "AbortError") setFilms([]); });
+    return () => controller.abort();
+  }, [placeId]);
+
+  if (!films?.length) return null;
+  return (
+    <ul className="point-films">
+      {films.map((fact) => (
+        <li key={fact.subject_id}>
+          <a href={workPath({ id: fact.subject_id, title: fact.subject_name })}>{fact.subject_name}</a>
+          {fact.role_label ? <span className="point-film-note">{fact.role_label}</span> : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 // The key the pin layer gives a point: latitude first, as everywhere in this app.
@@ -259,8 +292,11 @@ function GraphLayer({
   }, [visibleCandidates, onCandidatesInView]);
 
   const clusters = useMemo(
-    () => data.features.filter((feature) => data.clustered || feature.properties?.cluster),
-    [data.features, data.clustered],
+    () => bubbleFeatures(
+      data.features.filter((feature) => data.clustered || feature.properties?.cluster),
+      visibleCandidates,
+    ),
+    [data.features, data.clustered, visibleCandidates],
   );
   const places = useMemo(
     () => data.features.filter((feature) => !(data.clustered || feature.properties?.cluster)),
@@ -406,6 +442,12 @@ function GraphLayer({
               <span className={`graph-badge badge-${openProps.badge}`}>{pointSummary(openProps)}</span>
               <br />
               <small>{pointHint(openProps)}</small>
+              <PlaceFilms placeId={openProps.place_id} />
+              {placePath({ id: openProps.place_id, name: openProps.name }) && (
+                <a className="popup-open-place" href={placePath({ id: openProps.place_id, name: openProps.name })}>
+                  Open this place
+                </a>
+              )}
             </>
           )}
         </MapPopup>

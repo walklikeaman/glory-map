@@ -65,7 +65,37 @@ export function pinFeatureProperties(props = {}) {
     label: pinLabel(count),
     many: Number.isFinite(count) && count > 1,
     selected: props.selected === true,
+    // What the pin says under itself once the reader has zoomed in to street level: the
+    // film, because that is what they came for, and the place's own name when we hold no
+    // film title for it. A row of bare dots at z16 was "просто точки" on a phone.
+    title: pinTitle(props),
   };
+}
+
+// The first film's title, plus "+N" when the point holds more, else the place name.
+export function pinTitle(props = {}) {
+  const films = Array.isArray(props.films) ? props.films : [];
+  const first = films.find((film) => film?.title)?.title;
+  if (!first) return String(props.name ?? "");
+  const total = Number(props.work_count ?? films.length);
+  return Number.isFinite(total) && total > 1 ? `${first} +${total - 1}` : first;
+}
+
+// From this zoom every unclustered pin carries its title (the ranked names in
+// `placeLabels` show earlier). Bubbles split at CLUSTER_UNCHECKED_UNTIL_ZOOM + 1, so this is
+// the first zoom where every pin stands alone.
+export const TITLES_FROM_ZOOM = 15;
+
+// The label under a pin: the ranked name when it earned one, and from TITLES_FROM_ZOOM
+// every other pin's title too. MapLibre drops names that collide, so a crowded street
+// shows the ones that fit rather than a smear.
+export function pinNameTextField() {
+  return [
+    "step", ["zoom"],
+    ["get", "placeLabel"],
+    TITLES_FROM_ZOOM,
+    ["case", ["!=", ["get", "placeLabel"], ""], ["get", "placeLabel"], ["get", "title"]],
+  ];
 }
 
 // MapLibre measures a circle by its radius; the vocabulary is written in diameters.

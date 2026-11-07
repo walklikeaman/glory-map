@@ -7,6 +7,23 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] incident | Phone map: pins vanished on zoom-out, taps did nothing
+**Scenario**: Nikita tried the iPhone app in Tel Aviv: pins disappear when zooming out, a tap on a
+pin does nothing, pins carry no names, "Approximate · 4 works" means nothing, and "Listen as I
+walk" sits mid-screen.
+**Causes found** (Playwright, iPhone 13 viewport, local prod build on the live DB):
+- Below z12 `/api/map/points` returns the queue as gridded `candidates`, and `GraphLayer` drew only
+  the graph's clusters. The queue is ~99% of the map, so zooming out left a handful of bubbles
+  (Tel Aviv z10: 4 drawn, 17 after the fix). Both halves now go into one client-clustered source
+  (`bubbleFeatures`), so a cell holding both is one number.
+- Clicks were hit-tested at the exact pixel; an unchecked pin below z16 is an 8 px dot. Now the
+  nearest feature within 18 px (`nearestHit`, `TAP_SLOP_PX`).
+- A checked place's popup had only the badge line; it now lists its films from `/api/place` and
+  links to the place page. On a phone (≤639 px) the popup is a bottom sheet.
+- `.user-dot` was rendered but never styled, and the search radius was the same dashed amber ring
+  as "city only". Both are blue now, and the legend says so.
+**Rule**: anything tappable on the map is hit-tested with slop, never at the exact pixel.
+
 ## [2026-11-07] incident | Israel on the map; /api/resolve had written no links since 05.08
 **Scenario**: Nikita is in Israel and asked for Israeli films and points. Israel had one pin, and
 it was Petra, which is in Jordan. Only 12 of 942 Israeli or shot-in-Israel works were in `works`.
