@@ -432,3 +432,9 @@ test("Hebrew: a sentence saying the film was shot somewhere supports the role", 
   assert.equal(sentenceSupportsRole("העלילה מתרחשת בירושלים.", "filming_location"), false);
   assert.equal(sentenceSupportsRole("הספר נכתב בחיפה.", "author_place"), true);
 });
+
+test("the model is told to keep a place's name in the article's own script", () => {
+  // 07.11.2026: 75 places from Hebrew articles came back as "Jerusalem" for ירושלים and
+  // were dropped as quote_is_about_elsewhere, because the English name is not in the quote.
+  assert.match(extractionInstructions(), /never translated/);
+});
