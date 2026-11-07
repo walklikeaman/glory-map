@@ -83,6 +83,9 @@ const SECTION_RANK_BY_LANGUAGE = Object.freeze({
   it: ["produzione", "riprese", "luoghi delle riprese", "sviluppo"],
   ja: ["製作", "制作", "撮影", "ロケ地", "ロケーション"],
   pl: ["produkcja", "zdjęcia", "plenery", "miejsca zdjęć", "powstanie"],
+  // Read off live articles 07.11.2026: Shtisel nests "הפקה" and "אתרי צילום" under
+  // "יצירת הסדרה", Waltz with Bashir has a plain "הפקה", Beaufort only "רקע".
+  he: ["יצירת הסדרה", "יצירת הסרט", "הפקה", "צילומים", "אתרי צילום", "מקומות צילום", "רקע"],
 });
 
 // **A book is not made on a set, and its article says so in different words.**
@@ -109,6 +112,7 @@ const BOOK_SECTION_RANK_BY_LANGUAGE = Object.freeze({
   it: ["genesi", "stesura", "composizione", "contesto"],
   ja: ["成立", "執筆", "背景"],
   pl: ["geneza", "powstanie", "tło"],
+  he: ["כתיבת הספר", "כתיבה", "רקע"],
 });
 
 // Which table a work's article should be read with. A series is shot like a film; anything
@@ -140,6 +144,7 @@ export const MAX_LANGUAGES_PER_WORK = 3;
 const LANGUAGE_BY_WIKIDATA_ID = Object.freeze({
   Q1860: "en", Q150: "fr", Q188: "de", Q7737: "ru",
   Q1321: "es", Q652: "it", Q5287: "ja", Q809: "pl",
+  Q9288: "he",
 });
 
 // Only where the country implies ONE of the editions we can read. A multilingual country
@@ -150,6 +155,7 @@ const LANGUAGE_BY_COUNTRY_ID = Object.freeze({
   Q142: "fr", Q183: "de", Q40: "de", Q159: "ru",  // France, Germany, Austria, Russia
   Q29: "es", Q96: "es", Q414: "es",               // Spain, Mexico, Argentina
   Q38: "it", Q17: "ja", Q36: "pl",                // Italy, Japan, Poland
+  Q801: "he",                                     // Israel
 });
 
 function claimIds(entity, property) {

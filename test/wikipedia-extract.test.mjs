@@ -422,3 +422,13 @@ test("a person reaching the accept pass is dropped by name", () => {
   assert.equal(accepted.length, 0);
   assert.equal(rejected[0].reason, "names_a_person");
 });
+
+test("Hebrew: a sentence saying the film was shot somewhere supports the role", () => {
+  assert.equal(sentenceSupportsRole("הסרט צולם בעכו ובחיפה.", "filming_location"), true);
+  assert.equal(sentenceSupportsRole("הצילומים התקיימו בירושלים במשך שישה שבועות.", "filming_location"), true);
+  // A plan is not a place that was used.
+  assert.equal(sentenceSupportsRole("הסרט יצולם בתל אביב בשנה הבאה.", "filming_location"), false);
+  // A place inside the story says nothing about the shoot.
+  assert.equal(sentenceSupportsRole("העלילה מתרחשת בירושלים.", "filming_location"), false);
+  assert.equal(sentenceSupportsRole("הספר נכתב בחיפה.", "author_place"), true);
+});

@@ -400,16 +400,20 @@ test("a candidate in the wrong country is refused, even when it is the only one"
   assert.equal(chooseCandidate([ontario], { area: "England" }).candidates.length, 1);
 });
 
-test("the hint may refuse but never select", () => {
-  // Two real rivals. A hint naming one country does not promote that candidate — it only
-  // removes an answer that contradicts it. area_hint is written by a model, and letting an
-  // invented area pick between candidates is how a pin moves on a guess.
+test("a named country refuses the rivals outside it, and only a country does", () => {
+  // Until 07.11.2026 the hint could refuse only the WINNER, never the rivals. That kept
+  // Jerusalem, Tiberias and the Dead Sea off the map: a hamlet of the same name elsewhere
+  // has a population too, so "Jerusalem, Israel" stayed a tie. A named country now removes
+  // the candidates outside it; what is left still has to win on the old rules, and every
+  // row it produces still lands pending for review.
   const rivals = [
     at(52.2053, 0.1218, { name: "Cambridge", population: 145000, country: "United Kingdom" }),
     at(42.3736, -71.1097, { name: "Cambridge", population: 118000, country: "United States" }),
   ];
-  assert.equal(chooseCandidate(rivals, { area: "England" }).reason, "ambiguous_homonyms");
-  assert.equal(chooseCandidate(rivals, { area: "England" }).place, null);
+  assert.equal(chooseCandidate(rivals, { area: "England" }).place?.country, "United Kingdom");
+  // A hint that names no country still cannot choose between them.
+  assert.equal(chooseCandidate(rivals, { area: "the university town" }).reason, "ambiguous_homonyms");
+  assert.equal(chooseCandidate(rivals, {}).place, null);
 });
 
 test("a hint that names no country says nothing", () => {
@@ -638,4 +642,22 @@ test("without a language, and for English itself, only the English tag is asked"
   assert.ok(!buildGeocodeQuery(["Pinewood Studios"]).includes("@fr"));
   const english = buildGeocodeQuery(["Pinewood Studios"], { languages: new Map([["Pinewood Studios", "en"]]) });
   assert.equal((english.match(/"Pinewood Studios"@/g) ?? []).length, 1);
+});
+
+test("Jerusalem, Israel: a place with two countries, and a named country that removes rivals", () => {
+  // Measured 07.11.2026: the city carries P17 Israel and Palestine, and a town of 4,405 in
+  // New York has a population too, so the hint "Israel" refused the city and the rest tied.
+  const city = { wikidata_id: "Q1218", name: "Jerusalem", lat: 31.7767, lng: 35.2342, population: 1050151,
+    type_label: "city", exact_label: true, country: "Palestine", countries: new Set(["Palestine", "Israel"]),
+    chain: new Set(["Palestine", "Israel", "Jerusalem District"]), types: new Set(["city"]) };
+  const town = { wikidata_id: "Q3708812", name: "Jerusalem", lat: 42.6, lng: -77.1, population: 4405,
+    type_label: "town of New York", exact_label: true, country: "United States", countries: new Set(["United States"]),
+    chain: new Set(["United States", "New York", "Yates County"]), types: new Set(["town of New York"]) };
+
+  assert.equal(contradictsArea(city, "Israel", ["Israel", "Palestine", "United States"]), false);
+  assert.equal(chooseCandidate([town, city], { area: "Israel" }).place?.wikidata_id, "Q1218");
+  // Without a country there is still no way to choose, exactly as before.
+  assert.equal(chooseCandidate([town, city], {}).place, null);
+  // A hint in another script cannot be compared with English labels, so it says nothing.
+  assert.equal(contradictsArea(city, "ירושלים, ישראל"), false);
 });
