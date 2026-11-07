@@ -163,6 +163,9 @@ img {
 .maplibregl-popup .maplibregl-popup-content .point-films a { color: #f3efe7; text-decoration: none; }
 .maplibregl-popup .maplibregl-popup-content .point-films a:hover { text-decoration: underline; }
 .point-film-year { color: rgba(236, 232, 225, 0.45); }
+/* Scoped, because a later `.point-film-year` for the old light popup made the year black
+   on this dark one. */
+.maplibregl-popup .maplibregl-popup-content .point-films .point-film-year { color: rgba(236, 232, 225, 0.5); }
 /* What was filmed here. Its own line under the title, because it is a sentence and not a
    label, and clamped to two lines: a pin can hold ninety-six films, and a popup that
    prints ninety-six paragraphs is a popup nobody reads. The rest is one click away at the
@@ -187,6 +190,59 @@ img {
   letter-spacing: 0.02em;
 }
 .maplibregl-popup .maplibregl-popup-content .point-films a.point-film-source:hover { color: #f7b733; }
+/* A poster beside the title, so "Appointment with Death" is a film you recognise before
+   you read it. The row becomes a two-column grid only when there is a poster to show. */
+.maplibregl-popup .maplibregl-popup-content .point-films li.has-poster {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  column-gap: 0.5rem;
+  align-items: start;
+}
+.maplibregl-popup .maplibregl-popup-content .point-films li.has-poster > :not(.point-film-poster) {
+  grid-column: 2;
+}
+.maplibregl-popup .maplibregl-popup-content .point-films .point-film-poster {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  width: 34px;
+  height: 51px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+/* The film's own page, first among the links. */
+.maplibregl-popup .maplibregl-popup-content .point-films a.point-film-imdb {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  background: #f5c518;
+  color: #000;
+  font: 700 0.62rem/1.5 ui-sans-serif, system-ui, sans-serif;
+  vertical-align: 1px;
+}
+.maplibregl-popup .maplibregl-popup-content .point-films a.point-film-imdb:hover { text-decoration: none; filter: brightness(1.1); }
+/* The film's IMDb page, beside its title on the place card. */
+.sheet-imdb {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.35rem;
+  border-radius: 3px;
+  background: #f5c518;
+  color: #000;
+  font: 700 0.7rem/1.6 ui-sans-serif, system-ui, sans-serif;
+  text-decoration: none;
+  vertical-align: 1px;
+}
+/* The name in its own script, under the English one — for matching the street sign. */
+.name-original {
+  display: block;
+  /* dir="auto" makes Hebrew right-to-left; it still lines up under the name, left. */
+  text-align: left;
+  margin-top: 0.05rem;
+  color: rgba(236, 232, 225, 0.55);
+  font-size: 0.72rem;
+}
 
 /* The way into everything a place holds — the voice guide, the frames, the route. It is a
    destination, not the default: most clicks are "what is this?", and that is answered above

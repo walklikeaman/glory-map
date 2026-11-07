@@ -13,7 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { workPath } from "../lib/work-url.mjs";
 import { candidateSummary, pointFilmLine, pointHint, pointSummary, viewportQuery } from "../lib/map-layer.mjs";
-import { describedFilms, listingLine, sourceLabel } from "../lib/place-note.mjs";
+import { describedFilms, listingLine, sourceLinkLabel } from "../lib/place-note.mjs";
 import { useGeoJsonLayer, useMapCanvas, claimClick } from "./map/MapCanvas.jsx";
 import { MapPopup, PinLayer } from "./map/layers.jsx";
 
@@ -339,7 +339,11 @@ function GraphLayer({
           onClose={() => setOpenPoint(null)}
         >
           <strong>{openProps.name}</strong>
-          <br />
+          {/* The English name leads; the original is kept for the street sign. */}
+          {openProps.name_original && (
+            <small className="name-original" dir="auto">{openProps.name_original}</small>
+          )}
+          {!openProps.name_original && <br />}
           {openPoint.kind === "candidate" ? (
             <>
               <span className="graph-badge badge-candidate">{pointFilmLine(openProps)}</span>
@@ -363,9 +367,29 @@ function GraphLayer({
                 {describedFilms(openProps.films, { placeName: openProps.name }).map((film) => {
                   const note = film.note;
                   return (
-                    <li key={`${film.work_id}-${film.place_name}`}>
-                      <a href={workPath({ id: film.work_id, title: film.title })}>{film.title}</a>
-                      {film.year ? <span className="point-film-year"> {film.year}</span> : null}
+                    <li key={`${film.work_id}-${film.place_name}`} className={film.poster ? "has-poster" : undefined}>
+                      {/* Which film this is, at a glance, and the page about the film
+                          itself. The Wikipedia link below is the source of "filmed here",
+                          not a description of the film, and it was the only link there was. */}
+                      {film.poster && (
+                        <img alt="" className="point-film-poster" loading="lazy" src={film.poster} width={34} height={51} />
+                      )}
+                      <span className="point-film-head">
+                        <a
+                          href={film.imdb_url ?? workPath({ id: film.work_id, title: film.title })}
+                          {...(film.imdb_url ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                        >
+                          {film.title}
+                        </a>
+                        {film.year ? <span className="point-film-year"> {film.year}</span> : null}
+                        {film.imdb_url && (
+                          // The badge says where the title goes; it is the same link again,
+                          // so it is kept out of the tab order and the reader's announcement.
+                          <a className="point-film-imdb" href={film.imdb_url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
+                            IMDb
+                          </a>
+                        )}
+                      </span>
                       {note && <span className="point-film-note">{note}</span>}
                       {/* Where the claim came from, always — it is the reader's way to the
                           full sentence, and on a row with no note it is the only thing we
@@ -377,7 +401,7 @@ function GraphLayer({
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                         >
-                          {note ? sourceLabel(film.source_kind) : listingLine(film)}
+                          {note ? `Source: ${sourceLinkLabel(film)}` : listingLine(film)}
                         </a>
                       )}
                     </li>

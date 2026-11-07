@@ -133,6 +133,8 @@ function placeFeature(row) {
       place_id: row.place_id,
       wikidata_id: row.wikidata_id,
       name: row.name,
+      // The name in its own script, when `name` is the English rendering of it.
+      name_original: row.name_original ?? null,
       place_class: row.place_class,
       geocode_precision: row.geocode_precision,
       shot_on_set: row.shot_on_set === true,
@@ -188,6 +190,7 @@ function candidateFeature(row) {
     properties: {
       candidate: true,
       name: row.place_name,
+      name_original: row.place_name_original ?? null,
       area_hint: row.area_hint ?? null,
       // Two different numbers, and a point where one film was shot twice is not a point
       // where two films were shot. The pin is sized by films, not by rows.

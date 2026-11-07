@@ -76,6 +76,13 @@ function sameAsPlace(segment, placeName) {
   return left === right || right.includes(left) || left.includes(right);
 }
 
+function onlyThePlace(note, placeName) {
+  const normalise = (value) => squash(value).toLowerCase().replace(/[.,;:'"“”‘’]/g, "").trim();
+  const left = normalise(note);
+  const right = normalise(placeName);
+  return Boolean(left && right) && (left === right || right.includes(left));
+}
+
 function trimEnds(value) {
   // Leading punctuation left behind by a removed prefix, and the dangling separators a
   // removed tail leaves at the end.
@@ -114,8 +121,10 @@ export function sceneNote(sentence, { placeName = null, limit = NOTE_LIMIT } = {
   }
 
   if (note.length < MIN_NOTE) return null;
-  // Whatever is left that is only the heading again is not worth a second line.
-  if (sameAsPlace(note, placeName)) return null;
+  // Whatever is left that is only the heading again is not worth a second line. Only the
+  // heading, though: a sentence that MENTIONS the place is the description. Testing it
+  // with "contains" threw away every note in Jaffa, because they all say "Jaffa".
+  if (onlyThePlace(note, placeName)) return null;
 
   return clamp(note, Math.max(MIN_NOTE, limit));
 }
@@ -142,12 +151,39 @@ export function describedFilms(films, { placeName = null, limit = NOTE_LIMIT } =
       byWork.set(key, { ...film, note });
       continue;
     }
-    if ((note?.length ?? 0) > (seen.note?.length ?? 0)) {
+    if (betterRow({ ...film, note }, seen)) {
       byWork.set(key, { ...film, note });
     }
   }
 
   return [...byWork.values()];
+}
+
+// Any note beats none; between two notes, one from an English source beats one from
+// another language, with or without notes (the reader follows its link, and Hebrew Wikipedia is a dead end for
+// most of them); after that, the longer note. `source_lang` is set by the server only for
+// a non-English source, so its absence means English or not a Wikipedia at all.
+function betterRow(candidate, seen) {
+  const hasNote = (row) => Boolean(row.note);
+  if (hasNote(candidate) !== hasNote(seen)) return hasNote(candidate);
+  const english = (row) => !row.source_lang;
+  if (english(candidate) !== english(seen)) return english(candidate);
+  return (candidate.note?.length ?? 0) > (seen.note?.length ?? 0);
+}
+
+// The link's label, with the language named when it is not English — "Wikipedia (Hebrew)"
+// warns a reader before the tap rather than after.
+const LANGUAGE_NAMES = Object.freeze({
+  he: "Hebrew", ar: "Arabic", ru: "Russian", fr: "French", de: "German", es: "Spanish",
+  it: "Italian", ja: "Japanese", zh: "Chinese", ko: "Korean", pt: "Portuguese", pl: "Polish",
+  uk: "Ukrainian", tr: "Turkish", nl: "Dutch", sv: "Swedish", el: "Greek", fa: "Persian",
+});
+
+export function sourceLinkLabel(film) {
+  const label = sourceLabel(film?.source_kind);
+  const lang = typeof film?.source_lang === "string" ? film.source_lang : null;
+  if (!lang) return label;
+  return `${label} (${LANGUAGE_NAMES[lang] ?? lang})`;
 }
 
 // What the popup says when there is no note: the honest minimum, which is that somebody
