@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import dynamic from "next/dynamic";
 import {
   Award,
@@ -1044,6 +1045,7 @@ export default function SceneMapApp() {
   // see is not a map. Expanded it overlays the map, which is fine — the user asked
   // for it. Desktop is unaffected (the class only does anything under 860px).
   const [panelOpen, setPanelOpen] = useState(false);
+  const searchInputRef = useRef(null);
   // Commons images are licensed PER FILE, so the credit has to be fetched before the
   // photo may be shown at all (app/lib/attribution.mjs refuses it otherwise).
   const [imageAttribution, setImageAttribution] = useState({});
@@ -3340,6 +3342,29 @@ export default function SceneMapApp() {
           </div>
         )}
 
+        {/* UX-3: on a phone the search was behind "Search & filters" at the bottom. This is a
+            search field on the map, at the top where a thumb-free glance finds it (the
+            Google Maps pattern). It opens the sheet with its own search field focused, so
+            there is one search box and one set of suggestions, not two. CSS shows it only
+            at phone and tablet width, and only while the sheet is closed. */}
+        <button
+          type="button"
+          className="map-search"
+          onClick={() => {
+            // Rendered open synchronously, then focused in the tap itself: the field is
+            // display:none while the sheet is closed, and iOS raises the keyboard only for
+            // a focus inside the gesture.
+            flushSync(() => setPanelOpen(true));
+            searchInputRef.current?.focus({ preventScroll: true });
+          }}
+          // Shown only while the sheet is closed, so it is always the closed state.
+          aria-expanded={false}
+          aria-controls="command-panel-body"
+        >
+          <Search size={17} aria-hidden="true" />
+          <span>{workQuery || "Search a film, series, book or city"}</span>
+        </button>
+
         {/* "Only my films" was a checkbox inside a collapsed panel, under a disclosure, below
             a scroll — the reader had imported 2,422 films and reported he could not find the
             switch that shows them. It is the single most-wanted filter in the product, so it
@@ -3579,6 +3604,7 @@ export default function SceneMapApp() {
             field that sat next to each other, each hitting a different service and
             neither able to suggest the other's kind. */}
         <SearchBox
+          inputRef={searchInputRef}
           onChange={setWorkQuery}
           onLookupPlace={lookUpPlace}
           onPickCity={goToCity}

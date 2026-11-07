@@ -103,6 +103,9 @@ export default function SearchBox({
   onPickCity,
   onLookupPlace,
   onSubmit,
+  // The text field, for a caller that opens the box from elsewhere (the phone's search on
+  // the map, UX-3) and must focus it inside the same tap.
+  inputRef = null,
   children,
 }) {
   const [open, setOpen] = useState(false);
@@ -237,6 +240,7 @@ export default function SearchBox({
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Film, series, book or city"
+          ref={inputRef}
           role="combobox"
           type="text"
           value={value}

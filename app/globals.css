@@ -3762,13 +3762,18 @@ figcaption a {
      card is opaque, and at full width it sat on zoom and "my location". */
   /* Below "Only my films", which also lives at the top centre of the map: at 12 px the
      listen button sat on top of it and hid all but its count (#114). */
+  /* UX-3: the top now belongs to the search field, so the walk controls moved to the
+     bottom left, above the collapsed sheet and the legend button. The bottom is still
+     contested, so they step aside while a place card or the legend is open (rule near
+     .map-search). They still stop short of the right-edge map buttons. */
   .walk-controls {
-    top: calc(68px + env(safe-area-inset-top));
-    bottom: auto;
+    top: auto;
+    bottom: calc(var(--app-nav-height) + 128px);
     left: 12px;
     right: 64px;
     transform: none;
     max-width: none;
+    justify-items: start;
   }
 }
 
@@ -5855,4 +5860,48 @@ figcaption a {
   font-size: 0.8rem;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* UX-3: the phone's search field on the map. Hidden on the desktop, where the panel's own
+   field is always on screen. */
+.map-search { display: none; }
+
+@media (max-width: 860px) {
+  .map-search {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 12px;
+    right: 64px;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    padding: 0 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-solid);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: text;
+  }
+  .map-search span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .map-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .scene-shell:has(.command-panel.is-open) .map-search,
+  .scene-shell.is-in-section .map-search { display: none; }
+
+  /* "Only my films" moves under the search field instead of under it in z-order. */
+  .map-mine { top: calc(68px + env(safe-area-inset-top)); }
+}
+
+@media (max-width: 860px) {
+  /* The open place card owns the bottom of a phone, and the open legend grows up into the
+     walk's row: the walk controls step aside for either and come back when it closes. The
+     search field steps aside for the card too, which reaches the top in landscape. */
+  .scene-shell:has(.location-sheet) .walk-controls,
+  .scene-shell:has(.pin-legend) .walk-controls { visibility: hidden; }
+  .scene-shell:has(.location-sheet) .map-search { display: none; }
 }
