@@ -134,6 +134,9 @@ export const SURFACES = Object.freeze({
   workCardPoster: Object.freeze({ shape: "poster", box: 62, phoneBox: 52, budgetBytes: 16_384 }),
   // .work-profile-poster — 76 px, 56 px under 860.
   workProfilePoster: Object.freeze({ shape: "poster", box: 76, phoneBox: 56, budgetBytes: 20_480 }),
+  // .point-film-poster — 34 px beside each film in a map pin's card, the same on every
+  // screen. Enough to recognise a poster, which is all it is for.
+  pointFilmPoster: Object.freeze({ shape: "poster", box: 34, phoneBox: 34, budgetBytes: 8_192 }),
   // .place-scene-frame — 84×47, 64×36 under 860.
   placeSceneFrame: Object.freeze({ shape: "frame", box: 84, phoneBox: 64, budgetBytes: 10_240 }),
   // .work-stills and .work-profile-stills — auto-fill minmax(160/180px, 1fr) inside a

@@ -7,6 +7,22 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | Pin cards: IMDb first, posters, English names over the original
+**Scenario**: in Jaffa Nikita saw a card titled "יפו", Hebrew notes, and a Wikipedia link as the
+only way to the film. He wants the film's own page (IMDb) first, a poster, and every non-Latin
+name in English with the original under it.
+**Decision**: `/api/map/points` adds `imdb_url`, `poster` (w92) and `source_lang` to each listed
+film, and swaps non-Latin names and notes for English renderings from the new
+`text_translations` table (key = md5 of the served string). The original rides along as
+`name_original` / `note_original`. Renderings are made ahead of time by
+`scripts/translate-display-text.mjs` (Haiku, ~$0.003 per 10 strings), never per request. If a
+lookup fails the map still draws, in the original language. Between two rows for one film the
+English source now wins (`describedFilms`), and a non-English source link says its language.
+**Gotcha found**: `sceneNote` dropped every note that merely MENTIONED the place ("…shot in
+Jerusalem and Jaffa" under the Jaffa pin), because the "note is just the heading" test used
+`contains` both ways. Most Israeli pins showed no notes at all. Now only a note that is the
+place name (or part of it) is dropped.
+
 ## [2026-11-07] incident | Filled yellow pins never opened; browsed places vanished on zoom
 **Scenario**: after #361 Nikita reported (Jaffa, iPhone) that plain yellow dots don't open (rings
 do) and the yellow "district" dots disappear when zooming in and out.

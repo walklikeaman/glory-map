@@ -1797,6 +1797,10 @@ export default function SceneMapApp() {
       // room to answer why this corner is worth the walk. See [[place-note]].
       scene: lead.note ?? props.name ?? "Filming location",
       place: props.name ?? null,
+      // The name in its own script when `place` is its English rendering.
+      placeOriginal: props.name_original ?? null,
+      // The film's own page, ahead of the source that says it was filmed here.
+      imdbUrl: lead.imdb_url ?? null,
       position: [lat, lng],
       // Hollow means a source named it and nobody on our side has checked it. The sheet
       // must not present a queue row as a fact.
@@ -4777,7 +4781,14 @@ export default function SceneMapApp() {
               ) : null;
             })()}
             <div>
-              <p><WorkKindMark kind={activeLocation.kind} />{" "}{activeLocation.film}</p>
+              <p>
+                <WorkKindMark kind={activeLocation.kind} />{" "}{activeLocation.film}
+                {activeLocation.imdbUrl && (
+                  <a className="sheet-imdb" href={activeLocation.imdbUrl} target="_blank" rel="noopener noreferrer">
+                    IMDb
+                  </a>
+                )}
+              </p>
               <h2>{activeLocation.scene}</h2>
             </div>
           </div>
@@ -4819,6 +4830,9 @@ export default function SceneMapApp() {
               <MapPin size={19} />
               <div>
                 <strong>{activeLocation.place}</strong>
+                {activeLocation.placeOriginal && (
+                  <span className="name-original" dir="auto">{activeLocation.placeOriginal}</span>
+                )}
                 {/* Somebody standing in the street with this page open wants the pair, and
                     the card showed it without letting anyone take it. The copied text is
                     exactly what is printed — bare, so it pastes into a maps app. */}

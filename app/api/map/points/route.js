@@ -8,6 +8,9 @@ import {
   viewportCenter,
 } from "../../../lib/map-points.mjs";
 import { RANKED_SOURCES } from "../../../lib/notable-here.mjs";
+import { localiseMapRows, stringsToLookUp, textKey, workIdsOf } from "../../../lib/display-language.mjs";
+import { tmdbUrlForSurface } from "../../../lib/tmdb-images.mjs";
+import { imdbUrl } from "../../../lib/work-ratings.mjs";
 
 export const runtime = "nodejs";
 
@@ -45,8 +48,22 @@ function defaultCreateReader(env) {
     return data ?? [];
   };
 
+  // PostgREST puts `in.(…)` into the URL, so long lists go in slices.
+  const inSlices = async (table, columns, column, values) => {
+    const slices = [];
+    for (let i = 0; i < values.length; i += 120) slices.push(values.slice(i, i + 120));
+    const pages = await Promise.all(slices.map(async (slice) => {
+      const { data, error } = await client.from(table).select(columns).in(column, slice);
+      if (error) throw new Error(`${table} failed: ${error.message}`);
+      return data ?? [];
+    }));
+    return pages.flat();
+  };
+
   return {
     points: (params) => call("map_points_in_view", params),
+    works: (ids) => inSlices("works", "id, imdb_id, poster_path", "id", ids),
+    translations: (keys) => inSlices("text_translations", "source_md5, english", "source_md5", keys),
     clusters: (params) => call("map_clusters_in_view", params),
     // The queue in the same viewport. Separate calls rather than a union, because the two
     // are different things and the response keeps them apart all the way to the client.
@@ -67,6 +84,46 @@ function defaultCreateReader(env) {
 // viewport costs one indexed query. Zoomed out it returns grid clusters; zoomed in,
 // individual places carrying their grounding fields (place_class, confidence,
 // precision, shot_on_set) so the UI can be honest about what each pin is.
+// English names, posters and IMDb links on top of what the map RPCs return (see
+// display-language.mjs). Best effort by design: if either lookup fails — the translations
+// table not yet migrated, a slow works query — the map still draws, in the original
+// language and without posters, rather than going blank over a nicety.
+// A lookup that hangs is a failure too: the map waits this long for it, then draws without.
+const LOOKUP_TIMEOUT_MS = 1500;
+
+function bestEffort(promise, label, logError, timeoutMs) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => { logError(`${label} timed out`, { timeoutMs }); resolve([]); }, timeoutMs);
+  });
+  const settled = promise.then(
+    (value) => value ?? [],
+    (error) => { logError(`${label} failed`, { message: error?.message }); return []; },
+  );
+  return Promise.race([settled, timeout]).finally(() => clearTimeout(timer));
+}
+
+export async function localise(reader, groups, logError = () => {}, { timeoutMs = LOOKUP_TIMEOUT_MS } = {}) {
+  const all = Object.values(groups).flatMap((list) => list ?? []);
+  const strings = stringsToLookUp(all);
+  const workIds = workIdsOf(groups.candidateRows);
+  const [works, english] = await Promise.all([
+    workIds.length && reader.works
+      ? bestEffort(reader.works(workIds), "Map works lookup", logError, timeoutMs)
+      : [],
+    strings.length && reader.translations
+      ? bestEffort(reader.translations(strings.map(textKey)), "Map translations lookup", logError, timeoutMs)
+      : [],
+  ]);
+  const options = {
+    works: new Map(works.map((work) => [work.id, work])),
+    english: new Map(english.map((row) => [row.source_md5, row.english])),
+    posterUrl: (path) => tmdbUrlForSurface(path, "pointFilmPoster"),
+    imdbUrl,
+  };
+  return Object.fromEntries(Object.entries(groups).map(([key, list]) => [key, localiseMapRows(list, options)]));
+}
+
 export function createMapPointsHandler({
   env = process.env,
   createReader,
@@ -137,7 +194,11 @@ export function createMapPointsHandler({
         });
       }
 
-      return Response.json(buildMapResponse(query, rows, fictional, nearest, candidateRows), {
+      const readable = await localise(reader, { rows, fictional, nearest, candidateRows }, logError);
+
+      return Response.json(buildMapResponse(
+        query, readable.rows, readable.fictional, readable.nearest, readable.candidateRows,
+      ), {
         headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
       });
     } catch (error) {
