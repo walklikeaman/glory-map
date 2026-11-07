@@ -7,6 +7,18 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | Phone: search field on the map, walk control at the bottom (UX-3)
+**Object**: `.map-search` in `app/components/SceneMapApp.jsx` + `app/globals.css`, `SearchBox` (`inputRef`), the ≤860 px `.walk-controls` rule.
+**Scenario**: UX pass, phone
+**Outcome**: ✅ built; Playwright at 390, 768 and 1440 against the live DB
+**What happened**: on a phone the search sat behind "Search & filters" at the bottom while "Listen as I walk" took the top of the map. Now a search field floats at the top of the map (≤860 px, sheet closed), and the walk control sits at the bottom left above the collapsed sheet.
+
+Decisions worth keeping:
+- The field on the map is a button that opens the sheet with the sheet's own search focused: one search box and one suggestion list, not two. It opens with `flushSync` and focuses in the same tap, because the field is `display:none` while the sheet is closed and iOS only raises the keyboard for a focus inside the gesture.
+- The bottom of a phone is contested (place card, legend). The walk controls step aside while either is open and come back when it closes; the search field steps aside for the place card, which reaches the top in landscape.
+- "Only my films" moved under the search field (top 68 px).
+**Updated**: `wiki/log.md`, `TASKS.md`.
+
 ## [2026-11-07] decision | The map opens where the reader is standing
 **Scenario**: Nikita: "запускать карту в том месте, где мы находимся, запросить доступ к GPS".
 **Decision**: on open the app asks for the position once and centres on it, unless the
