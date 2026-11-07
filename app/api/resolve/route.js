@@ -59,20 +59,13 @@ function defaultCreateWriter(env) {
       failOn(error, "places upsert");
       return data ?? [];
     },
-    // The conflict target must name every column of a unique index, and since
-    // 20260808010100 that index is (work_id, place_id, relation_kind, scene_id, about).
-    //
-    // The three-column form this used to send has been raising 42P10 — "there is no
-    // unique or exclusion constraint matching the ON CONFLICT specification" — since
-    // 20260731234121 split the constraint into two PARTIAL indexes, which Postgres
-    // cannot infer from a bare inference clause. This route is the only write path into
-    // the canonical graph, and it failed here, after the Wikidata work had succeeded.
-    async upsertLinks(rows) {
-      const { data, error } = await client
-        .from("work_place_links")
-        .upsert(rows, { onConflict: "work_id,place_id,relation_kind,scene_id,about" })
-        .select("id, work_id, place_id, relation_kind");
-      failOn(error, "links upsert");
+    // Links and their evidence in ONE call, because `work_place_links_require_evidence`
+    // is checked at commit and PostgREST commits every request. Sending the links first
+    // and their evidence second failed every batch from 05.08 to 07.11.2026 — see
+    // supabase/migrations/20261107000000_a_resolved_link_is_written_with_its_evidence.sql.
+    async writeLinks(links) {
+      const { data, error } = await client.rpc("write_resolved_links", { p_links: links });
+      failOn(error, "links write");
       return data ?? [];
     },
     // Chunked: `in()` becomes a GET query string, and a full batch's subject ids
@@ -165,59 +158,51 @@ export function createResolveHandler({
       // places → uuids, keyed by wikidata_id (the plan's place identity).
       const placeRows = await writer.upsertPlaces(plan.places);
       const placeIdByQid = new Map(placeRows.map((row) => [row.wikidata_id, row.id]));
-      const qidByPlaceId = new Map(placeRows.map((row) => [row.id, row.wikidata_id]));
 
-      const linkRowsToWrite = plan.links
+      // Each link travels with the evidence that supports it; see writer.writeLinks.
+      const linkEvidenceByKey = new Map();
+      for (const row of plan.evidence) {
+        if (row.subject_type !== "link") continue;
+        const { subject_type: _type, subject_ref: key, ...fields } = row;
+        linkEvidenceByKey.set(key, [...(linkEvidenceByKey.get(key) ?? []), fields]);
+      }
+      const linksToWrite = plan.links
         .map((link) => {
           const placeId = placeIdByQid.get(link.place_wikidata_id);
           if (!placeId) return null;
+          const key = linkKeyOf({
+            workKey: link.workKey,
+            placeWikidataId: link.place_wikidata_id,
+            relationKind: link.relation_kind,
+          });
+          const evidence = linkEvidenceByKey.get(key) ?? [];
+          // Never a link without its source — the database would refuse it anyway.
+          if (evidence.length === 0) return null;
           return {
             work_id: link.workKey,
             place_id: placeId,
             relation_kind: link.relation_kind,
             confidence: link.confidence,
-            // Written out rather than left to the column defaults, because these two are
-            // the conflict target: a row that omits them is a row whose identity is
-            // implied somewhere else.
-            //
-            // `about` is null and `statement` is not written at all: a P915 statement
-            // says a work and a place are related and nothing more. The sentence belongs
-            // to sources that state one — a plaque, a paragraph, a permit record.
-            scene_id: null,
-            about: null,
+            evidence,
           };
         })
         .filter(Boolean);
+      const linkRows = linksToWrite.length > 0 ? await writer.writeLinks(linksToWrite) : [];
+      const linkEvidenceCount = linkRows.reduce((sum, row) => sum + (Number(row.evidence_inserted) || 0), 0);
 
-      const linkRows = linkRowsToWrite.length > 0 ? await writer.upsertLinks(linkRowsToWrite) : [];
-      // Rebuild each link's plan-side key so its evidence can find its uuid.
-      const linkIdByKey = new Map(
-        linkRows.map((row) => [
-          linkKeyOf({
-            workKey: row.work_id,
-            placeWikidataId: qidByPlaceId.get(row.place_id),
-            relationKind: row.relation_kind,
-          }),
-          row.id,
-        ]),
-      );
-
-      // Resolve every evidence row's subject to a real uuid, dropping any whose
-      // subject was not written (never write dangling evidence).
-      const evidenceWithIds = plan.evidence
+      // The place's own evidence has no commit-time rule, so it is written as before.
+      const placeEvidence = plan.evidence
+        .filter((row) => row.subject_type === "place")
         .map((row) => {
-          const subjectId = row.subject_type === "place"
-            ? placeIdByQid.get(row.subject_ref)
-            : linkIdByKey.get(row.subject_ref);
+          const subjectId = placeIdByQid.get(row.subject_ref);
           if (!subjectId) return null;
           const { subject_ref: _ref, ...rest } = row;
           return { ...rest, subject_id: subjectId };
         })
         .filter(Boolean);
-
-      const subjectIds = [...new Set(evidenceWithIds.map((row) => row.subject_id))];
+      const subjectIds = [...new Set(placeEvidence.map((row) => row.subject_id))];
       const existing = subjectIds.length > 0 ? await writer.loadEvidence(subjectIds) : [];
-      const toInsert = missingEvidenceRows(evidenceWithIds, existing);
+      const toInsert = missingEvidenceRows(placeEvidence, existing);
       if (toInsert.length > 0) await writer.insertEvidence(toInsert);
 
       // Group the response by work so the caller sees what each one produced.
@@ -238,7 +223,7 @@ export function createResolveHandler({
           flags: plan.flags,
           places_upserted: placeRows.length,
           links_upserted: linkRows.length,
-          evidence_inserted: toInsert.length,
+          evidence_inserted: toInsert.length + linkEvidenceCount,
         },
         { headers: noStoreHeaders },
       );
