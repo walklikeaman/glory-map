@@ -23,6 +23,53 @@ Jerusalem and Jaffa" under the Jaffa pin), because the "note is just the heading
 `contains` both ways. Most Israeli pins showed no notes at all. Now only a note that is the
 place name (or part of it) is dropped.
 
+## [2026-11-07] incident | Filled yellow pins never opened; browsed places vanished on zoom
+**Scenario**: after #361 Nikita reported (Jaffa, iPhone) that plain yellow dots don't open (rings
+do) and the yellow "district" dots disappear when zooming in and out.
+**Causes**: (1) `PinLayer` overwrote every feature's `key` with its coordinate, but the browsed
+places layer (`searched-places`, the filled pins from `/api/locations`) looks its locations up by
+id, so no tap on a filled pin ever matched. (2) Every map move REPLACED the browsed set with the
+new 30 results, so pins and city rings came and went with the zoom.
+**Fix**: a caller's own `key` wins; a browse now merges into what is drawn (`mergeBrowsed`, newest
+first, capped at 300), a new city or title still replaces it; one tap opens one layer's pin.
+Playwright over Jaffa, z10..z16: every pin in view opens, browsed pins stay at every zoom.
+
+## [2026-11-07] decision | Hebrew Wikipedia; a named country now removes rivals in the geocoder
+**Scenario**: Nikita allowed he.wikipedia.org in the cloud network. The first 10-work test accepted
+nothing, for three separate reasons. (1) `he` wasn't in the section tables. (2) The role and intent
+gates in wikipedia-extract are English-only, because `\b` is ASCII in JS, so every Hebrew quote failed
+`quote_does_not_support_role`. (3) The geocoder refused Jerusalem, Tiberias and the Dead Sea even
+in English: Jerusalem has P17 Israel *and* Palestine, and only one was compared. A town of 4,405 in
+New York also has a population, so the choice stayed a tie.
+**Decision**: a candidate keeps every P17. A country named in `area_hint` now removes the candidates
+outside it *before* the choice, and what is left must still win on the old rules. This replaces "the
+hint may refuse but never select" for countries only; a city or county hint is still refuse-only.
+A hint in a non-Latin script is ignored. Rows still land `pending`.
+**Result**: `--only he --again` over 636 works read 216 sections and queued 167 places, 90 of them
+with a point; candidates in Israel went from 43 to 94. A one-off re-geocode put points on 71 of 261
+older pointless Israeli rows. Haiku cost about $0.09.
+**Then**: Haiku often returned the English name for a Hebrew quote ("Jerusalem" for ירושלים), and
+75 places were dropped as `quote_is_about_elsewhere`. The prompt now says the name is copied in the
+article's own script and never translated. The rerun dropped 2 that way, and the totals became 253
+places queued, 136 with a point, and 116 candidates in Israel. Two runs cost about $0.19 together.
+
+## [2026-11-07] incident | Phone map: pins vanished on zoom-out, taps did nothing
+**Scenario**: Nikita tried the iPhone app in Tel Aviv: pins disappear when zooming out, a tap on a
+pin does nothing, pins carry no names, "Approximate · 4 works" means nothing, and "Listen as I
+walk" sits mid-screen.
+**Causes found** (Playwright, iPhone 13 viewport, local prod build on the live DB):
+- Below z12 `/api/map/points` returns the queue as gridded `candidates`, and `GraphLayer` drew only
+  the graph's clusters. The queue is ~99% of the map, so zooming out left a handful of bubbles
+  (Tel Aviv z10: 4 drawn, 17 after the fix). Both halves now go into one client-clustered source
+  (`bubbleFeatures`), so a cell holding both is one number.
+- Clicks were hit-tested at the exact pixel; an unchecked pin below z16 is an 8 px dot. Now the
+  nearest feature within 18 px (`nearestHit`, `TAP_SLOP_PX`).
+- A checked place's popup had only the badge line; it now lists its films from `/api/place` and
+  links to the place page. On a phone (≤639 px) the popup is a bottom sheet.
+- `.user-dot` was rendered but never styled, and the search radius was the same dashed amber ring
+  as "city only". Both are blue now, and the legend says so.
+**Rule**: anything tappable on the map is hit-tested with slop, never at the exact pixel.
+
 ## [2026-11-07] incident | Israel on the map; /api/resolve had written no links since 05.08
 **Scenario**: Nikita is in Israel and asked for Israeli films and points. Israel had one pin, and
 it was Petra, which is in Jordan. Only 12 of 942 Israeli or shot-in-Israel works were in `works`.

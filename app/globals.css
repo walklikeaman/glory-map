@@ -6044,3 +6044,61 @@ figcaption a {
   .onboarding.is-here { place-items: end center; padding-bottom: calc(var(--app-nav-height) + 8px); }
   .onboarding.is-here .onboarding-panel { max-height: calc(100dvh - var(--app-nav-height) - 40px); }
 }
+
+/* --- Phone map pass (2026-11-07) ------------------------------------------------------- */
+
+/* Where the reader is. The marker has always been rendered and never styled, so on a phone
+   the only sign of "you" was the search-radius ring. Blue, like every map app's "you",
+   so it can never be mistaken for a place. */
+.user-dot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #5aa9ff;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgba(90, 169, 255, 0.25), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.legend-you { display: grid; place-items: center; width: 20px; height: 20px; }
+.legend-you .user-dot { width: 12px; height: 12px; border-width: 2px; box-shadow: 0 0 0 4px rgba(90, 169, 255, 0.25); }
+
+@media (max-width: 860px) {
+  /* "Listen as I walk" sat in the middle of the lower half, a row above the legend button.
+     It now shares the legend's row, just above the collapsed sheet: left button, right
+     button, both in thumb reach. A started walk or a story trail is a card, too wide for
+     that row, so it keeps the raised spot it had. */
+  .walk-controls {
+    bottom: calc(var(--app-nav-height) + 80px);
+    right: auto;
+    max-width: calc(100% - 200px);
+  }
+  .walk-controls:has(.walk-active, .trail-controls) {
+    bottom: calc(var(--app-nav-height) + 128px);
+    right: 64px;
+    max-width: none;
+  }
+  .walk-controls .walk-start { min-height: 44px; padding: 0 14px; }
+}
+
+/* "Open this place" is a link on a checked place and a button on a queue row; both read as
+   the same full-width button, tall enough for a thumb. */
+.popup-open-place { display: flex; align-items: center; justify-content: center; min-height: 40px; box-sizing: border-box; text-decoration: none; }
+
+/* On a phone the pin's popup is a sheet over the bottom of the map, not a bubble beside
+   the pin: a 320 px bubble anchored to a pin on the left ran off the right edge and under
+   the map buttons. The selected pin keeps its ring, so "which one did I tap" still reads. */
+@media (max-width: 639px) {
+  .maplibregl-popup {
+    transform: none !important;
+    top: auto !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(var(--app-nav-height) + 76px) !important;
+    max-width: none !important;
+    z-index: 1100;
+  }
+  .maplibregl-popup .maplibregl-popup-tip { display: none; }
+  .maplibregl-popup .maplibregl-popup-content { max-height: 46vh; overflow-y: auto; }
+  .scene-shell:has(.maplibregl-popup) .walk-controls,
+  .scene-shell:has(.maplibregl-popup) .map-key { visibility: hidden; }
+}

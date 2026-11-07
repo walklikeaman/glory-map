@@ -49,6 +49,7 @@ import {
   findNearby,
   formatDistanceMeters,
   mapSearchRadiusKm,
+  mergeBrowsed,
   zoomForRadius,
 } from "../lib/nearby.mjs";
 import StoryTrail from "./StoryTrail.jsx";
@@ -1041,6 +1042,9 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
 export default function SceneMapApp() {
   const connectorInputRef = useRef(null);
   const [liveLocations, setLiveLocations] = useState(null);
+  // Read by a browse answer, which may land several renders after the move that asked it.
+  const liveLocationsRef = useRef(null);
+  liveLocationsRef.current = liveLocations;
   // The graph layer is an additive overlay: the live Wikidata path stays the default
   // so searching any city still works, while the graph shows what we have grounded.
   // On a phone the panel starts COLLAPSED: this is a map app, and a map you cannot
@@ -1514,7 +1518,9 @@ export default function SceneMapApp() {
   // card nobody requested: the second design review measured it covering 55% of a phone's
   // first screen, so the panel a visitor was meant to meet first was a 40 px strip behind a
   // sheet about Forrest Gump.
-  function applyLocationResults(nextLocations, { preserveContext = false, openFirst = false } = {}) {
+  function applyLocationResults(answer, { preserveContext = false, openFirst = false } = {}) {
+    // A move of the map ADDS to what is drawn; a new question (a city, a title) replaces it.
+    const nextLocations = preserveContext ? mergeBrowsed(liveLocationsRef.current, answer) : answer;
     const nextFilms = worksFromLocations(nextLocations);
     setLiveLocations(nextLocations);
     setSelectedFilms(nextFilms.map((film) => film.id));
@@ -3448,6 +3454,8 @@ export default function SceneMapApp() {
                   <li key={row.text}>
                     {row.kind === "area" ? (
                       <span aria-hidden="true" className="legend-area" />
+                    ) : row.kind === "you" ? (
+                      <span aria-hidden="true" className="legend-you"><span className="user-dot" /></span>
                     ) : row.kind === "count" ? (
                       <span
                         aria-hidden="true"
@@ -3549,6 +3557,8 @@ export default function SceneMapApp() {
             <>
               <AreaLayer
                 id="nearby-radius"
+                color="#5aa9ff"
+                dashed={false}
                 areas={[{ id: "nearby", position: userPosition, radiusMeters: nearbyRadius }]}
               />
               <MapMarker

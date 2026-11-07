@@ -12,14 +12,14 @@ export const BADGE_STYLES = Object.freeze({
   exact: Object.freeze({
     color: "#f7b733", fillColor: "#f7b733", fillOpacity: 0.85,
     radius: 7, weight: 2, dashArray: null,
-    label: "Filmed here", hint: "The exact spot is confirmed",
+    label: "Filmed right here", hint: "This is the exact spot. You can go and stand here.",
   }),
   // We only know the city/country: drawn deliberately larger and dashed so it reads
   // as a region, never as a doorstep.
   approximate: Object.freeze({
     color: "#f7b733", fillColor: "#f7b733", fillOpacity: 0.18,
     radius: 12, weight: 2, dashArray: "3 4",
-    label: "Approximate", hint: "Only the city or country is known",
+    label: "Somewhere in this city", hint: "Filmed in this city, but nobody knows the street yet. The pin sits in the city centre.",
   }),
   // Named by a checked source, but the spot itself is unconfirmed: the pin may sit at
   // the street's or the district's geocode rather than the doorway. Dashed like
@@ -27,19 +27,19 @@ export const BADGE_STYLES = Object.freeze({
   unconfirmed: Object.freeze({
     color: "#f7b733", fillColor: "#f7b733", fillOpacity: 0.35,
     radius: 7, weight: 2, dashArray: "3 3",
-    label: "Spot unconfirmed", hint: "The source names this place; its exact spot is not confirmed yet",
+    label: "Spot not checked yet", hint: "A source names this place, but the exact spot is not confirmed yet. The pin may be a few streets off.",
   }),
   // Real, correctly located — but it depicts somewhere else.
   studio: Object.freeze({
     color: "#b98cff", fillColor: "#b98cff", fillOpacity: 0.8,
     radius: 8, weight: 2, dashArray: null,
-    label: "Studio", hint: "Shot on a set — the story is set elsewhere",
+    label: "Filmed in a studio", hint: "Shot on a set here. In the story it is somewhere else.",
   }),
   // A book's setting: real place, but narrative rather than a shooting location.
   narrative: Object.freeze({
     color: "#6fd3c7", fillColor: "#6fd3c7", fillOpacity: 0.75,
     radius: 7, weight: 2, dashArray: null,
-    label: "Set here", hint: "Where the story takes place",
+    label: "The story is set here", hint: "The story takes place here. It may have been filmed somewhere else.",
   }),
 });
 
@@ -214,7 +214,8 @@ export function pointFilmLine(properties) {
 export function pointSummary(properties) {
   if (!properties) return "";
   const style = badgeStyle(properties.badge);
-  const works = properties.work_count === 1 ? "1 work" : `${properties.work_count ?? 0} works`;
+  // "films", not "works": the reader's word. A series counts as one, the same as a film.
+  const works = properties.work_count === 1 ? "1 film" : `${properties.work_count ?? 0} films`;
   return `${style.label} · ${works}`;
 }
 
@@ -223,4 +224,28 @@ export function pointSummary(properties) {
 export function pointHint(properties) {
   if (!properties) return "";
   return badgeStyle(properties.badge).hint;
+}
+
+// The bubbles a zoomed-out map draws, from both halves of the response.
+//
+// Below CLUSTER_BELOW_ZOOM the server sends the checked places as `features` and the queue
+// as `candidates`, each already gridded. Only the first half was drawn: the queue is 99% of
+// what the map holds, so zooming out from a city made almost every pin vanish (reported on
+// the iPhone, 2026-11-07). Both go into one list here; the client source clusters them
+// again, so a cell that holds both reads as one number, not two bubbles on top of each other.
+export function bubbleFeatures(clusters = [], candidateClusters = []) {
+  const shape = (feature, checked) => {
+    const props = feature?.properties ?? {};
+    const count = Number(props.point_count) || 0;
+    if (!feature?.geometry || count <= 0) return null;
+    return {
+      type: "Feature",
+      geometry: feature.geometry,
+      properties: { count, checked, studio: props.has_studio === true },
+    };
+  };
+  return [
+    ...(clusters ?? []).map((feature) => shape(feature, true)),
+    ...(candidateClusters ?? []).filter((feature) => feature?.properties?.cluster).map((feature) => shape(feature, false)),
+  ].filter(Boolean);
 }

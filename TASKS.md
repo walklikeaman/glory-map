@@ -30,6 +30,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] UX-1 Pin soup: real clustering below zoom ~14, unchecked pins as small dots or off by default (one clustered layer for graph + queue; dots at z15)
 - [x] UX-2 Left panel / phone sheet: 12 blocks → Search, Results (Works / Places), Plan; filters behind one chip; legal text to Profile
 - [x] UX-3 Phone: search field floating on the map; "Listen as I walk" off the top of the map
+- [x] UX-3b Phone pass after Nikita tried the iPhone app (2026-11-07): the queue's bubbles drawn when zoomed out, ~36 px tap target, film titles under pins from z15, a popup that lists the films (a sheet on a phone), plain badge words, a blue "you" dot and radius, walk button on the legend's row
 - [ ] UX-4 One home for routes: stop list, build route and timed tour all in the Routes section
 - [ ] UX-5 Copy pass: no engineering words ("candidates", "unchecked", "gazetteer", raw coordinates)
 
@@ -60,7 +61,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] Map, a picked work: "Known for" says "Nothing here passes your filters" while the work's pins are drawn, and the Locations list under it still lists other films' nearby places (seen with Notting Hill over London). Needs a check on production with real tiles: the cloud browser can't load the basemap.
 - [ ] `/work/<slug>` answers 404 when the database fails: `/api/work` swallows the load error and returns `work.title: null`. Same fix as the city/place/letter pages (#readRoute), but the route has to say 502 first.
 - [ ] (04.11) The directory letter pages still hit a statement timeout now and then at runtime (`/directory/films/n?page=2` answered 500, then 0.23 s on the next 8 asks). `catalogue_letter` reads the `catalogue_index` view, which groups every `location_submissions` row on each call. Fix in the DB: a materialized view refreshed after ingest, or an index on `directory_sort_key(title_norm)`. Needs the schema owner.
-- [ ] (07.11) Israel coverage is thin: English Wikipedia rarely names filming spots, and he.wikipedia.org is blocked in the cloud network. Allow it in the environment, then run `enrich-from-wikipedia.mjs --raw --source wikidata` on Hebrew articles.
+- [x] (07.11) Hebrew Wikipedia read for the Israeli catalogue: 636 works, 253 places queued, 136 with a point; candidates in Israel 43 → 116 (PR #360, #362). The prompt now keeps names in the article's script, so drops for an English name on a Hebrew quote went from 75 to 2.
 - [ ] Production (`glory-map.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
 
 ## In progress
