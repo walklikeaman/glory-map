@@ -7,6 +7,20 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-07] decision | First run: "Filmed around you", then "add my films"
+**Scenario**: Nikita: the first launch should open where you are, say what was filmed
+nearby (Palermo → The Godfather, Taormina → the station scene), and only then offer to
+connect your own list. Later the same question from a button on the map.
+**Decision**: the guest welcome text is replaced by `HereSheet`: top works within 20 km
+of the reader (60 km when fewer than 3), ranked like "Known for", each at its nearest
+place with a distance; a tap opens that pin. "Add my films to the map" → sign-in → the
+poster deck. The ✨ map button opens it for the current map centre. Logic in
+`app/lib/around-here.mjs`.
+**Gotchas**: (1) `applyLocationResults` closed any open card when a slow /api/locations
+answer landed, so a pin tapped right after locating snapped shut; a map point the reader
+opened now survives. (2) A reloaded `?lat=&lng=` map was labelled "London"; it is now
+"this area". Data is thin outside the big cities (Taormina has no Godfather row yet).
+
 ## [2026-11-07] decision | Phone: search field on the map, walk control at the bottom (UX-3)
 **Object**: `.map-search` in `app/components/SceneMapApp.jsx` + `app/globals.css`, `SearchBox` (`inputRef`), the ≤860 px `.walk-controls` rule.
 **Scenario**: UX pass, phone

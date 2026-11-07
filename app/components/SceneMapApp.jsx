@@ -54,6 +54,7 @@ import {
 import StoryTrail from "./StoryTrail.jsx";
 import { AppNav, SectionSheet } from "./AppSections.jsx";
 import Onboarding from "./Onboarding.jsx";
+import HereSheet from "./HereSheet.jsx";
 import {
   decide, emptyOnboarding, libraryFromDecisions, loadOnboarding, looksSignedIn, saveOnboarding, shouldOfferDeck,
   shouldOfferOnboarding, undoLast,
@@ -667,6 +668,8 @@ function areaRadiusMeters(precision) {
 
 
 
+const AREA_WITHOUT_NAME = "this area";
+
 const GEOLOCATION_ERRORS = {
   1: {
     status: "denied",
@@ -1143,7 +1146,9 @@ export default function SceneMapApp() {
   const [mapCenter, setMapCenter] = useState(opened ? [opened.lat, opened.lng] : londonCenter);
   const [browseCenter, setBrowseCenter] = useState(opened ? [opened.lat, opened.lng] : londonCenter);
   const [browseRadius, setBrowseRadius] = useState(10);
-  const [cityName, setCityName] = useState(opened?.name ?? "London");
+  // A link to a bare coordinate names no city, and calling it London was a lie the panel
+  // repeated ("8 places in London" over Taormina) after every reload of a located map.
+  const [cityName, setCityName] = useState(opened ? opened.name ?? AREA_WITHOUT_NAME : "London");
   const [cityRadius, setCityRadius] = useState(15);
   // The exclusion is London's Wikidata id; a map opened elsewhere must not carry it, or
   // the city it opened on is filtered out of its own results.
@@ -1250,6 +1255,11 @@ export default function SceneMapApp() {
   // empty library is offered the poster deck once; both open from the profile any time.
   const [onboarding, setOnboarding] = useState(emptyOnboarding);
   const [onboardingOpen, setOnboardingOpen] = useState(null); // null | "welcome" | "deck"
+  // "What's here?" opened from the map, as opposed to the first run's own copy of it.
+  const [hereOpen, setHereOpen] = useState(false);
+  // True while the position asked for on open is still on its way, so the first run's
+  // "Filmed around you" waits for it instead of listing London first.
+  const [locatingOnOpen, setLocatingOnOpen] = useState(false);
   useEffect(() => {
     const record = loadOnboarding(window.localStorage);
     if (record) setOnboarding(record);
@@ -1501,6 +1511,11 @@ export default function SceneMapApp() {
     setLiveLocations(nextLocations);
     setSelectedFilms(nextFilms.map((film) => film.id));
     setActiveLocation((currentLocation) => {
+      // A map pin the reader opened while this answer was on its way stays open. Whatever
+      // was open before the question was already closed by the move that asked it, so a
+      // point still open here was the reader's own pick — closing it made a pin tapped
+      // right after "locate me" (or from "What's here?") snap shut a second later.
+      if (!openFirst && currentLocation?.display === "point") return currentLocation;
       if (!preserveContext) return openFirst ? nextLocations[0] ?? null : null;
       return nextLocations.some((location) => location.id === currentLocation?.id)
         ? currentLocation
@@ -3059,12 +3074,14 @@ export default function SceneMapApp() {
   useEffect(() => {
     if (!locateOnOpen(opened) || typeof navigator === "undefined" || !navigator.geolocation) return;
     const startCity = viewNow.current.cityName;
+    setLocatingOnOpen(true);
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         const { cityName: city, activeLocation: open, show } = viewNow.current;
         if (city === startCity && !open) show(coords);
+        setLocatingOnOpen(false);
       },
-      () => {},
+      () => setLocatingOnOpen(false),
       { enableHighAccuracy: false, maximumAge: 600_000, timeout: 10_000 },
     );
   }, []);
@@ -3261,6 +3278,16 @@ export default function SceneMapApp() {
             title="My location"
           >
             <LocateFixed size={18} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="map-control map-furniture-group"
+            onClick={() => setHereOpen(true)}
+            aria-label="What's interesting around here"
+            title="What's here?"
+          >
+            <Sparkles size={18} aria-hidden="true" />
           </button>
 
           <div className="map-furniture-group map-layers">
@@ -5258,7 +5285,25 @@ export default function SceneMapApp() {
         onOpenAccount={() => setAccountOpen(true)}
       />
       <AppNav section={section} onSection={setSection} />
-      {onboardingOpen && (
+      {(onboardingOpen === "welcome" || hereOpen) && (() => {
+        // The first run asks about the reader; the button asks about the map. Both say
+        // "you" when the place they ask about is where the reader is standing.
+        const center = onboardingOpen === "welcome" ? (userPosition ?? mapCenter) : browseCenter;
+        const nearReader = userPosition && !userIsDemo && haversineKm(userPosition, center) < 3;
+        const named = cityName && cityName !== "Your location" && cityName !== AREA_WITHOUT_NAME ? cityName : "here";
+        return (
+          <HereSheet
+            center={center}
+            placeLabel={nearReader ? "you" : named}
+            locating={onboardingOpen === "welcome" && locatingOnOpen}
+            firstRun={onboardingOpen === "welcome"}
+            onOpenPlace={openPlaceFromFeature}
+            onPickFilms={supabase && !accountUser ? () => { finishOnboarding(); setAccountOpen(true); } : null}
+            onClose={() => { if (onboardingOpen === "welcome") finishOnboarding(); setHereOpen(false); }}
+          />
+        );
+      })()}
+      {onboardingOpen === "deck" && (
         <Onboarding
           key={onboardingOpen}
           mode={onboardingOpen}
