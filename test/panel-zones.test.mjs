@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { RESULT_TABS, barsSetBehindChip, filtersChipLabel, nextResultTab } from "../app/lib/panel-zones.mjs";
+import { RESULT_TABS, barsSetBehindChip, filtersChipLabel, nextResultTab, planSummaryLabel } from "../app/lib/panel-zones.mjs";
 
 test("results have two tabs, works first", () => {
   assert.deepEqual(RESULT_TABS.map((tab) => tab.id), ["works", "places"]);
@@ -28,4 +28,14 @@ test("arrow keys cycle the tabs; other keys do nothing", () => {
   assert.equal(nextResultTab("places", "ArrowRight"), "works");
   assert.equal(nextResultTab("works", "ArrowLeft"), "places");
   assert.equal(nextResultTab("works", "Enter"), null);
+});
+
+test("the panel's plan line says how far the walk has got", () => {
+  assert.match(planSummaryLabel({ stops: 0 }), /Places tab/);
+  assert.equal(planSummaryLabel({ stops: 2 }), "Your route · 2 of 5 stops");
+  assert.equal(
+    planSummaryLabel({ stops: 3, route: { distanceKm: 2.14, durationMinutes: 28.4 } }),
+    "Your route · 3 of 5 stops · 2.1 km · 28 min",
+  );
+  assert.equal(planSummaryLabel({ stops: 3, route: { distanceKm: null, durationMinutes: 28 } }), "Your route · 3 of 5 stops");
 });

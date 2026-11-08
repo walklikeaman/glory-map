@@ -169,7 +169,7 @@ import { ThenNowWipe } from "./ThenNowWipe";
 import { VisitorShots, shareResultMessage, shareShot } from "./VisitorShots";
 import { composeDiptych, shareOrDownload } from "./shareDiptych";
 import { wipeMode } from "../lib/then-now-wipe.mjs";
-import { RESULT_TABS, filtersChipLabel, nextResultTab } from "../lib/panel-zones.mjs";
+import { RESULT_TABS, filtersChipLabel, nextResultTab, planSummaryLabel } from "../lib/panel-zones.mjs";
 import { PIN_LEGEND, pinHtml, pinSize } from "../lib/map-pin.mjs";
 
 
@@ -2862,7 +2862,7 @@ export default function SceneMapApp() {
   }
 
   // Hand the walk to the reader's own maps app (#191): a GPX file for anything that
-  // navigates offline. The Google Maps link is a plain anchor in the panel.
+  // navigates offline. The Google Maps link is a plain anchor in the Routes section.
   function downloadRouteGpx() {
     const gpx = routeGpx({
       name: cityName ? `GloryMap walk · ${cityName}` : "GloryMap walk",
@@ -3345,6 +3345,279 @@ export default function SceneMapApp() {
       wikidataId: city.wikidata_id ?? null,
     });
   }
+
+  // Everything that plans a walk: the timed tour, the hand-built route, its export and the
+  // stories at each stop (UX-4). Rendered in the Routes section, its one home; the map's
+  // panel only links to it.
+  // Built only while the Routes section is open: nothing else shows it.
+  const routePlanner = section !== "routes" ? null : (
+    <div className="route-planner">
+      {routeStops.length === 0 && !timedTour && !restoredWalk && (
+        <p className="section-note">
+          No route yet. Let a timed tour pick the stops around the map&rsquo;s area, or add places
+          yourself with + on the panel&rsquo;s Places tab.
+        </p>
+      )}
+      <section className="timed-tour-card" aria-labelledby="timed-tour-title">
+        <div className="timed-tour-heading">
+          <span className="timed-tour-icon" aria-hidden="true"><Clock3 size={18} /></span>
+          <div>
+            <p className="eyebrow">Area · {cityName}</p>
+            <strong id="timed-tour-title">Tour by time and place</strong>
+          </div>
+        </div>
+        <div className="budget-options" role="group" aria-label="Tour time budget">
+          {TOUR_BUDGETS.map((minutes) => (
+            <button
+              className={tourBudget === minutes ? "is-selected" : ""}
+              key={minutes}
+              type="button"
+              aria-pressed={tourBudget === minutes}
+              disabled={timedTourStatus === "loading"}
+              onClick={() => {
+                setTourBudget(minutes);
+                resetTimedTour();
+              }}
+            >
+              {minutes} min
+            </button>
+          ))}
+        </div>
+        <label className="guide-language">
+          <span>Guide language</span>
+          <select
+            value={tourLanguage}
+            disabled={timedTourStatus === "loading"}
+            onChange={(event) => chooseTourLanguage(event.target.value)}
+          >
+            {GUIDE_LANGUAGES.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.nativeName === language.name ? language.name : `${language.nativeName} · ${language.name}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="timed-tour-button"
+          type="button"
+          onClick={buildTimedTour}
+          disabled={timedTourStatus === "loading" || visibleLocations.length < 3}
+        >
+          {timedTourStatus === "loading" ? (
+            <LoaderCircle className="loading-icon" size={17} />
+          ) : (
+            <Clock3 size={17} />
+          )}
+          {timedTourStatus === "loading" ? "Planning..." : "Generate nearby tour"}
+        </button>
+        {/* The tour plans around the area the map last showed, which this sheet covers. */}
+        {visibleLocations.length < 3 && (
+          <p className="timed-tour-message">
+            Fewer than 3 places in the map&rsquo;s area. Move the map somewhere busier, then come back.
+          </p>
+        )}
+        {timedTourMessage && (
+          <p
+            className={`timed-tour-message${timedTourStatus === "error" ? " is-error" : ""}`}
+            role={timedTourStatus === "error" ? "alert" : "status"}
+          >
+            {timedTourMessage}
+          </p>
+        )}
+        {timedTour && (
+          <div className="timed-tour-result" aria-live="polite">
+            <div>
+              <strong>{timedTour.guide.title}</strong>
+              <p>{timedTour.guide.intro}</p>
+            </div>
+            <div className="timed-tour-metrics">
+              <span>{timedTour.route.distanceKm.toFixed(1)} km</span>
+              <span>{timedTour.route.durationMinutes} min</span>
+              <span>{timedTour.stops.length} stops</span>
+            </div>
+            <ol>
+              {timedTour.stops.map((stop) => {
+                const record = tourAccess?.[stop.locationId ?? stop.id];
+                return (
+                  <li key={stop.id}>
+                    <strong>{stop.place}</strong>
+                    <span>{stop.film}</span>
+                    {/* Per stop, not only in the summary: "2 of 4 unconfirmed" does
+                        not tell you WHICH two, and that is the whole question when
+                        you are standing at the bus stop deciding. */}
+                    <span className={`access-note${record && isRoutable(record) ? " is-known" : ""}`}>
+                      {accessNote(record)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+            <button className="start-tour-button" type="button" onClick={() => { setSection("map"); setPanelOpen(false); startTimedTour(); }}>
+              <Route size={17} />
+              Start tour
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* "Tour by work" was removed. There were THREE ways to build a walk — by time,
+          by work, and by hand — at 2,024 px, 2,202 px and 2,529 px, with no guidance on
+          which to use and the manual one disabled without explanation. The route is the
+          product; splitting it three ways made the primary outcome the least legible
+          thing on the surface. One generator, by time and place, and the manual route
+          card below it. */}
+
+      {/* A walk that came back from this phone rather than from the network. Said out
+          loud, with its age: a route is a plan for an afternoon, and one restored
+          silently would be the product asserting where somebody is. */}
+      {restoredWalk && (
+        <p className="restored-walk" role="status">
+          <History size={14} aria-hidden="true" />
+          <span>Your walk from {walkAgeLabel(restoredWalk)}, kept on this phone</span>
+          <button type="button" onClick={() => {
+            clearWalk(window.localStorage);
+            setRestoredWalk(null);
+            setRouteStops([]);
+            invalidateRoute();
+          }}>Clear</button>
+        </p>
+      )}
+
+      {keptTiles && (
+        <p className="kept-offline" role="status">
+          <Download size={13} aria-hidden="true" />
+          {keptTiles.working && <span>Keeping this walk for offline…</span>}
+          {keptTiles.skipped === "save_data" && <span>Data saver is on, so the map was not kept for offline.</span>}
+          {keptTiles.reason === "no_tile_source" && <span>This basemap cannot be kept offline.</span>}
+          {keptTiles.reason === "unavailable" && <span>Could not keep the map for offline; the walk still works online.</span>}
+          {keptTiles.reason === null && (
+            <span>
+              {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
+              {" "}({corridorSizeLabel(keptTiles.kept)}) for this walk
+              {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched`}
+              {keptTiles.truncated && " — the route is long, so the start is kept"}
+            </span>
+          )}
+        </p>
+      )}
+
+      <div className="route-card">
+        <div>
+          <p className="eyebrow">Route</p>
+          <strong>{routeStops.length} / 5 stops</strong>
+          {/* The "+" that adds a stop lives on each row of the panel's Places tab, so an
+              empty route says where to find it, and takes the reader there. */}
+          {routeStops.length === 0 && (
+            <button
+              type="button"
+              className="route-card-hint"
+              onClick={() => { setSection("map"); setPanelOpen(true); setResultsTab("places"); }}
+            >
+              Add stops from Places
+            </button>
+          )}
+        </div>
+        <button
+          className={`primary-button${routeResult ? " is-complete" : ""}`}
+          disabled={routeStops.length < 3 || routeStatus !== "idle"}
+          // The route is drawn on the map, so building it goes back there to show it.
+          // Closing the phone sheet too, or it would come back over the route.
+          onClick={() => { setSection("map"); setPanelOpen(false); buildRoute(); }}
+          type="button"
+        >
+          <Route size={18} />
+          {routeStatus === "loading"
+            ? "Building..."
+            : routeStatus === "fallback"
+              ? "Approximate route"
+              : routeResult
+              ? "Route ready"
+              : "Build route"}
+        </button>
+      </div>
+
+      {routeStops.length >= 2 && (
+        <div className="route-export">
+          <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
+            <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
+          </a>
+          <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
+            <Download size={14} aria-hidden="true" />GPX
+          </button>
+        </div>
+      )}
+
+      {aiTour && (
+        <section className="ai-tour-result" aria-live="polite">
+          <p className="eyebrow">Stories at each stop</p>
+          <ol>
+            {aiTour.stops.map((stop) => {
+              const location = sourceLocations.find((item) => item.id === stop.locationId);
+
+              return (
+                <li key={stop.locationId}>
+                  <strong>{location?.place}</strong>
+                  <span>{stop.narration}</span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      {routeStops.length > 0 && (
+        <ol className="route-list">
+          {routeStops.map((stop, index) => (
+            <li key={stop.id}>
+              <button type="button" onClick={() => { setSection("map"); setPanelOpen(false); setActiveLocation(stop); }}>
+                <span>{index + 1}</span>
+                {stop.place}
+              </button>
+              <button className="icon-button" type="button" onClick={() => removeRouteStop(stop.id)} aria-label="Remove stop">
+                <X size={15} />
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {routeStatus === "loading" && (
+        <p className="route-summary" role="status">
+          Building a walking route through {cityName}...
+        </p>
+      )}
+
+      {routeResult && (
+        <div
+          className={`route-summary${routeResult.source === "fallback" ? " is-fallback" : ""}`}
+          role="status"
+        >
+          <strong>
+            {routeResult.distanceKm.toFixed(1)} km on foot · {routeResult.durationMinutes} min
+          </strong>
+          {routeResult.source === "fallback" ? (
+            <span>{routeMessage}</span>
+          ) : (
+            <span>
+              {aiTour?.timed
+                ? "Nearby planner chose the stops · "
+                : aiTour
+                  ? "AI chose the stop order · "
+                  : ""}
+              Route follows mapped streets ·{" "}
+              <a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noreferrer">
+                OpenStreetMap routing
+              </a>
+              {" · "}
+              <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">
+                fix the map
+              </a>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <main className={`scene-shell${section === "map" ? "" : " is-in-section"}`}>
@@ -4248,252 +4521,17 @@ export default function SceneMapApp() {
 
         <section className="panel-zone panel-plan" aria-labelledby="panel-plan-title">
           <h2 id="panel-plan-title" className="panel-zone-title">Plan</h2>
-          <section className="timed-tour-card" aria-labelledby="timed-tour-title">
-            <div className="timed-tour-heading">
-              <span className="timed-tour-icon" aria-hidden="true"><Clock3 size={18} /></span>
-              <div>
-                <p className="eyebrow">Area · {cityName}</p>
-                <strong id="timed-tour-title">Tour by time and place</strong>
-              </div>
-            </div>
-            <div className="budget-options" role="group" aria-label="Tour time budget">
-              {TOUR_BUDGETS.map((minutes) => (
-                <button
-                  className={tourBudget === minutes ? "is-selected" : ""}
-                  key={minutes}
-                  type="button"
-                  aria-pressed={tourBudget === minutes}
-                  disabled={timedTourStatus === "loading"}
-                  onClick={() => {
-                    setTourBudget(minutes);
-                    resetTimedTour();
-                  }}
-                >
-                  {minutes} min
-                </button>
-              ))}
-            </div>
-            <label className="guide-language">
-              <span>Guide language</span>
-              <select
-                value={tourLanguage}
-                disabled={timedTourStatus === "loading"}
-                onChange={(event) => chooseTourLanguage(event.target.value)}
-              >
-                {GUIDE_LANGUAGES.map((language) => (
-                  <option key={language.code} value={language.code}>
-                    {language.nativeName === language.name ? language.name : `${language.nativeName} · ${language.name}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="timed-tour-button"
-              type="button"
-              onClick={buildTimedTour}
-              disabled={timedTourStatus === "loading" || visibleLocations.length < 3}
-            >
-              {timedTourStatus === "loading" ? (
-                <LoaderCircle className="loading-icon" size={17} />
-              ) : (
-                <Clock3 size={17} />
-              )}
-              {timedTourStatus === "loading" ? "Planning..." : "Generate nearby tour"}
-            </button>
-            {timedTourMessage && (
-              <p
-                className={`timed-tour-message${timedTourStatus === "error" ? " is-error" : ""}`}
-                role={timedTourStatus === "error" ? "alert" : "status"}
-              >
-                {timedTourMessage}
-              </p>
-            )}
-            {timedTour && (
-              <div className="timed-tour-result" aria-live="polite">
-                <div>
-                  <strong>{timedTour.guide.title}</strong>
-                  <p>{timedTour.guide.intro}</p>
-                </div>
-                <div className="timed-tour-metrics">
-                  <span>{timedTour.route.distanceKm.toFixed(1)} km</span>
-                  <span>{timedTour.route.durationMinutes} min</span>
-                  <span>{timedTour.stops.length} stops</span>
-                </div>
-                <ol>
-                  {timedTour.stops.map((stop) => {
-                    const record = tourAccess?.[stop.locationId ?? stop.id];
-                    return (
-                      <li key={stop.id}>
-                        <strong>{stop.place}</strong>
-                        <span>{stop.film}</span>
-                        {/* Per stop, not only in the summary: "2 of 4 unconfirmed" does
-                            not tell you WHICH two, and that is the whole question when
-                            you are standing at the bus stop deciding. */}
-                        <span className={`access-note${record && isRoutable(record) ? " is-known" : ""}`}>
-                          {accessNote(record)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ol>
-                <button className="start-tour-button" type="button" onClick={startTimedTour}>
-                  <Route size={17} />
-                  Start tour
-                </button>
-              </div>
-            )}
-          </section>
-
-          {/* "Tour by work" was removed. There were THREE ways to build a walk — by time,
-              by work, and by hand — at 2,024 px, 2,202 px and 2,529 px, with no guidance on
-              which to use and the manual one disabled without explanation. The route is the
-              product; splitting it three ways made the primary outcome the least legible
-              thing on the surface. One generator, by time and place, and the manual route
-              card below it. */}
-
-          {/* A walk that came back from this phone rather than from the network. Said out
-              loud, with its age: a route is a plan for an afternoon, and one restored
-              silently would be the product asserting where somebody is. */}
-          {restoredWalk && (
-            <p className="restored-walk" role="status">
-              <History size={14} aria-hidden="true" />
-              <span>Your walk from {walkAgeLabel(restoredWalk)}, kept on this phone</span>
-              <button type="button" onClick={() => {
-                clearWalk(window.localStorage);
-                setRestoredWalk(null);
-                setRouteStops([]);
-                invalidateRoute();
-              }}>Clear</button>
-            </p>
-          )}
-
-          {keptTiles && (
-            <p className="kept-offline" role="status">
-              <Download size={13} aria-hidden="true" />
-              {keptTiles.working && <span>Keeping this walk for offline…</span>}
-              {keptTiles.skipped === "save_data" && <span>Data saver is on, so the map was not kept for offline.</span>}
-              {keptTiles.reason === "no_tile_source" && <span>This basemap cannot be kept offline.</span>}
-              {keptTiles.reason === "unavailable" && <span>Could not keep the map for offline; the walk still works online.</span>}
-              {keptTiles.reason === null && (
-                <span>
-                  {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
-                  {" "}({corridorSizeLabel(keptTiles.kept)}) for this walk
-                  {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched`}
-                  {keptTiles.truncated && " — the route is long, so the start is kept"}
-                </span>
-              )}
-            </p>
-          )}
-
-          <div className="route-card">
-            <div>
-              <p className="eyebrow">Route</p>
-              <strong>{routeStops.length} / 5 stops</strong>
-              {/* The "+" that adds a stop lives on each row of the Places tab (UX-2), so
-                  an empty route says where to find it. */}
-              {routeStops.length === 0 && resultsTab !== "places" && (
-                <button type="button" className="route-card-hint" onClick={() => setResultsTab("places")}>
-                  Add stops from Places
-                </button>
-              )}
-            </div>
-            <button
-              className={`primary-button${routeResult ? " is-complete" : ""}`}
-              disabled={routeStops.length < 3 || routeStatus !== "idle"}
-              onClick={() => buildRoute()}
-              type="button"
-            >
-              <Route size={18} />
-              {routeStatus === "loading"
-                ? "Building..."
-                : routeStatus === "fallback"
-                  ? "Approximate route"
-                  : routeResult
-                  ? "Route ready"
-                  : "Build route"}
+          {/* UX-4: the route has one home, the Routes section. The panel keeps the "+" on
+              each place (Places tab) and this one line saying where the walk is planned. */}
+          <div className="plan-summary">
+            <span>
+              {planSummaryLabel({ stops: routeStops.length, route: routeResult })}
+            </span>
+            <button type="button" className="ghost-button" onClick={() => setSection("routes")}>
+              <Route size={16} aria-hidden="true" />
+              Plan a walk
             </button>
           </div>
-
-          {routeStops.length >= 2 && (
-            <div className="route-export">
-              <a href={googleMapsDirectionsUrl(routeStops) ?? undefined} target="_blank" rel="noreferrer">
-                <ExternalLink size={14} aria-hidden="true" />Open in Google Maps
-              </a>
-              <button type="button" onClick={downloadRouteGpx} title="For Organic Maps, OsmAnd, Komoot or any GPS app">
-                <Download size={14} aria-hidden="true" />GPX
-              </button>
-            </div>
-          )}
-
-          {aiTour && (
-            <section className="ai-tour-result" aria-live="polite">
-              <p className="eyebrow">Stories at each stop</p>
-              <ol>
-                {aiTour.stops.map((stop) => {
-                  const location = sourceLocations.find((item) => item.id === stop.locationId);
-
-                  return (
-                    <li key={stop.locationId}>
-                      <strong>{location?.place}</strong>
-                      <span>{stop.narration}</span>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          )}
-
-          {routeStops.length > 0 && (
-            <ol className="route-list">
-              {routeStops.map((stop, index) => (
-                <li key={stop.id}>
-                  <button type="button" onClick={() => setActiveLocation(stop)}>
-                    <span>{index + 1}</span>
-                    {stop.place}
-                  </button>
-                  <button className="icon-button" type="button" onClick={() => removeRouteStop(stop.id)} aria-label="Remove stop">
-                    <X size={15} />
-                  </button>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {routeStatus === "loading" && (
-            <p className="route-summary" role="status">
-              Building a walking route through {cityName}...
-            </p>
-          )}
-
-          {routeResult && (
-            <div
-              className={`route-summary${routeResult.source === "fallback" ? " is-fallback" : ""}`}
-              role="status"
-            >
-              <strong>
-                {routeResult.distanceKm.toFixed(1)} km on foot · {routeResult.durationMinutes} min
-              </strong>
-              {routeResult.source === "fallback" ? (
-                <span>{routeMessage}</span>
-              ) : (
-                <span>
-                  {aiTour?.timed
-                    ? "Nearby planner chose the stops · "
-                    : aiTour
-                      ? "AI chose the stop order · "
-                      : ""}
-                  Route follows mapped streets ·{" "}
-                  <a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noreferrer">
-                    OpenStreetMap routing
-                  </a>
-                  {" · "}
-                  <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">
-                    fix the map
-                  </a>
-                </span>
-              )}
-            </div>
-          )}
         </section>
 
         {/* The layers console, behind a disclosure and closed by default.
@@ -5420,15 +5458,9 @@ export default function SceneMapApp() {
 
       <SectionSheet
         section={section}
+        planner={routePlanner}
         onClose={() => setSection("map")}
         onShow={(position) => { setSection("map"); showOnMap(position); }}
-        routeStops={routeStops}
-        routeResult={routeResult}
-        routeStatus={routeStatus}
-        onBuildRoute={() => { setSection("map"); buildRoute(); }}
-        timedTour={timedTour}
-        onStartTimedTour={() => { setSection("map"); startTimedTour(); }}
-        restoredWalk={restoredWalk}
         marks={placeMarks}
         onMarks={updateMarks}
         accountUser={accountUser}
