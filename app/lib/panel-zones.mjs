@@ -33,3 +33,14 @@ export function nextResultTab(current, key) {
   const at = RESULT_TABS.findIndex((tab) => tab.id === current);
   return RESULT_TABS[(at + step + RESULT_TABS.length) % RESULT_TABS.length].id;
 }
+
+// The panel's one line about the walk (UX-4): the route itself is planned in the Routes
+// section, so this says how far it has got, including the length once it is built.
+export function planSummaryLabel({ stops = 0, route = null } = {}) {
+  if (!stops) return "Add places with + on the Places tab, or let a timed tour pick them.";
+  const base = `Your route · ${stops} of 5 stops`;
+  const km = route?.distanceKm;
+  const minutes = route?.durationMinutes;
+  if (!Number.isFinite(km) || !Number.isFinite(minutes)) return base;
+  return `${base} · ${km.toFixed(1)} km · ${Math.round(minutes)} min`;
+}

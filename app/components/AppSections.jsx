@@ -71,57 +71,6 @@ function PlaceRow({ entry, onShow, children }) {
   );
 }
 
-function RoutesView({ routeStops, routeResult, routeStatus, onBuildRoute, timedTour, onStartTimedTour, restoredWalk, onShow, onBack }) {
-  const nothing = routeStops.length === 0 && !timedTour && !restoredWalk;
-  return (
-    <>
-      {nothing && (
-        <div className="section-empty-state">
-          <p className="section-empty">
-            No route yet. Open a place and add it from its Route tab, or generate a timed tour from the map&rsquo;s panel.
-          </p>
-          <BackToMap onBack={onBack} />
-        </div>
-      )}
-      {routeStops.length > 0 && (
-        <section className="section-block">
-          <h3>Your route · {routeStops.length} of 5 stops</h3>
-          {routeResult && (
-            <p className="section-note">{routeResult.distanceKm.toFixed(1)} km on foot · {routeResult.durationMinutes} min</p>
-          )}
-          <ol className="section-list">
-            {routeStops.map((stop, index) => (
-              <PlaceRow key={stop.id} entry={{ place: `${index + 1}. ${stop.place}`, film: stop.film, position: stop.position }} onShow={onShow} />
-            ))}
-          </ol>
-          {!routeResult && (
-            <button type="button" className="wide-button" disabled={routeStops.length < 3 || routeStatus !== "idle"} onClick={() => onBuildRoute()}>
-              <Route size={18} aria-hidden="true" />
-              {routeStops.length < 3 ? `Add ${3 - routeStops.length} more to build a route` : "Build route"}
-            </button>
-          )}
-        </section>
-      )}
-      {timedTour && (
-        <section className="section-block">
-          <h3>{timedTour.guide?.title ?? "Timed tour"}</h3>
-          <p className="section-note">{timedTour.stops.length} stops · {timedTour.route.durationMinutes} min</p>
-          <button type="button" className="wide-button" onClick={onStartTimedTour}>
-            <Route size={18} aria-hidden="true" />
-            Walk this tour
-          </button>
-        </section>
-      )}
-      {restoredWalk && (
-        <section className="section-block">
-          <h3>Saved on this phone</h3>
-          <p className="section-note">A walk of {restoredWalk.stops?.length ?? 0} stops, kept for offline use.</p>
-        </section>
-      )}
-    </>
-  );
-}
-
 function CollectionView({ marks, onMarks, onShow, onBack }) {
   const { want, visited, works } = collectionOf(marks);
   if (want.length === 0 && visited.length === 0) {
@@ -352,7 +301,10 @@ function AddView({ suggestions, onSuggestions, mapCenter, userPosition, userIsDe
 
 const TITLES = { routes: "Routes", add: "Add a place", collection: "Collection", profile: "Profile" };
 
-export function SectionSheet({ section, onClose, ...props }) {
+// `planner` is the Routes section, the route's one home (UX-4): the timed tour, the
+// hand-built route, its export and the stories at each stop. It is built in the map
+// component, which owns that state, and handed in whole.
+export function SectionSheet({ section, onClose, planner = null, ...props }) {
   if (section === "map") return null;
   return (
     <section className="section-sheet" aria-label={TITLES[section]}>
@@ -363,7 +315,7 @@ export function SectionSheet({ section, onClose, ...props }) {
         </button>
       </header>
       <div className="section-body">
-        {section === "routes" && <RoutesView {...props} onBack={onClose} />}
+        {section === "routes" && planner}
         {section === "collection" && <CollectionView {...props} onBack={onClose} />}
         {section === "profile" && <ProfileView {...props} />}
         {section === "add" && <AddView {...props} />}

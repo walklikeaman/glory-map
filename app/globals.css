@@ -6102,3 +6102,15 @@ figcaption a {
   .scene-shell:has(.maplibregl-popup) .walk-controls,
   .scene-shell:has(.maplibregl-popup) .map-key { visibility: hidden; }
 }
+
+/* UX-4: the panel's Plan zone is one line that leads to the Routes section. */
+.plan-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.plan-summary .ghost-button { flex: none; }
+.route-planner { display: grid; gap: 14px; }

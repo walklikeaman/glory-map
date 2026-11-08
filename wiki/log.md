@@ -7,6 +7,18 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-08] decision | The route has one home: the Routes section (UX-4)
+**Object**: `routePlanner` in `app/components/SceneMapApp.jsx`, `SectionSheet` in `app/components/AppSections.jsx`, `planSummaryLabel` in `app/lib/panel-zones.mjs`.
+**Scenario**: UX pass
+**Outcome**: ✅ built; tests + Playwright at 1440 and 390 (3 stops → Routes → Build route)
+**What happened**: the Routes tab said "No route yet" while the panel's Plan zone held the timed tour, the route card, export and stop list. All of that now lives in the Routes section. The panel keeps the "+" on each place (Places tab) and one line: "Your route · N of 5 stops · km · min" with a "Plan a walk" button.
+
+Decisions worth keeping:
+- The planner stays in the map component, which owns its state (tour, route, stops), and is handed to `SectionSheet` as one element, built only while Routes is open.
+- Anything in Routes that acts on the map (Build route, Start tour, a stop in the list) returns to the map and closes the phone sheet, so the result is visible.
+- The timed tour plans around the map's last area, which the sheet covers; with fewer than 3 places there it says so instead of showing a dead button.
+**Updated**: `wiki/log.md`, `TASKS.md`.
+
 ## [2026-11-07] decision | Place names come from Wikidata, not from a translator
 **Scenario**: Nikita answered the translation question with "сравнивай названия на IMDb, не переводи".
 **Decision**: names are not machine-translated. `translate-display-text.mjs` looks each name up on
