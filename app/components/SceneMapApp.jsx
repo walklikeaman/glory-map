@@ -110,6 +110,7 @@ import {
   filmsInView,
   filmsInViewLabel,
 } from "../lib/films-in-view.mjs";
+import { workPlacesAsLocations } from "../lib/work-locations.mjs";
 import {
   FILTER_DEFAULTS, clearedFilter, filterChipLabel, filtersFromParams,
   narrowingFilters, workChipTitle, writeFilterParams,
@@ -1952,6 +1953,7 @@ export default function SceneMapApp() {
   // is a claim about ONE story's order, and overlaying two would be meaningless.
   const [trailScenes, setTrailScenes] = useState([]);
   const [trailPlaces, setTrailPlaces] = useState([]);
+  const [trailWork, setTrailWork] = useState(null); // the /api/work `work` the places above belong to
   // Spoiler-free is the DEFAULT, never a setting someone has to find: with progress 0
   // the server withholds each unreached scene's coordinates entirely, so the trail
   // cannot leak the plot even by the shape of a line. Seeing it whole is an explicit,
@@ -2147,11 +2149,18 @@ export default function SceneMapApp() {
   // The list and its heading are ONE truth. Counting the viewport while listing the whole
   // selection put "6 places from 4 films" above ten rows, which is a header contradicting
   // the thing it heads.
-  const locationsInView = useMemo(
-    () => filterInView(visibleLocations, mapBounds),
-    [mapBounds, visibleLocations],
+  // With a work picked, the Places tab lists that work's places rather than the nearby
+  // search, which knows nothing of the pick — see [[work-locations]].
+  const pickedWorkLocations = useMemo(
+    () => (graphWorkId && trailWork?.id === graphWorkId ? workPlacesAsLocations(trailWork, trailPlaces) : null),
+    [graphWorkId, trailWork, trailPlaces],
   );
-  const inView = useMemo(() => countInView(visibleLocations, mapBounds), [mapBounds, visibleLocations]);
+  const listedLocations = pickedWorkLocations ?? visibleLocations;
+  const locationsInView = useMemo(
+    () => filterInView(listedLocations, mapBounds),
+    [mapBounds, listedLocations],
+  );
+  const inView = useMemo(() => countInView(listedLocations, mapBounds), [mapBounds, listedLocations]);
 
   // The card reopens on Details whenever the place changes: leaving it on Route means
   // clicking a new pin shows route controls where the sentence about the place should be.
@@ -2339,7 +2348,7 @@ export default function SceneMapApp() {
   // live chips. Only a grounded work has scenes and a uuid; a live chip carries a
   // Wikidata id or a synthetic slug, which /api/trail rightly refuses.
   useEffect(() => {
-    if (!graphWorkId) { setTrailScenes([]); setTrailPlaces([]); return undefined; }
+    if (!graphWorkId) { setTrailScenes([]); setTrailPlaces([]); setTrailWork(null); return undefined; }
 
     const controller = new AbortController();
     (async () => {
@@ -2357,12 +2366,14 @@ export default function SceneMapApp() {
           fetch(`/api/work?id=${encodeURIComponent(graphWorkId)}`, { signal: controller.signal }),
         ]);
         const scenes = trail.ok ? (await trail.json()).scenes ?? [] : [];
-        const places = profile.ok ? (await profile.json()).places ?? [] : [];
+        const profileBody = profile.ok ? await profile.json() : {};
+        const places = profileBody.places ?? [];
         setTrailScenes(Array.isArray(scenes) ? scenes : []);
         setTrailPlaces(places.filter((place) => place.lat !== null && place.lng !== null));
+        setTrailWork(profileBody.work?.id ? profileBody.work : null);
       } catch (error) {
         // Most works have no trail extracted yet; that is an ordinary outcome.
-        if (error?.name !== "AbortError") { setTrailScenes([]); setTrailPlaces([]); }
+        if (error?.name !== "AbortError") { setTrailScenes([]); setTrailPlaces([]); setTrailWork(null); }
       }
     })();
     return () => controller.abort();
@@ -4488,9 +4499,9 @@ export default function SceneMapApp() {
                 </div>
                 {/* The distinction the panel could not make before: nothing here because we hold
                     nothing, or nothing here because the map is somewhere else. */}
-                {locationsInView.length === 0 && visibleLocations.length > 0 && (
+                {locationsInView.length === 0 && listedLocations.length > 0 && (
                   <p className="location-empty" role="status">
-                    None of the {visibleLocations.length} places for the films you have selected are
+                    None of the {listedLocations.length} places for the films you have selected are
                     on screen. Zoom out or drag the map to find them.
                   </p>
                 )}
