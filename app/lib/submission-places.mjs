@@ -138,7 +138,7 @@ export function submissionToLocation(row, { work, kind, matchedBy = MATCHED_BY.i
     relation_property: null,
     relation_label: row.status === "verified"
       ? (matchedBy === MATCHED_BY.title ? "Source checked · matched by title" : "Source checked")
-      : (matchedBy === MATCHED_BY.title ? "In review · matched by title" : "In review"),
+      : (matchedBy === MATCHED_BY.title ? "Unconfirmed · matched by title" : "Unconfirmed"),
     review_status: row.status ?? "pending",
     relation_description: submissionDescription(row, work.title, matchedBy),
     matched_by: matchedBy,
@@ -241,7 +241,7 @@ export function submissionToCandidate(row, { work, matchedBy = MATCHED_BY.id } =
     name,
     // The badge carries the review state, because on this block that is the single thing
     // a reader most needs to know before believing anything else on the row.
-    precision: row?.status === "verified" ? "Source checked" : "In review",
+    precision: row?.status === "verified" ? "Source checked" : "Unconfirmed",
     sentence: submissionDescription(row, work?.title ?? "this work", matchedBy),
     // Whoever said it, in the meta line. Never "filmed on location": nobody has checked.
     // Inside a lot the meta line says whether a reader can get in instead, because that

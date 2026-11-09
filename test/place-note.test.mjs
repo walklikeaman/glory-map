@@ -101,7 +101,7 @@ test("the source is named the way a reader would name it", () => {
 // With no note, the popup says what we know and no more: somebody listed it, nobody
 // checked it.
 test("the fallback line never dresses a listing up as a scene", () => {
-  assert.equal(listingLine({ source_kind: "moviemaps" }), "Listed by MovieMaps · not checked by us");
+  assert.equal(listingLine({ source_kind: "moviemaps" }), "Reported by MovieMaps · unconfirmed");
   assert.equal(
     listingLine({ source_kind: "wikipedia", status: "verified" }),
     "Checked against Wikipedia",

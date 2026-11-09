@@ -56,7 +56,7 @@ export async function generateMetadata({ params }) {
     description: count > 0
       ? `${count} place${count === 1 ? "" : "s"} recorded for ${work.title}, each with the source that stated it.`
       : waiting > 0
-        ? `${waiting} unverified candidate place${waiting === 1 ? "" : "s"} for ${work.title}, each with the source that named it.`
+        ? `${waiting} unconfirmed place${waiting === 1 ? "" : "s"} for ${work.title}, each with the guide that reported it.`
         : `No places recorded for ${work.title} yet.`,
   };
 }
@@ -175,8 +175,8 @@ export default async function WorkPage({ params }) {
         // Set apart with the same treatment distance 2 gets, and for the same reason: a
         // reader must never mistake a row nobody has checked for one we stand behind.
         // Nothing here is in the graph, and the block says so before the first row.
-        <section className="work-block is-aside" aria-label="Candidates from our sources">
-          <h2>Candidates, not yet verified</h2>
+        <section className="work-block is-aside" aria-label="Unconfirmed places">
+          <h2>Unconfirmed places</h2>
           <p className="work-block-note">{candidatesNote(candidates.length, candidatesTotal)}</p>
           <ul className="work-places">
             {candidates.map((candidate) => <PlaceRow key={candidate.id} place={candidate} />)}

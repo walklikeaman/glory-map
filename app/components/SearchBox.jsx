@@ -340,7 +340,7 @@ export default function SearchBox({
             <>
               <li className="search-note" role="presentation">
                 {cities.unavailable
-                  ? "The place gazetteer did not answer."
+                  ? "Place search is not answering right now. Try again in a moment."
                   : `No place on Wikidata is called “${query}”.`}
               </li>
               {options.filter((option) => option.kind === "lookup").map((option) => (

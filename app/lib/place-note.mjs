@@ -194,5 +194,5 @@ export function listingLine(film) {
   const source = sourceLabel(film?.source_kind);
   return film?.status === "verified"
     ? `Checked against ${source}`
-    : `Listed by ${source} · not checked by us`;
+    : `Reported by ${source} · unconfirmed`;
 }

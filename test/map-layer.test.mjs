@@ -176,9 +176,9 @@ test("a checked SOURCE is never called a verified place", async () => {
   const checked = candidateSummary({ status: "verified" });
   // The review checked whoever said it, not whether it happened. "Verified" here would
   // promote a queue row to a fact in the one place nobody would look.
-  assert.match(checked, /still a candidate/);
+  assert.match(checked, /not confirmed the spot ourselves/);
   assert.equal(/^Verified/.test(checked), false);
-  assert.match(candidateSummary({ status: "pending" }), /Nobody has checked it/);
+  assert.match(candidateSummary({ status: "pending" }), /Not confirmed by us yet/);
 });
 
 test("the queue is asked for only when wanted, and never alongside a work", async () => {

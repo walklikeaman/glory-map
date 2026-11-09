@@ -61,11 +61,7 @@ export default async function CityPage({ params, searchParams }) {
         </p>
         {page.total > 0 && (
           <p className="directory-note">
-            Showing {page.from}–{page.to}, the best-covered first. The centre is{" "}
-            {city.lat.toFixed(4)}, {city.lng.toFixed(4)}
-            {city.anchor === "wikidata"
-              ? " — the city's own Wikidata coordinate, because we hold too few places here to measure one."
-              : " — measured from the places we hold, not taken from a gazetteer, so it sits where the filming is rather than at the town hall."}
+            Showing {page.from}–{page.to}, the best-covered first.
           </p>
         )}
       </header>

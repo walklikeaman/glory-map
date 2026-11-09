@@ -232,7 +232,7 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
         </button>
       </div>
       <p className="voice-status" aria-live="polite">
-        {message || (speechState === "playing" ? `Playing as ${NARRATOR_PROFILES[narratorId].label.toLowerCase()}.` : "Ready to stream an AI-generated original recap.")}
+        {message || (speechState === "playing" ? `Playing as ${NARRATOR_PROFILES[narratorId].label.toLowerCase()}.` : "Press play for a short AI-narrated story of this place.")}
       </p>
     </section>
   );

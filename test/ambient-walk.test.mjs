@@ -126,7 +126,7 @@ test("an unchecked listing says so first, names its sources, and drops the addre
   const text = candidatePlaceText({ name: "Hollywood Pantages Theatre", films: PANTAGES_FILMS });
   assert.equal(
     text,
-    "Not yet checked by us. Movie-Locations and MovieMaps list Hollywood Pantages Theatre as a filming location. "
+    "Not confirmed yet. Movie-Locations and MovieMaps list Hollywood Pantages Theatre as a filming location. "
       + "Friends with Benefits, 2011: Kayla splits up with Dylan. The Bodyguard, 1992: interior of the Oscar ceremony. "
       + "And one more film.",
   );
@@ -137,7 +137,7 @@ test("an unchecked listing says so first, names its sources, and drops the addre
 // not have heard more than we know.
 test("no part of an unchecked telling makes a claim before the qualifier", () => {
   const text = candidatePlaceText({ name: "Hollywood Pantages Theatre", films: PANTAGES_FILMS });
-  const qualifier = text.indexOf("Not yet checked");
+  const qualifier = text.indexOf("Not confirmed yet");
   assert.equal(qualifier, 0);
   for (const film of PANTAGES_FILMS) {
     const at = text.indexOf(film.title);
@@ -147,7 +147,7 @@ test("no part of an unchecked telling makes a claim before the qualifier", () =>
 
 test("a listing with one source says 'lists', and one without films says nothing", () => {
   const one = candidatePlaceText({ name: "Hollywood Tower Apartments", films: [PANTAGES_FILMS[1]] });
-  assert.match(one, /^Not yet checked by us\. MovieMaps lists Hollywood Tower Apartments as a filming location\. The Bodyguard, 1992/);
+  assert.match(one, /^Not confirmed yet\. MovieMaps lists Hollywood Tower Apartments as a filming location\. The Bodyguard, 1992/);
   assert.equal(candidatePlaceText({ name: "Somewhere", films: [] }), null);
   assert.equal(candidatePlaceText({ name: "Somewhere", films: [{ note: "no title" }] }), null);
 });
@@ -189,7 +189,7 @@ test("a telling is fetched only for a checked place, and a failed fetch says not
   assert.equal(asked, "/api/place?id=2b453aa8-7bfc-486c-8266-8a73f872a6a7");
 
   asked = null;
-  assert.match(await tellingFor(pantages, { fetchImpl }), /^Not yet checked by us\./);
+  assert.match(await tellingFor(pantages, { fetchImpl }), /^Not confirmed yet\./);
   assert.equal(asked, null, "a listing carries its own sentences");
 
   assert.equal(await tellingFor(palladium, { fetchImpl: async () => ({ ok: false }) }), null);

@@ -31,7 +31,7 @@ test("a pending submission reaches the map as a candidate, never as a verified p
   const location = submissionToLocation(row(), { work: WORK, kind: "film" });
 
   assert.equal(location.relation_kind, "candidate");
-  assert.equal(location.relation_label, "In review");
+  assert.equal(location.relation_label, "Unconfirmed");
   assert.equal(location.loc_wikidata_id, null, "a queue row is not a Wikidata item");
   assert.match(location.loc_source_id, /^submission:/);
   assert.match(location.relation_description, /not yet verified/i);
@@ -100,7 +100,7 @@ test("a row matched only by title says so, because a title is not an identifier"
 
   const [byId] = selectSubmissionPlaces([row()], { work: WORK, kind: "film", center: LONDON });
   assert.equal(byId.matched_by, "id");
-  assert.equal(byId.relation_label, "In review");
+  assert.equal(byId.relation_label, "Unconfirmed");
   assert.doesNotMatch(byId.relation_description, /by title/i);
 });
 
@@ -140,7 +140,7 @@ test("a candidate on the card is badged by review state, not by precision", () =
   // believing anything else on the row, so it takes the badge the graph uses for
   // geocode precision.
   const pending = submissionToCandidate(row(), { work: WORK });
-  assert.equal(pending.precision, "In review");
+  assert.equal(pending.precision, "Unconfirmed");
   assert.equal(
     submissionToCandidate(row({ status: "verified" }), { work: WORK }).precision,
     "Source checked",
@@ -204,7 +204,7 @@ test("the card counts what the queue holds, not what it managed to print", () =>
   const shown = selectWorkCandidates(many, { work: WORK });
   assert.equal(shown.length, 60);
   assert.match(candidatesNote(shown.length, 62), /^60 of 62 places/);
-  assert.match(coverageLine({ places: [], candidates: 62 }), /62 candidates/);
+  assert.match(coverageLine({ places: [], candidates: 62 }), /62 places reported by location guides/);
 });
 
 test("a work with facts counts its candidates apart from them", () => {
@@ -215,7 +215,7 @@ test("a work with facts counts its candidates apart from them", () => {
     tally: { on_location: 2 },
     candidates: 62,
   });
-  assert.equal(line, "2 places · 2 filmed on location · 62 unverified candidates.");
+  assert.equal(line, "2 places · 2 filmed on location · 62 more unconfirmed.");
 });
 
 // ---------- rows nobody geocoded ----------

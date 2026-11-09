@@ -1080,7 +1080,7 @@ export default function SceneMapApp() {
   // the two impressions.
   //
   // The honesty is carried by the RENDERING, not by the default. A candidate is drawn
-  // hollow and grey where a fact is filled and amber, its popup says "In review", and the
+  // hollow and grey where a fact is filled and amber, its popup says "Unconfirmed", and the
   // panel above says the rows are named by our sources and not checked by us. A reader can
   // tell the two apart at a glance; an empty map tells them nothing at all.
   const [candidatesOn, setCandidatesOn] = useState(initialFilters.candidates);
@@ -4385,7 +4385,7 @@ export default function SceneMapApp() {
                       has checked. The panel's most prominent list was the one place the product
                       made no claim about its own evidence, which is the same failure as the
                       London cover strip in a new shape. */}
-                  <p className="notable-note">Named by our sources · not checked by us</p>
+                  <p className="notable-note" title="These come from film-location guides and Wikipedia. We have not confirmed each spot ourselves yet.">Reported by location guides · unconfirmed</p>
                 </section>
               )}
 
@@ -4556,14 +4556,15 @@ export default function SceneMapApp() {
                 ? "loading…"
                 : graphSummary.clustered
                   ? "zoom in"
-                  : `${drawnUnchecked} unchecked`}
+                  : `${drawnUnchecked} unconfirmed`}
             </span>
           </summary>
         {/* Two words for the two stores, and only two. The panel used "verified", "grounded",
             "checked", "unchecked" and "candidates" for two ideas, beside "points", "pins" and
             "places" for one — the review counted seven numbers and five nouns describing a
-            single map. Checked means checked BY US; unchecked means a source named it. */}
-        <section className="graph-layer-panel" aria-label="Checked places layer">
+            single map. On screen they read "Confirmed" (checked BY US) and "Unconfirmed" (a source
+            reported it); the code keeps checked/unchecked. */}
+        <section className="graph-layer-panel" aria-label="Confirmed places layer">
           {/* The work list follows the kind filter, so it can only ever offer works
               that actually have a place to fly to under the current filter. */}
           <button
@@ -4573,7 +4574,7 @@ export default function SceneMapApp() {
             onClick={() => setGraphLayerOn((on) => !on)}
           >
             <Layers size={16} aria-hidden="true" />
-            Checked places
+            Confirmed places
             {graphLayerOn && graphSummary ? (
               <span className="graph-count">
                 {graphSummary.clustered
@@ -4732,7 +4733,7 @@ export default function SceneMapApp() {
                   onClick={() => setCandidatesOn((on) => !on)}
                 >
                   <Layers size={15} aria-hidden="true" />
-                  Unchecked places
+                  Unconfirmed places
                   {candidatesOn && graphSummary ? (
                     <span className="graph-count">
                       {graphSummary.clustered
@@ -4745,8 +4746,8 @@ export default function SceneMapApp() {
                 {candidatesOn && (
                   <>
                     <p className="graph-note">
-                      Named by our sources and not checked by us. Drawn hollow — each pin
-                      links to whoever said it.
+                      Reported by film-location guides, not confirmed by us yet. They are
+                      the hollow pins, and each one links to where it was reported.
                     </p>
 
                     <label className="candidate-switch">
@@ -4879,19 +4880,18 @@ export default function SceneMapApp() {
                     className="coordinate-copy"
                     type="button"
                     onClick={copyCoordinate}
-                    aria-label={`Copy the coordinate ${activeCoordinate}`}
+                    title={activeCoordinate}
+                    aria-label={`Copy coordinates ${activeCoordinate}`}
                   >
-                    <span>{activeCoordinate}</span>
+                    <span>{copiedCoordinate ? "Copied" : "Copy coordinates"}</span>
                     {copiedCoordinate ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                   </button>
-                ) : (
-                  <span>No coordinate recorded</span>
-                )}
+                ) : null}
                 {/* Said out loud rather than swallowed: clipboard access is refused
                     outside a secure context and while the document is unfocused. */}
                 {copyFailed && (
                   <span className="coordinate-copy-failed" role="status">
-                    Copying was blocked — select the number and copy it by hand.
+                    Copying was blocked. Copy it by hand: {activeCoordinate}
                   </span>
                 )}
               </div>
@@ -5077,7 +5077,7 @@ export default function SceneMapApp() {
                       <img
                         loading="lazy"
                         src={frame.url}
-                        alt={`Candidate frame from ${activeLocation.film} associated with ${frame.locationName}`}
+                        alt={`Possible frame from ${activeLocation.film} at ${frame.locationName}`}
                         onError={() => markImageBroken(frame.url)}
                       />
                       <figcaption>
