@@ -54,7 +54,7 @@ export const BADGE_STYLES = Object.freeze({
 export const CANDIDATE_STYLE = Object.freeze({
   color: "#9aa0a6", fillColor: "#9aa0a6", fillOpacity: 0,
   radius: 5, weight: 1.5, dashArray: "2 3",
-  label: "In review", hint: "Named by a source. Nobody has checked it.",
+  label: "Unconfirmed", hint: "Reported by a source. Not confirmed by us yet.",
 });
 
 // A candidate inside a studio lot keeps the hollow ring — it is still unchecked — and
@@ -62,8 +62,8 @@ export const CANDIDATE_STYLE = Object.freeze({
 export const CANDIDATE_STUDIO_STYLE = Object.freeze({
   ...CANDIDATE_STYLE,
   color: "#b98cff", fillColor: "#b98cff",
-  label: "In review · studio lot",
-  hint: "Named by a source, and inside a studio lot. The camera was here; the story is set elsewhere.",
+  label: "Unconfirmed · studio lot",
+  hint: "Reported by a source, and inside a studio lot. The camera was here; the story is set elsewhere.",
 });
 
 // A point with ninety-six films on it is not the same size as one with a single film.
@@ -194,7 +194,7 @@ export function candidateSummary(properties) {
   const checked = properties.status === "verified"
     // The review checked the SOURCE, not the claim. Saying "verified" here would promote
     // a queue row to a fact in the one place nobody would notice.
-    ? "Source checked — still a candidate, not part of our graph."
+    ? "The source was checked, but we have not confirmed the spot ourselves yet."
     : style.hint;
   return checked;
 }

@@ -32,7 +32,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] UX-3 Phone: search field floating on the map; "Listen as I walk" off the top of the map
 - [x] UX-3b Phone pass after Nikita tried the iPhone app (2026-11-07): the queue's bubbles drawn when zoomed out, ~36 px tap target, film titles under pins from z15, a popup that lists the films (a sheet on a phone), plain badge words, a blue "you" dot and radius, walk button on the legend's row
 - [x] UX-4 One home for routes: stop list, build route and timed tour all in the Routes section
-- [ ] UX-5 Copy pass: no engineering words ("candidates", "unchecked", "gazetteer", raw coordinates)
+- [x] UX-5 Copy pass: no engineering words ("candidates", "unchecked", "gazetteer", raw coordinates)
 
 **UX pass (P2):**
 - [ ] UX-6 Place card: no empty hero, Recreate disabled without a frame, one Play/Pause, one "Open in maps" menu

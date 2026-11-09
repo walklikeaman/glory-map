@@ -196,7 +196,7 @@ function candidateFeature(row) {
       // where two films were shot. The pin is sized by films, not by rows.
       work_count: row.work_count ?? films.length,
       row_count: row.row_count ?? films.length,
-      // "In review" / "Source checked" — the same two words the film card uses.
+      // "Unconfirmed" / "Source checked" — the same two words the film card uses.
       status: row.status ?? "pending",
       // Capped at 40 by the query. `work_count` is the true total beside it, so a popup
       // listing forty of ninety-six can say so instead of printing its cap as the count.

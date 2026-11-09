@@ -227,7 +227,7 @@ export function candidatePlaceText({ name, films }) {
   });
 
   const where = name ? ` ${sentenceEnd(name).replace(/\.$/, "")}` : " this place";
-  return `Not yet checked by us. ${source} ${verb}${where} as a filming location. ${lines.join(" ")}${andMore(described.length - told.length)}`
+  return `Not confirmed yet. ${source} ${verb}${where} as a filming location. ${lines.join(" ")}${andMore(described.length - told.length)}`
     .replace(/\s+/g, " ")
     .trim();
 }

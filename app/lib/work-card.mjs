@@ -68,7 +68,7 @@ export function coverageLine({ places, tally, candidates = 0 }) {
     // which was true of the graph and false of the page directly under it. Measured 18.08:
     // that was 6,378 of the 6,392 works the directory addresses.
     return waiting > 0
-      ? `Nothing verified yet — ${waiting} candidate${waiting === 1 ? "" : "s"} from our sources, below.`
+      ? `${waiting} place${waiting === 1 ? "" : "s"} reported by location guides, not confirmed yet. See below.`
       : "No places recorded for this work yet.";
   }
 
@@ -81,7 +81,7 @@ export function coverageLine({ places, tally, candidates = 0 }) {
   if (nearby > 0) parts.push(`${nearby} nearby rather than in the film`);
   // Counted separately from the places, never added to them: the number before the dot is
   // what we stand behind, and this is what we have not checked.
-  if (waiting > 0) parts.push(`${waiting} unverified candidate${waiting === 1 ? "" : "s"}`);
+  if (waiting > 0) parts.push(`${waiting} more unconfirmed`);
   return `${parts.join(" · ")}.`;
 }
 
@@ -97,7 +97,7 @@ export function candidatesNote(shown, total = shown) {
   const count = all > n
     ? `${n} of ${all} places`
     : `${n} place${n === 1 ? "" : "s"}`;
-  return `${count} named by a source we have not checked. Each row says who said it and links to where.`;
+  return `${count} reported by a source, not confirmed yet. Each one links to where it was reported.`;
 }
 
 // Which stills may be shown and what the caption is allowed to claim.

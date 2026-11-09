@@ -157,7 +157,7 @@ export default function AmbientGuide({ onPlace, onListeningChange }) {
           {/* The hollow pin cannot be seen while listening, so its meaning is written. */}
           <small className={current.checked ? "ambient-checked" : "ambient-unchecked"}>
             {status === "preparing" ? "Getting ready… · " : ""}
-            {current.checked ? "Checked place" : "Listed by a source, not checked by us"}
+            {current.checked ? "Confirmed place" : "Reported by a source · unconfirmed"}
           </small>
           <button aria-label="Skip this place" className="walk-stop" onClick={player.skip} type="button">
             <SkipForward size={14} />

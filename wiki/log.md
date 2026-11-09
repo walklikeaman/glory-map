@@ -7,6 +7,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-09] decision | Two trust words on screen: Confirmed / Unconfirmed (UX-5)
+**Object**: UI copy in `SceneMapApp.jsx`, `AmbientGuide.jsx`, `VoiceGuide.jsx`, `SearchBox.jsx`, `work/[slug]`, `city/[slug]`, and the copy helpers in `place-note`, `work-card`, `map-layer`, `submission-places`, `notable-here`, `ambient-walk`.
+**Scenario**: UX pass, item UX-5 from `docs/ux-audit-2026-11-03.md`.
+**What**: A visitor now sees only two trust words. "Confirmed" means we checked it. "Unconfirmed" means a source reported it ("Reported by MovieMaps · unconfirmed"). They replace "checked/unchecked", "candidates", "In review" and "not checked by us". Code and DB names stay `checked`/`candidate`; only the visible text changed. "Source checked" stays for the middle state, where the source was reviewed but the spot was not. The place card hides the raw coordinate: the button says "Copy coordinates" and the number sits in its tooltip, and in the failure message if the clipboard is blocked. The city page lost the "centre is 51.5, -0.1 … not a gazetteer" sentence. The voice guide says "Press play for a short AI-narrated story of this place."
+**Not changed**: the precision label "Spot not checked yet" (a separate axis: the exact spot, not who reported it), the agent-facing `tripHonestyLine`, and the admin `/review` page.
+
 ## [2026-11-08] decision | The route has one home: the Routes section (UX-4)
 **Object**: `routePlanner` in `app/components/SceneMapApp.jsx`, `SectionSheet` in `app/components/AppSections.jsx`, `planSummaryLabel` in `app/lib/panel-zones.mjs`.
 **Scenario**: UX pass

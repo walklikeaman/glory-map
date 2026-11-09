@@ -181,7 +181,7 @@ export function notableEmptyReason({
   if (!candidatesOn) {
     return {
       code: EMPTY_REASON.queue_hidden,
-      text: "Unchecked places are hidden, and almost everything here is one.",
+      text: "Unconfirmed places are hidden, and almost everything here is one.",
     };
   }
   if (summary.clustered) {
