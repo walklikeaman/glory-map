@@ -40,5 +40,7 @@ export function workPlacesAsLocations(work, places) {
       sourceUrl: null,
       sourceTitle: null,
       evidenceSource: "graph",
+      // Not from the nearby answer, so a reload of that answer must not close its card.
+      fromPickedWork: true,
     }));
 }

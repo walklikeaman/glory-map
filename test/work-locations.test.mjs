@@ -36,3 +36,9 @@ test("no work, or no places, is an empty list", () => {
   assert.deepEqual(workPlacesAsLocations(null, places), []);
   assert.deepEqual(workPlacesAsLocations(work, null), []);
 });
+
+test("a row says it came from the picked work, so a nearby reload leaves its card open", () => {
+  // 10.11: the card opened from this list shut as soon as the map panned to it, because
+  // the nearby reload kept only the places in its own answer.
+  assert.ok(workPlacesAsLocations(work, places).every((row) => row.fromPickedWork === true));
+});

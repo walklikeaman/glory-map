@@ -1531,6 +1531,9 @@ export default function SceneMapApp() {
       // point still open here was the reader's own pick — closing it made a pin tapped
       // right after "locate me" (or from "What's here?") snap shut a second later.
       if (!openFirst && currentLocation?.display === "point") return currentLocation;
+      // Same for a row of the picked work's own list: it never came from this answer, so
+      // the check below always closed it — the card shut as soon as the map panned to it.
+      if (!openFirst && currentLocation?.fromPickedWork) return currentLocation;
       if (!preserveContext) return openFirst ? nextLocations[0] ?? null : null;
       return nextLocations.some((location) => location.id === currentLocation?.id)
         ? currentLocation
