@@ -7,6 +7,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-10] decision | Place card trimmed: no empty hero, one voice button, one maps menu (UX-6)
+**Object**: the place card in `app/components/SceneMapApp.jsx`, `app/components/VoiceGuide.jsx`, `voiceToggle` in `app/lib/voice-guide.mjs`, CSS `.sheet-media.is-empty`, `.open-in-maps`.
+**Scenario**: UX pass, item UX-6 from `docs/ux-audit-2026-11-03.md`.
+**What**: With no picture, the hero shrinks to the title (`.is-empty`) instead of a 180 px black band. The voice guide has one button that does what comes next (Play, Generating…, Pause, Resume). Stop was dropped, because changing or closing the place already stops the audio. Google Maps, Street View and Google Earth now sit behind one "Open in maps" `<details>` menu. "Recreate this shot" was already disabled without a frame; its tooltip now reads "No film frame for this place yet".
+**Kept**: "Find place images" and the source link stay as their own rows, because they are not map apps.
+
 ## [2026-11-09] decision | Two trust words on screen: Confirmed / Unconfirmed (UX-5)
 **Object**: UI copy in `SceneMapApp.jsx`, `AmbientGuide.jsx`, `VoiceGuide.jsx`, `SearchBox.jsx`, `work/[slug]`, `city/[slug]`, and the copy helpers in `place-note`, `work-card`, `map-layer`, `submission-places`, `notable-here`, `ambient-walk`.
 **Scenario**: UX pass, item UX-5 from `docs/ux-audit-2026-11-03.md`.

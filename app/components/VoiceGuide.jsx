@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LoaderCircle, Pause, Play, Square, Volume2 } from "lucide-react";
-import { NARRATOR_PROFILES, narrationText, resolveNarrator } from "../lib/voice-guide.mjs";
+import { LoaderCircle, Pause, Play, Volume2 } from "lucide-react";
+import { NARRATOR_PROFILES, narrationText, resolveNarrator, voiceToggle } from "../lib/voice-guide.mjs";
 
 // Genres by work, for the visit: the tone of a film does not change while it is open.
 const genresByWork = new Map();
@@ -180,13 +180,6 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
     }
   }
 
-  function stop() {
-    if (!supported) return;
-    cancelCurrentRequest();
-    setSpeechState("idle");
-    setMessage("Narration stopped.");
-  }
-
   if (supported === false) {
     return (
       <section className="voice-guide is-unavailable" aria-label="Voice guide">
@@ -195,6 +188,8 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
       </section>
     );
   }
+
+  const toggle = voiceToggle(speechState);
 
   return (
     <section className="voice-guide" aria-label="Voice guide">
@@ -219,16 +214,15 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
         </select>
       </label>
       <div className="voice-controls">
-        <button type="button" onClick={play} disabled={supported !== true || speechState !== "idle"}>
-          {speechState === "loading" ? <LoaderCircle className="spin" size={15} /> : <Play size={15} />}
-          {speechState === "loading" ? "Generating" : "Play"}
-        </button>
-        <button type="button" onClick={togglePause} disabled={!["playing", "paused"].includes(speechState)}>
-          {speechState === "paused" ? <Play size={15} /> : <Pause size={15} />}
-          {speechState === "paused" ? "Resume" : "Pause"}
-        </button>
-        <button type="button" onClick={stop} disabled={speechState === "idle"}>
-          <Square size={14} /> Stop
+        <button
+          type="button"
+          onClick={toggle.action === "play" ? play : togglePause}
+          disabled={supported !== true || !toggle.action}
+        >
+          {speechState === "loading"
+            ? <LoaderCircle className="spin" size={15} />
+            : toggle.action === "pause" ? <Pause size={15} /> : <Play size={15} />}
+          {toggle.label}
         </button>
       </div>
       <p className="voice-status" aria-live="polite">

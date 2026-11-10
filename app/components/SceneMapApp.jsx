@@ -2200,6 +2200,13 @@ export default function SceneMapApp() {
   }
 
   const activeCoordinate = coordinateToCopy(activeLocation);
+  const activeMapLinks = activeLocation
+    ? externalPlaceLinks({
+      name: activeLocation.name,
+      lat: activeLocation.position?.[0],
+      lng: activeLocation.position?.[1],
+    })
+    : [];
   const activeRoute = routeTabState({ location: activeLocation, stops: routeStops });
 
   // `navigator.clipboard` is undefined outside a secure context and rejects when the
@@ -2389,6 +2396,10 @@ export default function SceneMapApp() {
       : activeLocation?.filmTmdbId ? "loading" : "unavailable";
   const activeFilmImageSource = activePrimaryFrame?.sourceUrl
     ?? (filmImageState.locationId === activeLocation?.id ? filmImageState.sourceUrl : null);
+  const activeHero = (() => {
+    const src = activeFilmImage ?? activeLocation?.now;
+    return src && !brokenImages.has(src) ? src : null;
+  })();
   // Both captions are shown under the side-by-side pair and under the wipe (#57), so
   // the frame's source and the photo's licence credit travel with either layout.
   const thenCaption = activeLocation ? (
@@ -4812,13 +4823,12 @@ export default function SceneMapApp() {
           >
             ×
           </button>
-          <div className="sheet-media">
-            {(() => {
-              const heroSrc = activeFilmImage ?? activeLocation.now;
-              return heroSrc && !brokenImages.has(heroSrc) ? (
-                <img src={heroSrc} alt="" onError={() => markImageBroken(heroSrc)} />
-              ) : null;
-            })()}
+          {/* UX-6: with no picture the hero was a 180 px black band. It shrinks to the
+              title instead, so the card starts with what we have. */}
+          <div className={`sheet-media${activeHero ? "" : " is-empty"}`}>
+            {activeHero && (
+              <img src={activeHero} alt="" onError={() => markImageBroken(activeHero)} />
+            )}
             <div>
               <p>
                 <WorkKindMark kind={activeLocation.kind} />{" "}{activeLocation.film}
@@ -5103,7 +5113,7 @@ export default function SceneMapApp() {
               className="wide-button recreate-launch"
               disabled={!activeFilmImage}
               onClick={() => setRecreateLocation({ ...activeLocation, backdrop: activeFilmImage })}
-              title={activeFilmImage ? undefined : "A reference image is required to recreate this shot"}
+              title={activeFilmImage ? undefined : "No film frame for this place yet"}
               type="button"
             >
               <Clapperboard size={18} />
@@ -5137,23 +5147,22 @@ export default function SceneMapApp() {
             {/* Deep links, never embeds: Street View is the only free way to see the
                 facade from the pavement without going there, and their imagery is not
                 licensed to be pulled into our own map. */}
-            {externalPlaceLinks({
-              name: activeLocation.name,
-              lat: activeLocation.position?.[0],
-              lng: activeLocation.position?.[1],
-            }).length > 0 && (
-              <div className="external-place-links">
-                {externalPlaceLinks({
-                  name: activeLocation.name,
-                  lat: activeLocation.position?.[0],
-                  lng: activeLocation.position?.[1],
-                }).map((link) => (
-                  <a key={link.id} className="ghost-button" href={link.url} target="_blank" rel="noopener noreferrer">
-                    {link.label}
-                    <ExternalLink size={14} />
-                  </a>
-                ))}
-              </div>
+            {/* UX-6: one "Open in maps" menu instead of a row of three buttons. */}
+            {activeMapLinks.length > 0 && (
+              <details className="open-in-maps">
+                <summary className="ghost-button">
+                  <MapPin size={16} aria-hidden="true" />
+                  Open in maps
+                </summary>
+                <div className="open-in-maps-list">
+                  {activeMapLinks.map((link) => (
+                    <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer">
+                      {link.label}
+                      <ExternalLink size={14} aria-hidden="true" />
+                    </a>
+                  ))}
+                </div>
+              </details>
             )}
             </div>
 
