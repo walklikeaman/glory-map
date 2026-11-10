@@ -105,3 +105,13 @@ export function createSpeechRequest({ text, profileId, model, language }) {
     response_format: "mp3",
   };
 }
+
+// UX-6: the card had Play, Pause and Stop side by side, two of them disabled at any
+// moment. One button now does what the state allows next. Closing the card or moving to
+// another place already stops the audio, so a separate Stop added nothing.
+export function voiceToggle(speechState) {
+  if (speechState === "loading") return { action: null, label: "Generating…" };
+  if (speechState === "playing") return { action: "pause", label: "Pause" };
+  if (speechState === "paused") return { action: "resume", label: "Resume" };
+  return { action: "play", label: "Play" };
+}

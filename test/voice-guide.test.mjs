@@ -63,3 +63,12 @@ test("rejects unknown profiles and oversized narration", () => {
     /Invalid narration request/,
   );
 });
+
+test("one voice button says what it will do next", async () => {
+  const { voiceToggle } = await import("../app/lib/voice-guide.mjs");
+  assert.deepEqual(voiceToggle("idle"), { action: "play", label: "Play" });
+  assert.deepEqual(voiceToggle("loading"), { action: null, label: "Generating…" });
+  assert.deepEqual(voiceToggle("playing"), { action: "pause", label: "Pause" });
+  assert.deepEqual(voiceToggle("paused"), { action: "resume", label: "Resume" });
+  assert.deepEqual(voiceToggle(undefined), { action: "play", label: "Play" });
+});
