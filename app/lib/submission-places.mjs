@@ -70,9 +70,25 @@ export const MATCHED_BY = Object.freeze({
 // graph — nothing here is — but "nobody has looked at this" and "we looked, and the
 // source is one a stranger can check" are different sentences, and saying the first about
 // the second is its own small dishonesty.
+// The review stores its signals as codes ("wikidata_entity+cited_source"); the page says
+// them in words, since a visitor can't read the codes.
+const SIGNAL_WORDS = {
+  wikidata_entity: "the place has a Wikidata entry",
+  cited_source: "the source cites where it came from",
+  independent_corroboration: "a second, independent source agrees",
+  coordinate_agreement: "the coordinates match the place",
+};
+
+function readableReason(reason) {
+  if (!/^[a-z_]+(\+[a-z_]+)*$/.test(reason)) return reason;
+  const words = reason.split("+").map((code) => SIGNAL_WORDS[code]).filter(Boolean);
+  if (words.length === 0) return "";
+  return words.length === 1 ? words[0] : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
 function checkedNote(row) {
   if (row?.status !== "verified") return "";
-  const reason = String(row?.status_reason ?? "").trim();
+  const reason = readableReason(String(row?.status_reason ?? "").trim());
   return reason
     ? ` We have checked the source: ${reason}. It is still a candidate, not part of our graph.`
     : " We have checked the source. It is still a candidate, not part of our graph.";
