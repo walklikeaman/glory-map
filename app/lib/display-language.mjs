@@ -41,7 +41,23 @@ export function englishFirst(text, english) {
   if (!needsEnglish(text)) return { text, original: null };
   const rendering = english?.get?.(textKey(text));
   if (typeof rendering !== "string" || !rendering.trim()) return { text, original: null };
-  return { text: rendering.trim(), original: text };
+  const rendered = rendering.trim();
+  // "청담대교 (Cheongdam Bridge)" leads with the bracket and keeps only the Korean under it.
+  const tail = ` (${rendered})`;
+  const original = text.endsWith(tail) ? text.slice(0, -tail.length).trim() : text;
+  return { text: rendered, original: original || text };
+}
+
+// Many queue names already carry their English in brackets, written by the source:
+// "ชีวารี โฮเต็ล แอนด์ รีสอร์ท (Chivaree Hotel and Resort)". That is not a translation,
+// it is the source's own English name, so the script stores it as is. Only a single,
+// final, Latin-only bracket counts; nested or mixed brackets are left alone.
+export function bracketedEnglish(name) {
+  const match = String(name ?? "").match(/^([^()]+?)\s*\(([^()]+)\)\s*$/);
+  if (!match) return null;
+  const [, head, inside] = match;
+  if (!needsEnglish(head) || needsEnglish(inside) || !/[A-Za-z]/.test(inside)) return null;
+  return inside.trim();
 }
 
 // Every string on these rows that could use an English rendering — the lookup list.
@@ -105,6 +121,8 @@ export function localiseMapRows(rows, { works = new Map(), english = new Map(), 
         if (work?.imdb_id) extra.imdb_url = imdbUrl(work.imdb_id);
         if (work?.poster_path) extra.poster = posterUrl(work.poster_path);
         if (film?.source_url) extra.source_lang = sourceLanguage(film.source_url);
+        // For the card's "Show original" — the sentence as the source wrote it.
+        if (note.original) extra.note_original = note.original;
         return Object.fromEntries(Object.entries({
           ...film,
           place_name: name.text ?? film?.place_name,

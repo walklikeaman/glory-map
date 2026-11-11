@@ -16,6 +16,7 @@ import { bubbleFeatures, candidateSummary, pointFilmLine, pointHint, pointSummar
 import { placePath } from "../lib/place-url.mjs";
 import { describedFilms, listingLine, sourceLinkLabel } from "../lib/place-note.mjs";
 import { useGeoJsonLayer, useMapCanvas, claimClick } from "./map/MapCanvas.jsx";
+import TranslatedNote from "./TranslatedNote.jsx";
 import { MapPopup, PinLayer, nearestHit } from "./map/layers.jsx";
 
 const REFRESH_DEBOUNCE_MS = 300;
@@ -426,7 +427,7 @@ function GraphLayer({
                           </a>
                         )}
                       </span>
-                      {note && <span className="point-film-note">{note}</span>}
+                      <TranslatedNote className="point-film-note" note={note} original={film.note_original} />
                       {/* Where the claim came from, always — it is the reader's way to the
                           full sentence, and on a row with no note it is the only thing we
                           can honestly offer beyond the title. */}

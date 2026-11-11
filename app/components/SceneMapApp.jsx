@@ -73,6 +73,7 @@ import {
   viewCountLabel,
 } from "../lib/place-card.mjs";
 import WorkProfile from "./WorkProfile.jsx";
+import TranslatedNote from "./TranslatedNote.jsx";
 import { isWalkableStop, trailStops } from "../lib/story-trail.mjs";
 import { onFootNote, orderTrail, TRAIL_ORDER, trailOrderNote, walkRuns } from "../lib/trail-order.mjs";
 import { trailFileName, trailGeoJson, trailOrderFromParams, trailShareUrl } from "../lib/trail-share.mjs";
@@ -1805,6 +1806,8 @@ export default function SceneMapApp() {
       placeOriginal: props.name_original ?? null,
       // The film's own page, ahead of the source that says it was filmed here.
       imdbUrl: lead.imdb_url ?? null,
+      // What the source wrote, when `scene` is our English rendering of it.
+      sceneOriginal: lead.note && lead.note_original ? lead.note_original : null,
       position: [lat, lng],
       // Hollow means a source named it and nobody on our side has checked it. The sheet
       // must not present a queue row as a fact.
@@ -4852,7 +4855,7 @@ export default function SceneMapApp() {
                   </a>
                 )}
               </p>
-              <h2>{activeLocation.scene}</h2>
+              <TranslatedNote as="h2" note={activeLocation.scene} original={activeLocation.sceneOriginal} />
             </div>
           </div>
 

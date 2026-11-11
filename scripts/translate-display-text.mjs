@@ -17,7 +17,7 @@ import process from "node:process";
 import { z } from "zod";
 
 import {
-  englishNameFromWikidata, needsEnglish, searchLanguage, servedNote, textKey,
+  bracketedEnglish, englishNameFromWikidata, needsEnglish, searchLanguage, servedNote, textKey,
 } from "../app/lib/display-language.mjs";
 import { CONTACT_USER_AGENT } from "../app/lib/user-agent.mjs";
 import { createModelClient, parseStructured, TIERS } from "../app/lib/model-client.mjs";
@@ -102,6 +102,11 @@ async function wikidata(params) {
 let unmatched = 0;
 for (const [md5, item] of todo.filter(([, entry]) => entry.kind === "place name")) {
   const lang = searchLanguage(item.text);
+  const bracketed = bracketedEnglish(item.text);
+  if (bracketed) {
+    rendered.push({ source_md5: md5, source: item.text, english: bracketed, source_lang: lang, method: "source-bracket" });
+    continue;
+  }
   const search = await wikidata({ action: "wbsearchentities", search: item.text, language: lang, uselang: "en", limit: 7 });
   const hits = search.search ?? [];
   const entities = hits.length
@@ -134,6 +139,12 @@ const Schema = z.object({
   items: z.array(z.object({ id: z.number().int(), english: z.string() })),
 });
 
+function mostlyLatin(text) {
+  const letters = [...text].filter((char) => /\p{L}/u.test(char));
+  const foreign = letters.filter((char) => needsEnglish(char)).length;
+  return letters.length > 0 && foreign / letters.length < 0.25;
+}
+
 let tokensIn = 0;
 let tokensOut = 0;
 for (let start = 0; start < notes.length; start += BATCH) {
@@ -150,7 +161,9 @@ for (let start = 0; start < notes.length; start += BATCH) {
     const entry = batch[item.id];
     const english = item.english.trim();
     // A repeated id would put one key twice into the upsert, and Postgres refuses the batch.
-    if (!entry || !english || needsEnglish(english) || rendered.some((row) => row.source_md5 === entry[0])) continue;
+    // A note may keep a quoted sign in its own script ("Appears as 'רחוב הרצל'") and still be
+    // English; what is refused is an answer that is mostly not English.
+    if (!entry || !english || !mostlyLatin(english) || rendered.some((row) => row.source_md5 === entry[0])) continue;
     rendered.push({ source_md5: entry[0], source: entry[1].text, english, source_lang: searchLanguage(entry[1].text), method: `claude:${result.model}` });
   }
 }
