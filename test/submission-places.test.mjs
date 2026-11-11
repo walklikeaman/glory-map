@@ -264,3 +264,21 @@ test("a checked row still outranks an unchecked one that happens to be located",
   ];
   assert.deepEqual(selectWorkCandidates(rows, { work: { title: "X" } }).map((c) => c.name), ["B", "A"]);
 });
+
+test("a checked row says why in words, not in the review's codes", () => {
+  const candidate = submissionToCandidate(
+    row({ status: "verified", status_reason: "wikidata_entity+independent_corroboration+cited_source" }),
+    { work: WORK },
+  );
+  assert.doesNotMatch(candidate.sentence, /_|\+/);
+  assert.match(
+    candidate.sentence,
+    /checked the source: the place has a Wikidata entry, a second, independent source agrees and the source cites where it came from\./,
+  );
+  // A reason already written as a sentence (a plaque, a permit) passes through untouched.
+  const plaque = submissionToCandidate(
+    row({ status: "verified", status_reason: "a filming permit issued by the city for this address" }),
+    { work: WORK },
+  );
+  assert.match(plaque.sentence, /checked the source: a filming permit issued by the city for this address\./);
+});
