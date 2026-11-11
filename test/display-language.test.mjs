@@ -203,3 +203,21 @@ test("Wikidata gives the English name only for a hit at this place, an exact lab
   assert.equal(englishNameFromWikidata("הר הזיתים", { lat: 0.5, lng: 0.5 }, hits, entities), null);
   assert.equal(englishNameFromWikidata("הר הזיתים", at, [], {}), null);
 });
+
+test("a name that already carries its English in brackets uses it, and the original drops it", async () => {
+  const { bracketedEnglish } = await import("../app/lib/display-language.mjs");
+  assert.equal(bracketedEnglish("청담대교 (Cheongdam Bridge)"), "Cheongdam Bridge");
+  assert.equal(bracketedEnglish("Parking Lot (near سيدى بحلال (Sidi Bouhlel))"), null);
+  assert.equal(bracketedEnglish("Сеченова 8"), null);
+  assert.equal(bracketedEnglish("Notting Hill (London)"), null);
+  const name = "청담대교 (Cheongdam Bridge)";
+  assert.deepEqual(englishFirst(name, new Map([[textKey(name), "Cheongdam Bridge"]])), { text: "Cheongdam Bridge", original: "청담대교" });
+});
+
+test("a translated note keeps its original for the card's Show original", () => {
+  const [row] = localiseMapRows([jaffaRow], {
+    english: new Map([[textKey("מרבית צילומי הסרט נעשו בישראל"), "Most of the film was shot in Israel"]]),
+  });
+  assert.equal(row.films[0].note, "Most of the film was shot in Israel");
+  assert.equal(row.films[0].note_original, "מרבית צילומי הסרט נעשו בישראל");
+});

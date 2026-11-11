@@ -7,6 +7,16 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-11] update | Scene notes translated, with "Show original"
+**Scenario**: Nikita: "все сцены нужно перевести на английский… кнопочку «Показать оригинал» надо оставить".
+**Done**: `translate-display-text.mjs --notes --write` rendered every non-Latin scene note on the map
+(130 notes, ~$0.13 on Haiku). The card shows the English and a "Show original" toggle
+(`TranslatedNote.jsx`), in the pin popup and on the place sheet; the API carries `note_original`.
+Names: 102 queue names in Thai/Korean/Japanese/Arabic already carried the source's own English in
+brackets ("청담대교 (Cheongdam Bridge)"), now used as is (`method = source-bracket`); 25 names
+remain in their own script (no Wikidata match, no bracket). Notes that are English with a quoted
+sign in another script are accepted (under 25% non-Latin letters).
+
 ## [2026-11-11] decision | Work page leads with poster and a mini-map, lists show 10 then "Show all" (UX-7)
 **Object**: `app/work/[slug]/page.jsx`, new `app/components/WorkMiniMap.jsx`, `firstAndRest` / `miniMapPoints` / `mapLinkFor` in `app/lib/work-card.mjs`.
 **Scenario**: UX pass, item UX-7 from `docs/ux-audit-2026-11-03.md` (the work page on a phone was 18,700 px of text cards).

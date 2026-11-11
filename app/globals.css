@@ -234,6 +234,22 @@ img {
   text-decoration: none;
   vertical-align: 1px;
 }
+/* "Show original" under a translated scene note: quiet, because the English is the content
+   and the original is there for whoever wants to check it. */
+.note-original-toggle {
+  display: inline-block;
+  margin: 0.1rem 0.6rem 0 0;
+  justify-self: start;
+  text-align: left;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(236, 232, 225, 0.6);
+  font-size: 0.7rem;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+.note-original-toggle:hover { color: #f3efe7; }
 /* The name in its own script, under the English one — for matching the street sign. */
 .name-original {
   display: block;
