@@ -120,3 +120,50 @@ export function stillsCaption({ stills, verified, note }) {
 export function workLinks(links) {
   return (Array.isArray(links) ? links : []).filter((link) => link?.url && link?.label);
 }
+
+// ---------- UX-7: lead with a picture and a map, not 18,000 px of text ----------
+
+// How many rows a block prints before "Show all". Ten fits a phone screen or two; the
+// rest stay on the page (it is server-rendered and indexed) behind a <details>.
+export const FIRST_PLACES = 10;
+
+export function firstAndRest(list, limit = FIRST_PLACES) {
+  const all = Array.isArray(list) ? list : [];
+  return { first: all.slice(0, limit), rest: all.slice(limit) };
+}
+
+function finite(value) {
+  const n = typeof value === "number" ? value : Number(value);
+  return value !== null && value !== "" && Number.isFinite(n) ? n : null;
+}
+
+// The pins the mini-map draws: every place and every unconfirmed row with a usable
+// coordinate, as [lat, lng] with a flag for which kind it is. Null Island is dropped,
+// for the same reason the place card drops it.
+export function miniMapPoints({ places = [], candidates = [] } = {}) {
+  const toPoint = (row, confirmed) => {
+    const lat = finite(row?.lat);
+    const lng = finite(row?.lng);
+    if (lat === null || lng === null || (lat === 0 && lng === 0)) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    return { position: [lat, lng], confirmed, name: row?.name ?? null };
+  };
+  return [
+    ...(Array.isArray(places) ? places : []).map((row) => toPoint(row, true)),
+    ...(Array.isArray(candidates) ? candidates : []).map((row) => toPoint(row, false)),
+  ].filter(Boolean);
+}
+
+// Where "Open on the map" lands: the median point, not the mean, so one stray location on
+// another continent does not drop the reader in the ocean between them.
+export function mapLinkFor(points, { zoom = 13 } = {}) {
+  const list = Array.isArray(points) ? points : [];
+  if (!list.length) return null;
+  const median = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  };
+  const lat = median(list.map((point) => point.position[0]));
+  const lng = median(list.map((point) => point.position[1]));
+  return `/?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}&z=${zoom}`;
+}

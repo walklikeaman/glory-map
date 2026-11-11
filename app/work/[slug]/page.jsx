@@ -19,7 +19,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { GET as workRoute } from "../../api/work/route.js";
-import { candidatesNote, coverageLine, placeBlocks, stillsCaption, workLinks } from "../../lib/work-card.mjs";
+import WorkMiniMap from "../../components/WorkMiniMap.jsx";
+import {
+  candidatesNote, coverageLine, firstAndRest, mapLinkFor, miniMapPoints, placeBlocks, stillsCaption, workLinks,
+} from "../../lib/work-card.mjs";
 import { placePath } from "../../lib/place-url.mjs";
 import { workIdFromSlug, workPath } from "../../lib/work-url.mjs";
 
@@ -104,6 +107,27 @@ function PlaceRow({ place, href = null }) {
   );
 }
 
+// UX-7: a block prints its first ten rows; the rest stay on the page, behind one
+// "Show all" toggle, so a work with 900 rows is not 18,000 px of cards on a phone.
+function PlaceList({ rows, hrefFor = () => null, keyFor }) {
+  const { first, rest } = firstAndRest(rows);
+  return (
+    <>
+      <ul className="work-places">
+        {first.map((place) => <PlaceRow key={keyFor(place)} place={place} href={hrefFor(place)} />)}
+      </ul>
+      {rest.length > 0 && (
+        <details className="work-show-all">
+          <summary>Show all {rows.length}</summary>
+          <ul className="work-places">
+            {rest.map((place) => <PlaceRow key={keyFor(place)} place={place} href={hrefFor(place)} />)}
+          </ul>
+        </details>
+      )}
+    </>
+  );
+}
+
 export default async function WorkPage({ params }) {
   const { slug } = await params;
   const data = await loadWork(slug);
@@ -116,18 +140,25 @@ export default async function WorkPage({ params }) {
   const blocks = placeBlocks(places);
   const caption = stillsCaption({ stills, verified, note });
   const canonical = workPath(work);
+  const points = miniMapPoints({ places, candidates });
 
   return (
     <main className="work-page">
       <header className="work-header">
         <Link className="work-back" href="/">← Map</Link>
-        <h1>
-          {work.title}
-          {work.year && <span className="work-year"> ({work.year})</span>}
-        </h1>
-        {/* Coverage before anything else. Thin coverage and a broken page look identical
-            otherwise, and thin is the normal state here. */}
-        <p className="work-coverage">{coverageLine({ places, tally, candidates: candidatesTotal })}</p>
+        <div className="work-title-row">
+          {work.poster && <img className="work-poster" src={work.poster} alt="" width="76" height="114" />}
+          <div>
+            <h1>
+              {work.title}
+              {work.year && <span className="work-year"> ({work.year})</span>}
+            </h1>
+            {/* Coverage before anything else. Thin coverage and a broken page look identical
+                otherwise, and thin is the normal state here. */}
+            <p className="work-coverage">{coverageLine({ places, tally, candidates: candidatesTotal })}</p>
+          </div>
+        </div>
+        <WorkMiniMap points={points} href={mapLinkFor(points)} title={work.title} />
         {!work.in_graph && (
           <p className="work-note">
             This work is not in our graph — what follows comes from what we could look up live.
@@ -160,14 +191,10 @@ export default async function WorkPage({ params }) {
         >
           <h2>{block.heading}</h2>
           <p className="work-block-note">{block.note}</p>
-          <ul className="work-places">
-            {/* The other end of the same table (#129, step 4). A place where two films
-                meet has a page showing both, and this link is the only way into it from a
-                card that can only ever show one of them. */}
-            {block.places.map((place) => (
-              <PlaceRow key={place.fact_id ?? place.id} place={place} href={placePath(place)} />
-            ))}
-          </ul>
+          {/* The other end of the same table (#129, step 4). A place where two films
+              meet has a page showing both, and this link is the only way into it from a
+              card that can only ever show one of them. */}
+          <PlaceList rows={block.places} hrefFor={placePath} keyFor={(place) => place.fact_id ?? place.id} />
         </section>
       ))}
 
@@ -178,9 +205,7 @@ export default async function WorkPage({ params }) {
         <section className="work-block is-aside" aria-label="Unconfirmed places">
           <h2>Unconfirmed places</h2>
           <p className="work-block-note">{candidatesNote(candidates.length, candidatesTotal)}</p>
-          <ul className="work-places">
-            {candidates.map((candidate) => <PlaceRow key={candidate.id} place={candidate} />)}
-          </ul>
+          <PlaceList rows={candidates} keyFor={(candidate) => candidate.id} />
         </section>
       )}
 
