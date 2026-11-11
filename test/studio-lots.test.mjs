@@ -179,7 +179,7 @@ test("a queue row inside a lot says so before it says anything else", () => {
   // learning they cannot go there.
   assert.match(candidate.sentence, /^New York City Backlot, inside Paramount Pictures Studios — a studio lot\./);
   // And the row still says nobody has checked it. The lot is geometry, not verification.
-  assert.match(candidate.sentence, /Not yet verified by us/);
+  assert.match(candidate.sentence, /Not confirmed yet/);
   assert.match(candidate.role_label, /no public access|tour goes inside/);
 });
 

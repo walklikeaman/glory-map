@@ -101,7 +101,7 @@ function submissionDescription(row, workTitle, matchedBy) {
     ? ` Matched to ${workTitle} by title, not by identifier — check it is the same work.`
     : "";
 
-  const unchecked = checked ? "" : " Not yet verified by us.";
+  const unchecked = checked ? "" : " Not confirmed yet.";
   // The lot goes in front of the source's own sentence rather than replacing it: the
   // source said something and we do not get to overwrite it, but a reader must not reach
   // the end of the row before learning they cannot go there.

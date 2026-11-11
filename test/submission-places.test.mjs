@@ -34,7 +34,7 @@ test("a pending submission reaches the map as a candidate, never as a verified p
   assert.equal(location.relation_label, "Unconfirmed");
   assert.equal(location.loc_wikidata_id, null, "a queue row is not a Wikidata item");
   assert.match(location.loc_source_id, /^submission:/);
-  assert.match(location.relation_description, /not yet verified/i);
+  assert.match(location.relation_description, /not confirmed yet/i);
 });
 
 test("a plaque says where its sentence can be checked", () => {
@@ -83,7 +83,7 @@ test("every source reaches the map, and every card names who said it", () => {
   assert.equal(chosen.length, 2);
   assert.match(chosen.find((place) => place.evidence_source === "reelstreets").relation_description, /Reelstreets/);
   assert.match(chosen.find((place) => place.evidence_source === "moviemaps").relation_description, /MovieMaps/);
-  for (const place of chosen) assert.match(place.relation_description, /not yet verified/i);
+  for (const place of chosen) assert.match(place.relation_description, /not confirmed yet/i);
 });
 
 test("a row matched only by title says so, because a title is not an identifier", () => {
@@ -151,7 +151,7 @@ test("a candidate carries who said it and where to check it", () => {
   const candidate = submissionToCandidate(row(), { work: WORK });
   assert.equal(candidate.role_label, "MovieMaps");
   assert.equal(candidate.source_url, "https://moviemaps.org/movies/xyz");
-  assert.match(candidate.sentence, /Not yet verified by us/);
+  assert.match(candidate.sentence, /Not confirmed yet/);
   // The area the source named, printed as the hint it is: location_submissions has no
   // city column and nothing here resolved one.
   assert.equal(candidate.city, "London");

@@ -36,7 +36,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 
 **UX pass (P2):**
 - [x] UX-6 Place card: no empty hero, Recreate disabled without a frame, one Play/Pause, one "Open in maps" menu
-- [ ] UX-7 Work page: poster + mini-map on top, first 10 places then "Show all"
+- [x] UX-7 Work page: poster + mini-map on top, first 10 places then "Show all"
 - [ ] UX-8 City page: posters, small map, "Walk London" call to action
 - [x] UX-9 Onboarding: one welcome screen for guests, a 20-poster left/right deck after sign-in, Skip in the top corner, no repeat after sign-in
 - [ ] UX-10 Desktop: section rail on the screen edge, sections replace the left panel

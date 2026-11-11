@@ -143,3 +143,35 @@ test("a link with no url is not a link", () => {
   );
   assert.deepEqual(workLinks(null), []);
 });
+
+// --- UX-7: the top of the page and the long lists ------------------------------
+
+test("a block prints the first ten and keeps the rest for Show all", async () => {
+  const { firstAndRest, FIRST_PLACES } = await import("../app/lib/work-card.mjs");
+  const list = Array.from({ length: 23 }, (_, i) => i);
+  const { first, rest } = firstAndRest(list);
+  assert.equal(FIRST_PLACES, 10);
+  assert.deepEqual(first, list.slice(0, 10));
+  assert.equal(rest.length, 13);
+  assert.deepEqual(firstAndRest(list.slice(0, 4)).rest, []);
+  assert.deepEqual(firstAndRest(null), { first: [], rest: [] });
+});
+
+test("the mini-map draws only usable coordinates and says which are confirmed", async () => {
+  const { miniMapPoints } = await import("../app/lib/work-card.mjs");
+  const points = miniMapPoints({
+    places: [{ name: "Glencoe", lat: 56.68, lng: -5.1 }, { name: "Nowhere", lat: null, lng: null }],
+    candidates: [{ name: "Null Island", lat: 0, lng: 0 }, { name: "Soho", lat: "51.51", lng: "-0.13" }, { lat: 120, lng: 0 }],
+  });
+  assert.deepEqual(points, [
+    { position: [56.68, -5.1], confirmed: true, name: "Glencoe" },
+    { position: [51.51, -0.13], confirmed: false, name: "Soho" },
+  ]);
+});
+
+test("Open on the map lands on the median point, not between continents", async () => {
+  const { mapLinkFor } = await import("../app/lib/work-card.mjs");
+  const at = (lat, lng) => ({ position: [lat, lng] });
+  assert.equal(mapLinkFor([at(51.5, -0.12), at(51.51, -0.13), at(34.05, -118.24)]), "/?lat=51.5000&lng=-0.1300&z=13");
+  assert.equal(mapLinkFor([]), null);
+});

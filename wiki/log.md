@@ -7,6 +7,13 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-11] decision | Work page leads with poster and a mini-map, lists show 10 then "Show all" (UX-7)
+**Object**: `app/work/[slug]/page.jsx`, new `app/components/WorkMiniMap.jsx`, `firstAndRest` / `miniMapPoints` / `mapLinkFor` in `app/lib/work-card.mjs`.
+**Scenario**: UX pass, item UX-7 from `docs/ux-audit-2026-11-03.md` (the work page on a phone was 18,700 px of text cards).
+**What**: The header now shows the TMDB poster (`work.poster`, already in `/api/work`) beside the title. Under it sits a 220 px MapLibre mini-map with every place that has a coordinate (filled pins = confirmed, rings = unconfirmed) and an "Open <title> on the map" link at the median point. The median is used so one far-off location does not centre the link in the ocean. Every block prints its first 10 rows; the rest stay in the server-rendered HTML behind a `<details>` "Show all N", so they are still indexed.
+**Gotchas**: the global `.map-canvas-surface` has `min-height: 100vh`. Inside the mini-map that pushed markers below the 220 px box, so the mini-map resets it to 0. The mini-map also needs `minZoom={0}`, because films shot on several continents cannot fit at the app's default minimum zoom of 3.
+**Also**: the candidate sentence "Not yet verified by us." is now "Not confirmed yet.", to match UX-5.
+
 ## [2026-11-10] decision | Place card trimmed: no empty hero, one voice button, one maps menu (UX-6)
 **Object**: the place card in `app/components/SceneMapApp.jsx`, `app/components/VoiceGuide.jsx`, `voiceToggle` in `app/lib/voice-guide.mjs`, CSS `.sheet-media.is-empty`, `.open-in-maps`.
 **Scenario**: UX pass, item UX-6 from `docs/ux-audit-2026-11-03.md`.
