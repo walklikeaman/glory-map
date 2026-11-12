@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { CITY_RADIUS_KM, findCity } from "../../../lib/city-gazetteer.mjs";
 import { CITY_WORKS_PER_PAGE, paginate } from "../../../lib/directory.mjs";
+import { posterUrlFor } from "../../../lib/work-artwork.mjs";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,14 @@ function defaultCreateReader(env) {
         p_offset: offset,
       });
       if (error) throw new Error(`city_catalogue failed: ${error.message}`);
+      return data ?? [];
+    },
+    // UX-8: the catalogue RPC carries no artwork, so the page's posters come from one
+    // extra read of `works` for the ids on this page.
+    async loadPosters(ids) {
+      if (!ids.length) return [];
+      const { data, error } = await client.from("works").select("id, poster_path").in("id", ids);
+      if (error) throw new Error(`works posters failed: ${error.message}`);
       return data ?? [];
     },
   };
@@ -83,6 +92,15 @@ export function createDirectoryCityHandler({
         page = paginate({ total: rows[0]?.total_works ?? 0, page: 1, perPage });
       }
 
+      // A poster is decoration: if the lookup fails, the list still renders without them.
+      let posters = new Map();
+      try {
+        const rowsWithArt = reader.loadPosters ? await reader.loadPosters(rows.map((row) => row.work_id)) : [];
+        posters = new Map(rowsWithArt.map((row) => [row.id, row.poster_path]));
+      } catch (error) {
+        logError("directory-city posters", error);
+      }
+
       return Response.json(
         {
           city: {
@@ -102,6 +120,7 @@ export function createDirectoryCityHandler({
             kind: row.kind,
             place_count: row.place_count,
             places: row.places ?? [],
+            poster: posterUrlFor(posters.get(row.work_id), "workProfilePoster"),
           })),
           points: rows[0]?.total_points ?? points,
           page,

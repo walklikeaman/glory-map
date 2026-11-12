@@ -7,6 +7,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-12] decision | City page: posters, a small map and "Walk <city>" (UX-8)
+**Object**: `app/city/[slug]/page.jsx`, `app/api/directory/city/route.js` (`loadPosters`), `cityBox` / `cityMapPoints` in `app/lib/directory.mjs`, `WorkMiniMap` (now takes `center` + `zoom`).
+**Scenario**: UX pass, item UX-8 from `docs/ux-audit-2026-11-03.md` (the city page was a text-only list of films).
+**What**: Each row shows the work's poster. The `city_catalogue` RPC carries no artwork, so the city route makes one extra `works` read for the ids on the page. That read is optional: if it fails, the list still renders, just without posters. There was no DB migration. Under the title sits a "Walk <city>" button linking to `/?city=<slug>`, and below it the mini-map at zoom 11 on the city's anchor. Its pins come from the same `/api/map/points` handler the big map uses (z12, candidates on), called in-process, with confirmed places first and a cap of 400. A failed map load gives an empty map, never a failed page.
+**Copy**: the city line said "named by our sources … candidates, not yet checked" (missed in UX-5). It now says "reported by location guides … not confirmed yet".
+
 ## [2026-11-11] update | Scene notes translated, with "Show original"
 **Scenario**: Nikita: "все сцены нужно перевести на английский… кнопочку «Показать оригинал» надо оставить".
 **Done**: `translate-display-text.mjs --notes --write` rendered every non-Latin scene note on the map

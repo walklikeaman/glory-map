@@ -386,3 +386,36 @@ test("no configuration is a 503, and the places are cached at the edge", async (
   });
   assert.match((await handler(get("/api/directory/places"))).headers.get("Cache-Control"), /max-age=3600/);
 });
+
+// ---------- UX-8: posters on the city page ----------
+
+test("a city page carries each work's poster, looked up once for the page", async () => {
+  const asked = [];
+  const handler = createDirectoryCityHandler({
+    env: ENV,
+    createReader: () => ({
+      loadCity: async () => [row(), row({ work_id: "no-art", title: "Plain" })],
+      loadPosters: async (ids) => { asked.push(ids); return [{ id: row().work_id, poster_path: "/abc.jpg" }]; },
+    }),
+  });
+  const payload = await (await handler(get("/api/directory/city?slug=london"))).json();
+  assert.deepEqual(asked, [[row().work_id, "no-art"]]);
+  assert.match(payload.works[0].poster, /\/abc\.jpg$/);
+  assert.equal(payload.works[1].poster, null);
+});
+
+test("a failed poster lookup still returns the city's list", async () => {
+  const handler = createDirectoryCityHandler({
+    env: ENV,
+    logError: () => {},
+    createReader: () => ({
+      loadCity: async () => [row()],
+      loadPosters: async () => { throw new Error("down"); },
+    }),
+  });
+  const response = await handler(get("/api/directory/city?slug=london"));
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.works.length, 1);
+  assert.equal(payload.works[0].poster, null);
+});

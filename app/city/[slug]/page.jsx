@@ -10,8 +10,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { GET as cityRoute } from "../../api/directory/city/route.js";
+import { GET as mapPointsRoute } from "../../api/map/points/route.js";
+import WorkMiniMap from "../../components/WorkMiniMap.jsx";
 import { findCity } from "../../lib/city-gazetteer.mjs";
-import { cityCoverage, cityWorkLine } from "../../lib/directory.mjs";
+import { cityBox, cityCoverage, cityMapPoints, cityWorkLine } from "../../lib/directory.mjs";
 import { workPath } from "../../lib/work-url.mjs";
 import { readRoute } from "../../lib/page-load.mjs";
 
@@ -23,6 +25,22 @@ async function loadCity(slug, page) {
   if (page) url.searchParams.set("page", page);
   const response = await cityRoute(new Request(url));
   return readRoute(response, "The city page");
+}
+
+// UX-8: the pins for the small map, asked of the same handler the big map uses. A map
+// that fails to load is not a reason to fail the page, so any error is an empty map.
+async function loadCityPoints(city) {
+  try {
+    const box = cityBox(city);
+    const url = new URL("https://glorymap.local/api/map/points");
+    for (const [key, value] of Object.entries(box)) url.searchParams.set(key, value.toFixed(4));
+    url.searchParams.set("z", "12");
+    url.searchParams.set("candidates", "1");
+    const response = await mapPointsRoute(new Request(url));
+    return response.ok ? cityMapPoints(await response.json()) : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }) {
@@ -42,11 +60,15 @@ export default async function CityPage({ params, searchParams }) {
   // invented slug is a 404 rather than a query.
   if (!findCity(slug)) notFound();
 
-  const data = await loadCity(slug, requestedPage);
+  const [data, mapPoints] = await Promise.all([
+    loadCity(slug, requestedPage),
+    loadCityPoints(findCity(slug)),
+  ]);
   if (!data) notFound();
 
   const { city, works = [], points = 0, page } = data;
   const base = `/city/${city.slug}`;
+  const walkHref = `/?city=${city.slug}`;
 
   return (
     <main className="directory-page">
@@ -59,6 +81,9 @@ export default async function CityPage({ params, searchParams }) {
         <p className="directory-lede">
           {cityCoverage({ works: page.total, points, radiusKm: city.radius_km })}
         </p>
+        {/* UX-8: the call to action is the product's own: open this city on the map. */}
+        <a className="wide-button city-walk" href={walkHref}>Walk {city.name}</a>
+        <WorkMiniMap points={mapPoints} center={[city.lat, city.lng]} zoom={11} />
         {page.total > 0 && (
           <p className="directory-note">
             Showing {page.from}–{page.to}, the best-covered first.
@@ -70,6 +95,9 @@ export default async function CityPage({ params, searchParams }) {
         {works.map((work) => (
           <li key={work.id}>
             <Link href={workPath(work) ?? base}>
+              {work.poster
+                ? <img className="directory-poster" src={work.poster} alt="" loading="lazy" width="56" height="84" />
+                : <span className="directory-poster is-empty" aria-hidden="true" />}
               <span className="directory-work-title">
                 {work.title}
                 {work.year ? <span className="work-year"> ({work.year})</span> : null}
