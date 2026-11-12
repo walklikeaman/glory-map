@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import { GET as filmsRoute } from "../../../api/directory/films/route.js";
 import { OTHER_LETTER, letterFromSlug, letterToSlug } from "../../../lib/directory.mjs";
 import { workPath } from "../../../lib/work-url.mjs";
-import { readRoute } from "../../../lib/page-load.mjs";
+import { readRoute, retryOn502 } from "../../../lib/page-load.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ async function loadLetter(slug, page) {
   const url = new URL("https://glorymap.local/api/directory/films");
   url.searchParams.set("letter", slug);
   if (page) url.searchParams.set("page", page);
-  const response = await filmsRoute(new Request(url));
+  const response = await retryOn502(() => filmsRoute(new Request(url)));
   return readRoute(response, "The directory");
 }
 
