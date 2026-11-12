@@ -9,3 +9,18 @@ export async function readRoute(response, what) {
   if (!response.ok) throw new Error(`${what} is unavailable (${response.status})`);
   return response.json();
 }
+
+// One more try after a 502 (QA 12.11). The catalogue's first query after a quiet spell can
+// hit the DB's statement timeout; the same query a moment later answers in 0.3 s. A visitor
+// should get the page, not a 500, for that.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function retryOn502(call, { waits = [1500], wait = sleep } = {}) {
+  let response = await call();
+  for (const ms of waits) {
+    if (response.status !== 502) break;
+    await wait(ms);
+    response = await call();
+  }
+  return response;
+}
