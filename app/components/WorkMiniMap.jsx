@@ -8,13 +8,14 @@ import { DEFAULT_LAYER_ID, layerById } from "../lib/map-layers.mjs";
 
 const BASEMAP = layerById(DEFAULT_LAYER_ID);
 
-export default function WorkMiniMap({ points = [], href = null, title = "" }) {
-  if (!points.length) return null;
+// `center` + `zoom` (the city page) frame a fixed area; without them the map fits its pins.
+export default function WorkMiniMap({ points = [], href = null, title = "", center = null, zoom = 13 }) {
+  if (!points.length && !center) return null;
   const positions = points.map((point) => point.position);
   return (
     <figure className="work-minimap">
-      <MapCanvas center={positions[0]} zoom={13} minZoom={0} basemap={BASEMAP} className="work-minimap-canvas">
-        <FitPositions positions={positions} maxZoom={14} padding={28} />
+      <MapCanvas center={center ?? positions[0]} zoom={zoom} minZoom={0} basemap={BASEMAP} className="work-minimap-canvas">
+        {!center && <FitPositions positions={positions} maxZoom={14} padding={28} />}
         {points.map((point, index) => (
           <MapMarker
             key={`${point.position.join(",")}:${index}`}

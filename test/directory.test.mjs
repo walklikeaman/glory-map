@@ -116,17 +116,17 @@ test("coverage states the radius, because the radius is what the page means", ()
   // hold is what is within a stated distance of a measured point.
   assert.equal(
     cityCoverage({ works: 656, points: 2300, radiusKm: 20 }),
-    "656 films with 2300 places named by our sources within 20 km of the centre — candidates, not yet checked.",
+    "656 films with 2300 places reported by location guides within 20 km of the centre, not confirmed yet.",
   );
   assert.match(cityCoverage({ works: 0, points: 0, radiusKm: 20 }), /^Nothing named/);
 });
 
-test("the city line says candidates, because that is what it counts", () => {
+test("the city line says unconfirmed, because that is what it counts", () => {
   // `city_catalogue` reads `location_submissions`. Every number on a city page is a
   // count of unchecked queue rows, and the page said "recorded" — which is the word this
   // project uses for the 70 places it stands behind, one of them in Los Angeles.
   const line = cityCoverage({ works: 1322, points: 3907, radiusKm: 20 });
-  assert.match(line, /candidates, not yet checked/);
+  assert.match(line, /not confirmed yet/);
   assert.equal(/recorded/.test(line), false);
 });
 
@@ -135,7 +135,7 @@ test("one is written as one", () => {
   // directory starts promising tours it cannot walk.
   assert.equal(
     cityCoverage({ works: 1, points: 1 }),
-    "1 film with 1 place named by our sources within 20 km of the centre — candidates, not yet checked.",
+    "1 film with 1 place reported by location guides within 20 km of the centre, not confirmed yet.",
   );
   assert.equal(cityWorkLine({ place_count: 1, places: ["Blackfriars Bridge"] }), "Blackfriars Bridge");
 });
@@ -313,4 +313,27 @@ test("the anchors sent to the database carry no names", () => {
 test("the page sizes are the ones the pages ask for", () => {
   assert.equal(WORKS_PER_PAGE, 100);
   assert.equal(CITY_WORKS_PER_PAGE, 48);
+});
+
+// ---------- UX-8: the city page's small map ----------
+
+test("a city's box covers its radius on both axes", async () => {
+  const { cityBox } = await import("../app/lib/directory.mjs");
+  const box = cityBox({ lat: 51.5, lng: -0.12, radius_km: 20 });
+  assert.ok(Math.abs(box.north - box.south - 40 / 111) < 1e-9);
+  assert.ok(box.east - box.west > box.north - box.south, "longitude degrees are shorter in London");
+});
+
+test("the city mini-map takes confirmed places first and caps the rest", async () => {
+  const { cityMapPoints } = await import("../app/lib/directory.mjs");
+  const feature = (lng, lat, name) => ({ geometry: { coordinates: [lng, lat] }, properties: { name } });
+  const points = cityMapPoints({
+    features: [feature(-0.1, 51.5, "Whitehall")],
+    candidates: [feature(-0.2, 51.4, "Soho"), feature(0, 0, "Null"), feature(-0.3, 51.3, "Extra")],
+  }, 2);
+  assert.deepEqual(points, [
+    { position: [51.5, -0.1], confirmed: true, name: "Whitehall" },
+    { position: [51.4, -0.2], confirmed: false, name: "Soho" },
+  ]);
+  assert.deepEqual(cityMapPoints(null), []);
 });

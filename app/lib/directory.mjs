@@ -108,7 +108,7 @@ export function cityCoverage({ works = 0, points = 0, radiusKm = 20 } = {}) {
   if (works === 0) {
     return `Nothing named within ${radiusKm} km of here yet.`;
   }
-  return `${plural(works, "film")} with ${plural(points, "place")} named by our sources within ${radiusKm} km of the centre — candidates, not yet checked.`;
+  return `${plural(works, "film")} with ${plural(points, "place")} reported by location guides within ${radiusKm} km of the centre, not confirmed yet.`;
 }
 
 // **One venue, however many ways our sources spell it.** `city_catalogue` returns DISTINCT
@@ -187,4 +187,29 @@ export function groupByCountry(cities = []) {
 // what we hold is nowhere near any of these cities.
 export function directorySummary({ works = 0, points = 0, cities = 0 } = {}) {
   return `${plural(works, "film")} with ${plural(points, "place")} between them, and ${plural(cities, "city")} with enough to browse.`;
+}
+
+// ---------- UX-8: the city page's small map ----------
+
+// The box around a city's disc, for asking the map for the points inside it.
+export function cityBox({ lat, lng, radius_km: radiusKm = 20 } = {}) {
+  const dLat = radiusKm / 111;
+  const dLng = radiusKm / (111 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+  return { west: lng - dLng, east: lng + dLng, south: lat - dLat, north: lat + dLat };
+}
+
+// The map response's places and unconfirmed rows as mini-map pins. Confirmed places go
+// first, so a cap cuts the queue rather than what we checked.
+export const CITY_MAP_PIN_LIMIT = 400;
+
+export function cityMapPoints(response, limit = CITY_MAP_PIN_LIMIT) {
+  const toPoint = (feature, confirmed) => {
+    const [lng, lat] = feature?.geometry?.coordinates ?? [];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+    return { position: [lat, lng], confirmed, name: feature?.properties?.name ?? null };
+  };
+  return [
+    ...(response?.features ?? []).map((feature) => toPoint(feature, true)),
+    ...(response?.candidates ?? []).map((feature) => toPoint(feature, false)),
+  ].filter(Boolean).slice(0, limit);
 }

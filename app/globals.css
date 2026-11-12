@@ -6175,3 +6175,15 @@ figcaption a {
   .work-poster { width: 56px; }
   .work-header h1 { font-size: 1.55rem; }
 }
+
+/* UX-8: the city page — a walk button, a small map and a poster on every row. */
+.city-walk { display: flex; justify-content: center; margin: 0.25rem 0 0.75rem; text-decoration: none; }
+.directory-works.is-city a { display: grid; grid-template-columns: 56px 1fr auto; column-gap: 12px; align-items: center; }
+.directory-works.is-city .directory-poster { grid-column: 1; grid-row: 1 / 3; width: 56px; height: 84px; object-fit: cover; border-radius: 4px; background: rgba(255, 255, 255, 0.06); }
+.directory-works.is-city .directory-work-title { grid-column: 2; grid-row: 1; }
+.directory-works.is-city .directory-count { grid-column: 3; grid-row: 1; }
+.directory-works.is-city .directory-work-places { grid-column: 2 / 4; grid-row: 2; }
+@media (max-width: 520px) {
+  .directory-works.is-city a { grid-template-columns: 44px 1fr auto; }
+  .directory-works.is-city .directory-poster { width: 44px; height: 66px; }
+}
