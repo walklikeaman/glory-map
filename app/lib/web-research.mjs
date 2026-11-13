@@ -182,6 +182,8 @@ export function submissionRow(work, location, point) {
         lat: point.lat,
         lng: point.lng,
         geocode_source: point.source,
+        // Wikidata is CC0; a point the model read off a page carries that page's unknown terms.
+        geocode_license: point.source === "wikidata" ? "CC0" : "unstated",
         geocode_source_id: point.sourceId ?? null,
         geocode_reason: point.reason,
       }
