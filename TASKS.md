@@ -64,6 +64,15 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] (07.11) Hebrew Wikipedia read for the Israeli catalogue: 636 works, 253 places queued, 136 with a point; candidates in Israel 43 → 116 (PR #360, #362). The prompt now keeps names in the article's script, so drops for an English name on a Hebrew quote went from 75 to 2.
 - [ ] Production (`glory-map.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
 
+## Data coverage (audit 2026-11-13, numbers in wiki/log.md)
+
+- [x] Country and city "pins" off the map; Wikidata filming locations resolved for all 5,009 works (PR #377)
+- [ ] GoT 129 and Stranger Things 74 places are moviemaps-only "Unconfirmed": find a second source (Wikidata P915 on the place, fandom, reelstreets) so they can be confirmed
+- [ ] Add missing big series: Peaky Blinders, The Wire, Succession, Dark, Squid Game; Friends and Breaking Bad have 0–2 places
+- [ ] 124 of 204 world capitals have no works (mostly Africa, Asia, Oceania): `ingest-country-works.mjs` per country, then the resolver
+- [ ] Paris candidates have lower-case address names ("2 rue françois ier, 75008 paris"): give them a real name
+- [ ] Places whose Wikidata entity has no English label stay in their own script ("замок де Сонне"): read the label by Q-id, not by search
+
 ## In progress
 
 - [ ] …
