@@ -1,0 +1,11 @@
+-- Filming locations researched on the open web (scripts/research-locations.mjs): fan
+-- sites, location blogs, fan wikis, tourism pages, read by a model with web search.
+--
+-- One web page saying a scene was shot somewhere is a lead, not a fact. These rows land
+-- `pending`, show on the map as "Unconfirmed" when they carry a point, and are promoted
+-- only when another source names the same place (Nikita, 2026-11-13: keep every point,
+-- mark the unconfirmed ones as unconfirmed).
+--
+-- The enum value is added on its own: a value added in a transaction cannot be used in
+-- that transaction, and the next migration's check constraint uses it.
+alter type submission_source_kind add value if not exists 'web_research';

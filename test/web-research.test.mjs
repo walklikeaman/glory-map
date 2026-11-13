@@ -83,6 +83,9 @@ test("a row lands as a web_research filming location with its link", () => {
   assert.equal(row.area_hint, "7001 396th Dr SE, Snoqualmie, United States");
   assert.equal(row.geocode_reason, "no_point_from_research");
   assert.equal(row.lat, undefined);
+  // The table refuses a point without a source and a licence.
+  const placed = submissionRow({ id: "w1" }, location, { lat: 1, lng: 2, source: "wikidata", sourceId: "Q1", reason: "gazetteer_place" });
+  assert.equal(placed.geocode_license, "CC0");
 });
 
 test("cost counts tokens and searches", () => {

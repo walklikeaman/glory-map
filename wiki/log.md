@@ -1,7 +1,14 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [2026-11-13] Web research of filming locations
+Format: `## [2026-11-13] Web research live, and street addresses get points
+
+- Nikita said yes: the `web_research` enum value and its evidence check are applied in prod (two migrations, `20261113200000`/`200100`). The 10 test works wrote 102 new rows and 9 second-source confirmations.
+- Placed rows need `geocode_license` (`location_submissions_geocode_provenance`): CC0 for Wikidata, "unstated" for a model's point.
+- `app/lib/nominatim.mjs` + `scripts/geocode-addresses.mjs`: the address is asked alone first ("Jesse Pinkman's house, 322 16th St" finds nothing, the bare address finds the house). Area results and answers more than 5 km apart are refused. 1 request a second. 48 of 87 research rows placed.
+- Nominatim was added to the allowlist mid-session: curl reached it, Node's fetch did not (DNS). `NODE_USE_ENV_PROXY=1` routes fetch through the proxy.
+
+## [2026-11-13] Web research of filming locations
 
 - `app/lib/web-research.mjs` + `scripts/research-locations.mjs`: Haiku 5.5 with `web_search_20260209` reads fan sites, location blogs and wikis for one work at a time and returns places with the page that names each. Rows land as `web_research`, `pending` ("Unconfirmed" on the map when they have a point). A name we already hold from another source becomes a `corroborated_by` entry on that row, which `corroborate-sources.mjs` now keeps on rerun, so the review counts the page as a second source.
 - `web_fetch_20260209` is refused for requests from a restricted-network sandbox (400). Search only.
