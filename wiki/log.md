@@ -7,6 +7,26 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-13] incident | Coverage audit; country-sized pins off the map; Wikidata locations for the whole catalogue
+**Scenario**: Nikita asked whether capitals, US cities, Europe, Game of Thrones and Stranger Things
+had been checked. Nobody had checked them. Audit = works with a place within 20 km of the centre.
+**Coverage** (after this run): world capitals 204 → 124 empty, 42 with 1–4 works, 21 with 5–19, 17 with 20+
+(empty ones are mostly Africa, Asia, Oceania). Top-55 US cities: 1 empty (Mesa), 21 thin. 43 big European
+cities: 1 empty (Cologne), 20 thin. GoT: every region is present with correct coordinates (Dubrovnik,
+N. Ireland, Iceland, Seville, Girona, Malta, Morocco), but only 27 places are confirmed and 129 are
+moviemaps-only "Unconfirmed". Stranger Things: Jackson GA, Atlanta, Vilnius present; 7 confirmed, 74 unconfirmed.
+Missing from `works`: Peaky Blinders, The Wire, Succession, Dark, Squid Game. Friends has 0 places.
+**Incident**: 86 verified places were whole areas from Wikidata P915 ("Israel" with 12 films, "Spain",
+"London" at the centre with 11 films), because resolver places were verified by hand.
+**Fix**: `reviewResolvedPlace` (place-review.mjs) + `scripts/review-resolved-places.mjs`: country/city
+precision, an area type (settlement, admin entity, archipelago, peninsula, desert, oasis, river, range,
+valley, plain, coast) or P2046 > 20 km² stays pending (`area_not_a_spot`); a structure or an
+archaeological site stays a spot. `resolve-works.mjs --source any --unlinked` ran over 5,009 works
+($0): 1,800 got places, then 366 new spots were verified (Emily in Paris 0 → ~35 in Paris, No Time to Die,
+The Last of Us, Wednesday, Money Heist). Snapshot: /mnt/project-files/glorymap-backfill/2026-11-13-coverage/.
+**Rule from now on**: after any resolver run, run `review-resolved-places.mjs --write`; never verify
+resolver places by hand.
+
 ## [2026-11-12] decision | City page: posters, a small map and "Walk <city>" (UX-8)
 **Object**: `app/city/[slug]/page.jsx`, `app/api/directory/city/route.js` (`loadPosters`), `cityBox` / `cityMapPoints` in `app/lib/directory.mjs`, `WorkMiniMap` (now takes `center` + `zoom`).
 **Scenario**: UX pass, item UX-8 from `docs/ux-audit-2026-11-03.md` (the city page was a text-only list of films).
