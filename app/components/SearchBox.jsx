@@ -136,9 +136,11 @@ export default function SearchBox({
   // way there is still one thing left to try, and it is the search that existed before
   // this box did: one Nominatim lookup, asked for deliberately rather than on every
   // keystroke, which is the only way that service may be used at all.
-  const offerLookup = query.length >= CITY_MIN_LENGTH
-    && cities.status === "ready"
-    && (cities.unavailable || cities.rows.length === 0);
+  // Offered under the Wikidata rows too, not only instead of them (13.11): Wikidata knows
+  // famous streets and not "12 Fournier Street" — an address is the one thing it will never
+  // list, and the reader typing one saw a city they did not ask for and no way past it.
+  const offerLookup = query.length >= CITY_MIN_LENGTH && cities.status === "ready";
+  const placesEmpty = cities.unavailable || cities.rows.length === 0;
 
   const options = useMemo(() => [
     ...works.rows.map((row) => ({ kind: "work", key: `work:${row.work_id}`, row })),
@@ -208,7 +210,6 @@ export default function SearchBox({
       "aria-selected": index === activeIndex,
       className: `search-suggestion${index === activeIndex ? " is-active" : ""}`,
       id: `${listId}-${index}`,
-      key: option.key,
       onMouseEnter: () => setActiveKey(option.key),
       role: "option",
     };
@@ -231,7 +232,7 @@ export default function SearchBox({
           aria-autocomplete="list"
           aria-controls={showList ? listId : undefined}
           aria-expanded={showList}
-          aria-label="A film, series or book title, or a city"
+          aria-label="A film, series or book title, or a place: a country, city, street or address"
           autoComplete="off"
           onChange={(event) => {
             onChange(event.target.value);
@@ -239,7 +240,7 @@ export default function SearchBox({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Film, series, book or city"
+          placeholder="Film, series, book or place"
           ref={inputRef}
           role="combobox"
           type="text"
@@ -267,7 +268,7 @@ export default function SearchBox({
             </li>
           )}
           {options.filter((option) => option.kind === "work").map((option) => (
-            <li {...optionProps(option)}>
+            <li key={option.key} {...optionProps(option)}>
               <button onClick={() => choose(option)} type="button">
                 {option.row.poster_thumb_url ? (
                   <img alt="" loading="lazy" src={option.row.poster_thumb_url} />
@@ -316,9 +317,9 @@ export default function SearchBox({
             </li>
           )}
 
-          <li className="search-group" role="presentation">Cities and places</li>
+          <li className="search-group" role="presentation">Countries, cities, streets</li>
           {options.filter((option) => option.kind === "city").map((option) => (
-            <li {...optionProps(option)}>
+            <li key={option.key} {...optionProps(option)}>
               <button onClick={() => choose(option)} type="button">
                 <span className="suggestion-poster-empty is-place" aria-hidden="true" />
                 <span className="suggestion-text">
@@ -338,18 +339,20 @@ export default function SearchBox({
           )}
           {offerLookup && (
             <>
-              <li className="search-note" role="presentation">
-                {cities.unavailable
-                  ? "Place search is not answering right now. Try again in a moment."
-                  : `No place on Wikidata is called “${query}”.`}
-              </li>
+              {placesEmpty && (
+                <li className="search-note" role="presentation">
+                  {cities.unavailable
+                    ? "Place search is not answering right now. Try again in a moment."
+                    : `No place on Wikidata is called “${query}”.`}
+                </li>
+              )}
               {options.filter((option) => option.kind === "lookup").map((option) => (
-                <li {...optionProps(option)}>
+                <li key={option.key} {...optionProps(option)}>
                   <button onClick={() => choose(option)} type="button">
                     <span className="suggestion-poster-empty is-place" aria-hidden="true" />
                     <span className="suggestion-text">
-                      <span className="suggestion-title">Look “{query}” up as a place</span>
-                      <small>Searches OpenStreetMap once</small>
+                      <span className="suggestion-title">Find “{query}” as an address</span>
+                      <small>Street, house number or any place · OpenStreetMap</small>
                     </span>
                   </button>
                 </li>

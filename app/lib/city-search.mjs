@@ -191,6 +191,46 @@ export function rankCitySuggestions(candidates, { limit = MAX_CITY_SUGGESTIONS }
     .slice(0, Math.max(1, limit));
 }
 
+// How close the map comes in on a picked place (QA 13.11). Picking a place used to PAN only,
+// at whatever zoom the map was at — so "France" from a street view landed in a field near
+// Orléans, and "Baker Street" from a country view showed half of England. The zoom follows
+// the size of the thing: its stated area when it has one, and street level when it states
+// neither an area nor a population (a street, a building, an address).
+export function zoomForRadiusKm(radiusKm) {
+  const r = finiteOrNull(radiusKm);
+  if (r === null || r <= 0) return 16;
+  if (r <= 0.5) return 16;
+  if (r <= 1.5) return 15;
+  if (r <= 4) return 14;
+  if (r <= 10) return 13;
+  if (r <= 30) return 12;
+  if (r <= 80) return 10;
+  if (r <= 250) return 8;
+  if (r <= 700) return 6;
+  if (r <= 1500) return 5;
+  return 4;
+}
+
+export function zoomForPlace({ area_km2: areaKm2 = null, population = null } = {}) {
+  const area = finiteOrNull(areaKm2);
+  if (area !== null && area > 0) return zoomForRadiusKm(Math.sqrt(area / Math.PI));
+  // A settlement that states people but no area: the old default, a city view.
+  if (finiteOrNull(population) !== null) return 12;
+  return 16;
+}
+
+// The same, for a gazetteer answer that carries a bounding box [south, north, west, east]
+// instead of an area — the OpenStreetMap lookup. Half the box's larger side is the radius.
+export function zoomForBoundingBox(boundingBox) {
+  if (!Array.isArray(boundingBox) || boundingBox.length !== 4) return 12;
+  const [south, north, west, east] = boundingBox.map(Number);
+  if (![south, north, west, east].every(Number.isFinite)) return 12;
+  const midLat = ((south + north) / 2) * (Math.PI / 180);
+  const heightKm = Math.abs(north - south) * 111.32;
+  const widthKm = Math.abs(east - west) * 111.32 * Math.cos(midLat);
+  return zoomForRadiusKm(Math.max(heightKm, widthKm) / 2);
+}
+
 export function formatCitySuggestions(candidates, query) {
   return (Array.isArray(candidates) ? candidates : []).map((candidate) => ({
     wikidata_id: candidate.wikidata_id,
@@ -199,6 +239,7 @@ export function formatCitySuggestions(candidates, query) {
     lat: candidate.lat,
     lng: candidate.lng,
     radius_km: radiusFromAreaKm2(candidate.area_km2),
+    zoom: zoomForPlace(candidate),
     population: candidate.population,
     match: matchRange(candidate.name, normalizeWorkTitle(query)),
   }));

@@ -230,3 +230,26 @@ test("a gazetteer that is down empties the group instead of failing the box", as
     assert.deepEqual(body.suggestions, []);
   }
 });
+
+test("a picked place gets a zoom that fits its size", async () => {
+  const { zoomForPlace, zoomForBoundingBox, zoomForRadiusKm } = await import("../app/lib/city-search.mjs");
+  // France: ~640,000 km² — a country view, not a street.
+  assert.ok(zoomForPlace({ area_km2: 640_000, population: 68_000_000 }) <= 6);
+  // London: ~1,572 km² — the city view the map always used.
+  assert.equal(zoomForPlace({ area_km2: 1572, population: 8_900_000 }), 12);
+  // A street states neither an area nor a population.
+  assert.equal(zoomForPlace({ area_km2: null, population: null }), 16);
+  // A town that states people but no area keeps the old city view.
+  assert.equal(zoomForPlace({ area_km2: null, population: 5000 }), 12);
+  assert.equal(zoomForRadiusKm(0.3), 16);
+  assert.equal(zoomForRadiusKm(5000), 4);
+  // OpenStreetMap boxes: a street is tiny, a country is huge.
+  assert.ok(zoomForBoundingBox([51.5226, 51.5235, -0.1585, -0.1560]) >= 15);
+  assert.ok(zoomForBoundingBox([41.3, 51.1, -5.2, 9.6]) <= 6);
+  assert.equal(zoomForBoundingBox(null), 12);
+});
+
+test("each suggestion carries its zoom", () => {
+  const [row] = formatCitySuggestions([{ wikidata_id: "Q1", name: "Baker Street", lat: 51.5, lng: -0.15, area_km2: null, population: null }], "baker");
+  assert.equal(row.zoom, 16);
+});

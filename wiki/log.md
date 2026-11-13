@@ -16,6 +16,25 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-13] decision | Picking a work shows ALL its places; "Unconfirmed places" is a map setting; search zooms by size
+**Scenario**: Nikita: "even unconfirmed points must be listed, as unconfirmed; maybe a setting to show them on the
+map", and "I still don't get how to work by film". Checked on the live DB: picking Twin Peaks over London left
+the map on London with nothing of Twin Peaks on it. It has 5 confirmed places and 46 unconfirmed rows, and the
+map drew neither (the queue layer skips a work-scoped view; the camera never moved).
+**Decisions**:
+- Picking a work frames its places once per pick (`boundsOfPositions`), padded around the panel, the rail, the
+  phone sheet and the bottom buttons (`paddingForCovers`). The farthest 10% stay on the map but out of the frame
+  (Twin Peaks' lone New York pin). A shared link that carries a view is not re-framed.
+- The work's unconfirmed rows from `/api/work` are drawn as hollow pins (`workCandidatesAsLocations`) under the
+  same "Unconfirmed places" switch, listed in Places, and deduped against its confirmed places (name or ~50 m).
+- That switch now also sits at the top of the map's layers menu (same state as the panel switch, which stays).
+- Picking a place zooms to its size (`zoomForPlace` / `zoomForBoundingBox`): France z6, London z12, a street z16.
+  It used to pan only. Picking a place also clears the picked work: a new question, not a narrower one.
+- The OpenStreetMap address lookup is offered under the Wikidata rows every time, not only when they are empty
+  (Wikidata never lists "12 Fournier Street"). A street or a house is named as itself, not as its city.
+- On a phone, a pick from search closes the sheet so the answer is visible.
+**Not done**: a sheet left open past mid-screen is not padded for; antimeridian-spanning works frame the globe.
+
 ## [2026-11-13] incident | Coverage audit; country-sized pins off the map; Wikidata locations for the whole catalogue
 **Scenario**: Nikita asked whether capitals, US cities, Europe, Game of Thrones and Stranger Things
 had been checked. Nobody had checked them. Audit = works with a place within 20 km of the centre.

@@ -1,3 +1,4 @@
+import { zoomForBoundingBox } from "../../lib/city-search.mjs";
 import { cityRadiusKm, isWikidataId } from "../../lib/location-search.mjs";
 import { USER_AGENT } from "../../lib/user-agent.mjs";
 import { upstreamFailed } from "../../lib/upstream-error.mjs";
@@ -32,9 +33,9 @@ export async function GET(request) {
     if (!response.ok) throw new Error(`Nominatim responded with ${response.status}`);
 
     const results = await response.json();
-    const city = results.find((result) =>
-      ["city", "town", "village", "municipality", "administrative"].includes(result.addresstype),
-    ) ?? results[0];
+    const isSettlement = (result) =>
+      ["city", "town", "village", "municipality", "administrative"].includes(result?.addresstype);
+    const city = results.find(isSettlement) ?? results[0];
     const lat = Number(city?.lat);
     const lng = Number(city?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -44,11 +45,17 @@ export async function GET(request) {
     const boundingBox = city.boundingbox?.map(Number);
     const radiusKm = cityRadiusKm({ lat, lng, boundingBox });
     const wikidataId = city.extratags?.wikidata;
-    const name = city.address?.city
+    // A street or an address is named as itself. Naming it by its city turned
+    // "Abbey Road" into "London" in the status line, as if the lookup had missed.
+    // A house has no name of its own: "12 Fournier Street" is its number and its road.
+    const address = [city.address?.house_number, city.address?.road].filter(Boolean).join(" ");
+    const name = !isSettlement(city)
+      ? (city.name || address || String(city.display_name ?? query).split(",")[0])
+      : city.address?.city
       ?? city.address?.town
       ?? city.address?.village
       ?? city.address?.municipality
-      ?? city.display_name.split(",")[0];
+      ?? String(city.display_name ?? query).split(",")[0];
 
     return Response.json(
       {
@@ -56,6 +63,7 @@ export async function GET(request) {
         lat,
         lng,
         radius_km: radiusKm,
+        zoom: zoomForBoundingBox(boundingBox),
         bounding_box: boundingBox,
         wikidata_id: isWikidataId(wikidataId) ? wikidataId : null,
       },
