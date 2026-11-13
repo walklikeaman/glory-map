@@ -8,9 +8,8 @@
 // back finds the city, the open place and the route where they were — nothing here
 // resets anything.
 //
-// On a phone the menu is the bottom bar, where a thumb is; on a desktop it is a rail
-// beside the panel, clear of the walk control at the bottom and the "Only my films" chip
-// at the top.
+// On a phone the menu is the bottom bar, where a thumb is; on a desktop it is a rail on
+// the screen's left edge, and an open section takes the map panel's place (UX-10).
 
 import { useEffect, useState } from "react";
 import { Award, Check, Heart, LogIn, Map as MapIcon, MapPin, PlusCircle, Route, Trash2, User, X } from "lucide-react";

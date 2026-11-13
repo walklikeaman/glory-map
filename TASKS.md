@@ -39,7 +39,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] UX-7 Work page: poster + mini-map on top, first 10 places then "Show all"
 - [x] UX-8 City page: posters, small map, "Walk London" call to action
 - [x] UX-9 Onboarding: one welcome screen for guests, a 20-poster left/right deck after sign-in, Skip in the top corner, no repeat after sign-in
-- [ ] UX-10 Desktop: section rail on the screen edge, sections replace the left panel
+- [x] UX-10 Desktop: section rail on the screen edge, sections replace the left panel
 - [ ] UX-11 Works without a poster: kind icon on a neutral tile
 
 **Features, after the UX pass (order from PRIORITIES.md):**
