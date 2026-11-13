@@ -111,7 +111,7 @@ import {
   filmsInView,
   filmsInViewLabel,
 } from "../lib/films-in-view.mjs";
-import { workPlacesAsLocations } from "../lib/work-locations.mjs";
+import { boundsOfPositions, paddingForCovers, workCandidatesAsLocations, workPlacesAsLocations } from "../lib/work-locations.mjs";
 import {
   FILTER_DEFAULTS, clearedFilter, filterChipLabel, filtersFromParams,
   narrowingFilters, workChipTitle, writeFilterParams,
@@ -1960,6 +1960,7 @@ export default function SceneMapApp() {
   const [trailScenes, setTrailScenes] = useState([]);
   const [trailPlaces, setTrailPlaces] = useState([]);
   const [trailWork, setTrailWork] = useState(null); // the /api/work `work` the places above belong to
+  const [trailCandidates, setTrailCandidates] = useState([]); // the same work's unconfirmed rows
   // Spoiler-free is the DEFAULT, never a setting someone has to find: with progress 0
   // the server withholds each unreached scene's coordinates entirely, so the trail
   // cannot leak the plot even by the shape of a line. Seeing it whole is an explicit,
@@ -2123,7 +2124,7 @@ export default function SceneMapApp() {
   // vocabulary, one renderer — this path used to draw an amber diamond while the graph drew
   // circles, three shapes for one idea, which is the complaint [[map-pin]] exists to answer.
   const searchedPlaceFeatures = useMemo(
-    () => visibleLocations
+    () => (graphWorkId ? [] : visibleLocations)
       .filter((location) => location.display !== "area")
       .map((location) => ({
         type: "Feature",
@@ -2137,7 +2138,9 @@ export default function SceneMapApp() {
           narrative: location.kind === "narrative",
         },
       })),
-    [visibleLocations],
+    // While a work is picked the map is about that work, and the nearby answer's pins were
+    // other films' places left over from wherever the map had been.
+    [visibleLocations, graphWorkId],
   );
 
 
@@ -2157,9 +2160,56 @@ export default function SceneMapApp() {
   // the thing it heads.
   // With a work picked, the Places tab lists that work's places rather than the nearby
   // search, which knows nothing of the pick — see [[work-locations]].
+  const pickedWorkLoaded = Boolean(graphWorkId && trailWork?.id === graphWorkId);
+  // Its unconfirmed rows ride on the same "Unconfirmed places" switch as everywhere else on
+  // the map, and the studio-lot switch narrows them the same way it narrows the queue layer.
+  const pickedWorkCandidates = useMemo(
+    () => (pickedWorkLoaded && graphLayerOn && candidatesOn
+      ? workCandidatesAsLocations(trailWork, trailCandidates, { confirmed: trailPlaces })
+        .filter((location) => studioLotsOn || !location.studioLot)
+      : []),
+    [pickedWorkLoaded, graphLayerOn, candidatesOn, studioLotsOn, trailWork, trailCandidates, trailPlaces],
+  );
   const pickedWorkLocations = useMemo(
-    () => (graphWorkId && trailWork?.id === graphWorkId ? workPlacesAsLocations(trailWork, trailPlaces) : null),
-    [graphWorkId, trailWork, trailPlaces],
+    () => (pickedWorkLoaded ? [...workPlacesAsLocations(trailWork, trailPlaces), ...pickedWorkCandidates] : null),
+    [pickedWorkLoaded, trailWork, trailPlaces, pickedWorkCandidates],
+  );
+  // Picking a work brings its places on screen (QA 13.11). It used to filter the map to the
+  // work and leave the camera where it was — pick Twin Peaks over London and the map showed
+  // London with nothing of Twin Peaks on it, which read as "this film has no places". Once
+  // per pick, when its places have arrived: re-framing on every later toggle would yank
+  // the map away from wherever the reader has since panned.
+  // Seeded with the work a shared link opened on when that link also carried a view, so it
+  // keeps the view it was shared with instead of being re-framed when the places arrive.
+  const fittedWorkRef = useRef(opened && initialFilters.workId ? initialFilters.workId : null);
+  useEffect(() => {
+    if (!graphWorkId) { fittedWorkRef.current = null; return; }
+    if (!mapApi || !pickedWorkLocations?.length || fittedWorkRef.current === graphWorkId) return;
+    const bounds = boundsOfPositions(pickedWorkLocations.map((location) => location.position));
+    if (!bounds) return;
+    fittedWorkRef.current = graphWorkId;
+    const [[west, south], [east, north]] = bounds;
+    const canvas = mapApi.getContainer().getBoundingClientRect();
+    const covers = [...document.querySelectorAll(".command-panel, .app-nav, .map-search, .walk-controls, .map-key")]
+      .map((element) => element.getBoundingClientRect())
+      .map((rect) => ({
+        left: rect.left - canvas.left, right: rect.right - canvas.left,
+        top: rect.top - canvas.top, bottom: rect.bottom - canvas.top,
+        width: rect.width, height: rect.height,
+      }));
+    const padding = paddingForCovers(covers, { width: canvas.width, height: canvas.height });
+    // A frame bigger than the room left for it would throw inside MapLibre.
+    const fits = padding.left + padding.right < canvas.width - 40 && padding.top + padding.bottom < canvas.height - 40;
+    mapApi.fitBounds(bounds, { maxZoom: 15, padding: fits ? padding : 24, animate: false });
+  }, [mapApi, graphWorkId, pickedWorkLocations]);
+
+  const pickedWorkCandidateFeatures = useMemo(
+    () => pickedWorkCandidates.map((location) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [location.position[1], location.position[0]] },
+      properties: { key: location.id, work_count: 1, checked: !location.isCandidate, narrative: false },
+    })),
+    [pickedWorkCandidates],
   );
   const listedLocations = pickedWorkLocations ?? visibleLocations;
   const locationsInView = useMemo(
@@ -2361,7 +2411,7 @@ export default function SceneMapApp() {
   // live chips. Only a grounded work has scenes and a uuid; a live chip carries a
   // Wikidata id or a synthetic slug, which /api/trail rightly refuses.
   useEffect(() => {
-    if (!graphWorkId) { setTrailScenes([]); setTrailPlaces([]); setTrailWork(null); return undefined; }
+    if (!graphWorkId) { setTrailScenes([]); setTrailPlaces([]); setTrailCandidates([]); setTrailWork(null); return undefined; }
 
     const controller = new AbortController();
     (async () => {
@@ -2383,10 +2433,11 @@ export default function SceneMapApp() {
         const places = profileBody.places ?? [];
         setTrailScenes(Array.isArray(scenes) ? scenes : []);
         setTrailPlaces(places.filter((place) => place.lat !== null && place.lng !== null));
+        setTrailCandidates(Array.isArray(profileBody.candidates) ? profileBody.candidates : []);
         setTrailWork(profileBody.work?.id ? profileBody.work : null);
       } catch (error) {
         // Most works have no trail extracted yet; that is an ordinary outcome.
-        if (error?.name !== "AbortError") { setTrailScenes([]); setTrailPlaces([]); setTrailWork(null); }
+        if (error?.name !== "AbortError") { setTrailScenes([]); setTrailPlaces([]); setTrailCandidates([]); setTrailWork(null); }
       }
     })();
     return () => controller.abort();
@@ -3362,7 +3413,19 @@ export default function SceneMapApp() {
   // Both ways into a city end here: a suggestion picked from the box, and a name the
   // gazetteer had to be asked about. Whichever brought us, the map stops being about
   // where the visitor is standing and starts being about the place they asked for.
+  // On a phone the search lives in the sheet, and the sheet covers the map. A pick is a
+  // request to SEE something on the map, so the sheet steps aside for the answer.
+  function closePanelOnPhone() {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches) setPanelOpen(false);
+  }
+
   function goToCity(city) {
+    closePanelOnPhone();
+    // A place picked after a work is a new question, not a narrower one: keeping the work
+    // filter showed Paris filtered to a film shot in Seattle — "Nothing here passes your
+    // filters" — from the same box that had just been asked about Paris.
+    setGraphWorkId("");
+    setPickedWork(null);
     setUserPosition(null);
     setUserIsDemo(false);
     setNearbyStatus("idle");
@@ -3372,6 +3435,13 @@ export default function SceneMapApp() {
       radiusKm: city.radius_km ?? 15,
       wikidataId: city.wikidata_id ?? null,
     });
+    // A searched place is the one other case where the zoom is the point: a country, a city
+    // and a street are not seen at the same zoom, and panning alone left "France" picked
+    // from a street view as a field near Orléans. The pan that follows lands on the same
+    // centre, so it moves nothing.
+    if (mapApi && Number.isFinite(city.zoom)) {
+      mapApi.jumpTo({ center: [city.lng, city.lat], zoom: city.zoom });
+    }
   }
 
   // Everything that plans a walk: the timed tour, the hand-built route, its export and the
@@ -3709,13 +3779,34 @@ export default function SceneMapApp() {
               className={`map-control${layersOpen ? " is-on" : ""}`}
               onClick={() => setLayersOpen((open) => !open)}
               aria-expanded={layersOpen}
-              aria-label={`Base map: ${activeLayerLabel(MAP_LAYERS, basemap.id)}`}
-              title={`Base map: ${activeLayerLabel(MAP_LAYERS, basemap.id)}`}
+              aria-label={`Map settings. Base map: ${activeLayerLabel(MAP_LAYERS, basemap.id)}`}
+              title={`Map settings · ${activeLayerLabel(MAP_LAYERS, basemap.id)}`}
             >
               <Layers size={18} aria-hidden="true" />
             </button>
             {layersOpen && (
-              <div className="map-layers-menu" role="group" aria-label="Base map">
+              <div className="map-layers-menu" role="group" aria-label="Map settings">
+                {/* The unconfirmed switch, where a map's settings are (13.11). It existed,
+                    but three levels down the panel — inside "What the map is drawing",
+                    under "Confirmed places" — so the owner asked for a setting that was
+                    already there. It is the SAME state as the panel's switch, not a copy. */}
+                <label className="map-layers-switch">
+                  <input
+                    type="checkbox"
+                    checked={graphLayerOn && candidatesOn}
+                    onChange={(event) => {
+                      const on = event.target.checked;
+                      if (on) setGraphLayerOn(true);
+                      setCandidatesOn(on);
+                    }}
+                  />
+                  <span className="map-layers-swatch is-unconfirmed" aria-hidden="true" />
+                  <span>
+                    <strong>Unconfirmed places</strong>
+                    <small>Reported by guides and fans, not checked by us yet</small>
+                  </span>
+                </label>
+                <p className="map-layers-heading">Base map</p>
                 {layers.map((layer) => (
                   <button
                     key={layer.id}
@@ -3894,6 +3985,19 @@ export default function SceneMapApp() {
             }}
           />
 
+          {/* The picked work's unconfirmed rows, hollow like every unconfirmed pin. The
+              queue layer below skips a work-scoped view, so without this a film's map
+              showed only its confirmed places. */}
+          <PinLayer
+            id="picked-work-unconfirmed"
+            features={pickedWorkCandidateFeatures}
+            selectedKey={activeLocation?.id ?? null}
+            onSelect={(properties) => {
+              const location = pickedWorkCandidates.find((candidate) => candidate.id === properties.key);
+              if (location) setActiveLocation(location);
+            }}
+          />
+
           {graphLayerOn && (
             <GraphLayer
               kinds={graphKinds.length ? graphKinds : null}
@@ -4059,6 +4163,7 @@ export default function SceneMapApp() {
             setGraphLayerOn(true);
             setGraphWorkId(suggestion.work_id);
             setPickedWork({ work_id: suggestion.work_id, title: suggestion.title });
+            closePanelOnPhone();
             if (suggestion.kind && suggestion.kind !== workKind) changeWorkKind(suggestion.kind);
           }}
           onSubmit={searchWork}
@@ -4512,7 +4617,9 @@ export default function SceneMapApp() {
                   {/* Two numbers, because they answer two different questions (#160): how much
                       is drawn, and how many works that came from. One number could not tell a
                       thin catalogue from a viewport zoomed too far out. */}
-                  <span aria-live="polite">{viewCountLabel(inView)} in {cityName}</span>
+                  {/* A picked work's places are its own wherever the map is, so they are not
+                      "in" the city the map was last asked about. */}
+                  <span aria-live="polite">{viewCountLabel(inView)}{pickedWorkLocations ? " on screen" : ` in ${cityName}`}</span>
                 </div>
                 {/* The distinction the panel could not make before: nothing here because we hold
                     nothing, or nothing here because the map is somewhere else. */}
@@ -4529,6 +4636,9 @@ export default function SceneMapApp() {
                       <span>
                         <WorkKindMark kind={location.kind} />{" "}
                         {location.film}
+                        {location.isCandidate && location.evidenceSource === "queue" && (
+                          <em className="location-unconfirmed"> · unconfirmed</em>
+                        )}
                       </span>
                     </button>
                     <button
@@ -5001,13 +5111,21 @@ export default function SceneMapApp() {
                 {accessNote(tourAccess[activeLocation.locationId ?? activeLocation.id])}
               </p>
             )}
-            {activeLocation.isCandidate && (
+            {activeLocation.isCandidate && (activeLocation.evidenceSource === "queue" ? (
+              <p className="evidence-caveat" role="note">
+                <strong>Unconfirmed.</strong> Reported by
+                {" "}{activeLocation.sourceUrl
+                  ? <a href={activeLocation.sourceUrl} target="_blank" rel="noreferrer">{activeLocation.sourceTitle ?? "a location guide"}</a>
+                  : (activeLocation.sourceTitle ?? "a location guide")}
+                , not confirmed by us yet.
+              </p>
+            ) : (
               <p className="evidence-caveat" role="note">
                 <strong>Unverified.</strong> Found by reading this place&rsquo;s own article,
                 not a statement about the work. It may be where something was named,
                 written or imagined rather than filmed &mdash; open the source and judge it.
               </p>
-            )}
+            ))}
             <p>{activeLocation.description}</p>
             <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} />
             {wipeMode({ thenUrl: activeFilmImage, nowUrl: activeLocation.now, broken: brokenImages }) === "wipe" ? (
