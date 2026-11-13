@@ -1,7 +1,16 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+Format: `## [2026-11-13] Web research of filming locations
+
+- `app/lib/web-research.mjs` + `scripts/research-locations.mjs`: Haiku 5.5 with `web_search_20260209` reads fan sites, location blogs and wikis for one work at a time and returns places with the page that names each. Rows land as `web_research`, `pending` ("Unconfirmed" on the map when they have a point). A name we already hold from another source becomes a `corroborated_by` entry on that row, which `corroborate-sources.mjs` now keeps on rerun, so the review counts the page as a second source.
+- `web_fetch_20260209` is refused for requests from a restricted-network sandbox (400). Search only.
+- 8,000 max_tokens truncated 4 of 10 answers; 16,000 plus "do not narrate" fixed all four.
+- 10 works cost $0.89 in total (about $0.06 each). They returned 111 places, 20 of them with a point. The model gives street addresses (Breaking Bad: 21 Albuquerque addresses) but rarely coordinates, and we have no street geocoder in the cloud network.
+- Coordinates: the gazetteer hit must lie within 40 km of the named city; the model's own point is kept only under the same check.
+- The source kind needs two migrations: the enum value, then the evidence check (`else false` refuses unknown kinds). The SQL waits in /mnt/project-files/glorymap-research/ for Nikita's yes.
+
+## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
 
 Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 

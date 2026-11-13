@@ -142,12 +142,13 @@ export function placeFromGroup(group, { scoreOf } = {}) {
 //
 // `text_mention` is the honest method: the source published a sentence naming this place,
 // on a page we can link to. Not `web_search_cited` — nobody searched — and not
-// `manual_fix`, which would claim a person looked.
+// `manual_fix`, which would claim a person looked. The exception is a `web_research` row,
+// where somebody did search, and found the page that way.
 export function evidenceFromRows(placeId, rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({
     subject_type: "place",
     subject_id: placeId,
-    method: "text_mention",
+    method: row.source_kind === "web_research" ? "web_search_cited" : "text_mention",
     source_url: row.source_url ?? null,
     source_ref: row.source_kind ?? null,
     snippet: row.source_sentence ? String(row.source_sentence).slice(0, 500) : null,

@@ -68,7 +68,9 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 
 - [x] Country and city "pins" off the map; Wikidata filming locations resolved for all 5,009 works (PR #377)
 - [ ] GoT 129 and Stranger Things 74 places are moviemaps-only "Unconfirmed": find a second source (Wikidata P915 on the place, fandom, reelstreets) so they can be confirmed
-- [ ] Add missing big series: Peaky Blinders, The Wire, Succession, Dark, Squid Game; Friends and Breaking Bad have 0–2 places
+- [x] Add missing big series: Peaky Blinders, The Wire, Succession, Dark, Squid Game (`ingest-country-works.mjs --works`)
+- [ ] Web research of filming locations, most IMDb votes first (`scripts/research-locations.mjs`, Haiku + web search, ~$0.06 per work, ~80 works per $5 night). Test on 10 works: 111 places found, 20 with a point. Waits on Nikita's yes for the `web_research` source kind (SQL in /mnt/project-files/glorymap-research/)
+- [ ] Research rows carry street addresses but few points: the cloud network blocks every street geocoder (Nominatim, Photon, US Census). Allow one, then geocode `area_hint` for rows without a point
 - [ ] 124 of 204 world capitals have no works (mostly Africa, Asia, Oceania): `ingest-country-works.mjs` per country, then the resolver
 - [ ] Paris candidates have lower-case address names ("2 rue françois ier, 75008 paris"): give them a real name
 - [ ] Places whose Wikidata entity has no English label stay in their own script ("замок де Сонне"): read the label by Q-id, not by search

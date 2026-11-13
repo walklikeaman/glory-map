@@ -140,7 +140,7 @@ function report(rows, decisions) {
 }
 
 const rows = await readQueue();
-const decisions = rows.map((row) => ({ id: row.id, verdict: reviewSubmission(row) }));
+const decisions = rows.map((row) => ({ id: row.id, current: row.status, verdict: reviewSubmission(row) }));
 report(rows, decisions);
 
 // The same grouping the SQL uses, applied. One request per (status, reason, chunk), so a
@@ -149,9 +149,11 @@ async function applyVerdicts(decisions) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) throw new Error("--write needs SUPABASE_SERVICE_ROLE_KEY in the environment");
 
+  // Only rows whose status changes: re-stamping a row already verified for the same
+  // reason would move its `reviewed_at` without anyone deciding anything new.
   const groups = new Map();
-  for (const { id, verdict } of decisions) {
-    if (!DECISIVE.has(verdict.status)) continue;
+  for (const { id, current, verdict } of decisions) {
+    if (!DECISIVE.has(verdict.status) || verdict.status === current) continue;
     const groupKey = JSON.stringify([verdict.status, verdict.reason]);
     groups.set(groupKey, [...(groups.get(groupKey) ?? []), id]);
   }

@@ -44,6 +44,9 @@ const SOURCE_LABELS = {
   // A signed-in reader's suggestion that a moderator has checked (#48). It reaches the
   // queue only as `verified`, and the link is the page the moderator checked it against.
   reader: { evidence: "reader", title: "The page it was checked against", who: "a reader, checked by us" },
+  // A page found by web research (scripts/research-locations.mjs): a fan site, a location
+  // blog, a tourism board. One page saying so is a lead, which the card says.
+  web_research: { evidence: "web_search_cited", title: "The page this came from", who: "a web page" },
   open_plaques: {
     evidence: "open_plaques",
     title: "The plaque on the wall",

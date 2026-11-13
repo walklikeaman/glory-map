@@ -53,6 +53,7 @@ const SOURCE_NAMES = Object.freeze({
   open_plaques: "Open Plaques",
   permit_record: "Film permit",
   fandom: "Fandom",
+  web_research: "a web page",
 });
 
 // The name a reader recognises, never the column value. An unknown kind falls back to

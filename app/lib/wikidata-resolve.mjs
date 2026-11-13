@@ -35,7 +35,8 @@ const GENERIC = new Set([
   "hall", "club", "hotel", "school", "college", "library", "theatre", "theater",
   "cinema", "bridge", "street", "road", "avenue", "lane", "court", "square",
   "garden", "gardens", "the", "of", "at", "light", "lighthouse", "deli",
-  "delicatessen", "restaurant", "museum", "palace",
+  "delicatessen", "restaurant", "museum", "palace", "gate", "tower", "fort",
+  "fortress", "castle", "church", "cathedral", "abbey", "monastery", "beach",
   // School naming is regional and abbreviates hard: "David Thompson Secondary"
   // is the same institution as "David Thompson Secondary School".
   "secondary", "high", "primary", "elementary", "academy", "university",
@@ -57,10 +58,21 @@ export function hasGeneric(value) {
 
 // Does this candidate name the same place? Label or any alternative label,
 // exactly or with the generic words removed.
+// Wikidata labels often carry Wikipedia's disambiguator: "Pile Gate, Dubrovnik",
+// "Rector's Palace (Dubrovnik)". Within 150 m the town adds nothing, so each label is
+// also compared without it. Measured 13.11 on Game of Thrones and Stranger Things:
+// 1 of 202 moviemaps pins resolved, most misses being exactly this.
+export function withoutDisambiguator(value) {
+  return String(value ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/,\s*[^,]+$/, "").trim();
+}
+
 export function namesTheSamePlace(placeName, candidate) {
   const want = normalizePlaceName(placeName);
   const wantBare = bareName(placeName);
-  const names = [candidate?.label, ...(candidate?.alts ?? [])].filter(Boolean);
+  const names = [candidate?.label, ...(candidate?.alts ?? [])]
+    .filter(Boolean)
+    .flatMap((name) => [name, withoutDisambiguator(name)])
+    .filter(Boolean);
   return names.some((n) => {
     if (normalizePlaceName(n) === want) return true;
     // A bare form of one or two characters would match almost anything, and

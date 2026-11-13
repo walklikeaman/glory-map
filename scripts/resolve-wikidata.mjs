@@ -4,6 +4,7 @@
 //
 //   node --env-file=.env.local scripts/resolve-wikidata.mjs --dry-run --limit 20
 //   node --env-file=.env.local scripts/resolve-wikidata.mjs
+//   node --env-file=.env.local scripts/resolve-wikidata.mjs --work <uuid>,<uuid>   # one series first
 //
 // This is the first path to `verified`. The review gate weights wikidata_entity
 // at 0.6 against a 0.6 threshold, so a canonical entity is the only single
@@ -35,6 +36,7 @@ const DRY_RUN = process.argv.includes("--dry-run");
 const LIMIT = Number.parseInt(arg("limit", "0"), 10) || 0;
 const GAP_MS = Number.parseInt(arg("gap", "2500"), 10) || 2500;
 const SOURCE_KIND = String(arg("source", "moviemaps"));
+const WORK_IDS = String(arg("work", "") || "").split(",").map((id) => id.trim()).filter(Boolean);
 
 const ENDPOINT = "https://query.wikidata.org/sparql";
 const AGENT = "GloryMapBot/0.1 (+https://github.com/walklikeaman/glory-map; contact via repo issues)";
@@ -74,10 +76,11 @@ async function main() {
   // later run — which is right, because Wikidata gains entries over time.
   const rows = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from("location_submissions")
+    let query = db.from("location_submissions")
       .select("id, place_name, lat, lng")
-      .eq("source_kind", SOURCE_KIND).not("lat", "is", null).is("wikidata_id", null)
-      .range(from, from + 999);
+      .eq("source_kind", SOURCE_KIND).not("lat", "is", null).is("wikidata_id", null);
+    if (WORK_IDS.length) query = query.in("work_id", WORK_IDS);
+    const { data, error } = await query.order("id").range(from, from + 999);
     if (error) throw new Error(error.message);
     if (!data.length) break;
     rows.push(...data);
