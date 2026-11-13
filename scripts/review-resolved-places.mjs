@@ -63,8 +63,12 @@ async function areasKm2(qids) {
   return areas;
 }
 
-// human settlement, administrative territorial entity, archipelago, peninsula, desert, oasis
-const AREA_TYPES = ["Q486972", "Q56061", "Q33837", "Q34763", "Q8514", "Q43742"];
+// human settlement, administrative territorial entity, archipelago, peninsula, desert, oasis,
+// river, mountain range, valley, plain, coast
+const AREA_TYPES = [
+  "Q486972", "Q56061", "Q33837", "Q34763", "Q8514", "Q43742",
+  "Q4022", "Q46831", "Q39816", "Q160091", "Q93352",
+];
 // …unless it is also a structure or a site you walk into: a castle that is also a civil
 // parish, a fortress that is also a national park (Alnwick, Masada) stays a spot.
 // architectural structure, archaeological site
