@@ -40,7 +40,7 @@ async function main() {
   let read = 0;
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("location_submissions")
-      .select("id, work_id, source_kind, place_name, lat, lng")
+      .select("id, work_id, source_kind, place_name, lat, lng, corroborated_by")
       .range(from, from + 999);
     if (error) throw new Error(error.message);
     if (!data.length) break;
@@ -57,6 +57,7 @@ async function main() {
   console.log(`${multi.length} works are described by more than one source\n`);
 
   const updates = multi.flatMap(corroborateWork);
+  const rowsById = new Map(multi.flat().map((row) => [row.id, row]));
   const gained = updates.filter((u) => u.lat !== undefined);
   const bySource = {};
   for (const u of updates) {
@@ -87,6 +88,11 @@ async function main() {
   for (let i = 0; i < updates.length; i += WRITE_BATCH) {
     const batch = updates.slice(i, i + WRITE_BATCH);
     await Promise.all(batch.map(async ({ id, ...patch }) => {
+      // A confirmation that is not another row of ours (a web page that named the same
+      // place, written by research-locations.mjs) has no submission_id to re-derive it
+      // from, so a rerun keeps it instead of overwriting it.
+      const kept = (rowsById.get(id)?.corroborated_by ?? []).filter((entry) => entry && !entry.submission_id);
+      patch.corroborated_by = [...patch.corroborated_by, ...kept];
       const { error } = await db.from("location_submissions").update(patch).eq("id", id);
       if (error) throw new Error(`${id}: ${error.message}`);
     }));
