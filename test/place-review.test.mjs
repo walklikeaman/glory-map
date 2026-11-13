@@ -179,3 +179,25 @@ test("a frame match helps but cannot publish a place on its own", () => {
   assert.equal(verdict.status, STATUS.pending);
   assert.ok(SIGNAL_WEIGHTS.frame_match < VERIFY_THRESHOLD);
 });
+
+test("reviewResolvedPlace holds countries and cities back from the map", async () => {
+  const { reviewResolvedPlace } = await import("../app/lib/place-review.mjs");
+  const spot = { name: "Fort Lovrijenac", lat: 42.6408, lng: 18.1043, place_class: "real_exterior", wikidata_id: "Q1430830" };
+  assert.equal(reviewResolvedPlace({ ...spot, geocode_precision: "point" }).status, STATUS.verified);
+  for (const precision of ["country", "city"]) {
+    const verdict = reviewResolvedPlace({ ...spot, name: "Croatia", wikidata_id: "Q224", geocode_precision: precision });
+    assert.equal(verdict.status, STATUS.pending);
+    assert.equal(verdict.reason, "area_not_a_spot");
+  }
+  const region = reviewResolvedPlace({ ...spot, name: "Île-de-France", wikidata_id: "Q13917", geocode_precision: "street", area_km2: 12012 });
+  assert.equal(region.status, STATUS.pending);
+  assert.equal(reviewResolvedPlace({ ...spot, geocode_precision: "point", area_km2: 0.02 }).status, STATUS.verified);
+  assert.equal(reviewResolvedPlace({ ...spot, name: "Saint-Tropez", geocode_precision: "point", area_km2: Infinity }).status, STATUS.pending);
+});
+
+test("reviewResolvedPlace keeps a place without a coordinate pending, not rejected", async () => {
+  const { reviewResolvedPlace } = await import("../app/lib/place-review.mjs");
+  const verdict = reviewResolvedPlace({ name: "Galeries Lafayette", lat: null, lng: null, wikidata_id: "Q3094686", geocode_precision: "none" });
+  assert.equal(verdict.status, STATUS.pending);
+  assert.equal(reviewResolvedPlace({ name: "Winterfell", lat: 1, lng: 1, place_class: "fictional", geocode_precision: "point" }).status, STATUS.rejected);
+});

@@ -148,3 +148,31 @@ export function reviewPlace(candidate) {
     reason: signals.length === 0 ? "no_evidence" : `insufficient:${signals.join("+")}`,
   };
 }
+
+// A pin is a spot someone can walk to. Wikidata's filming locations (P915) often name a
+// whole country, region or city ("Game of Thrones → Croatia", "Emily in Paris → Paris").
+// The resolver marks most of them `geocode_precision` country or city, but a region with
+// a finely stated point (Île-de-France, Palawan, Rub' al Khali) slips through as `point`,
+// so the entity's own area (P2046) is checked too. Drawn, these put one pin in the middle
+// of a country with a dozen films on it. They stay in the graph as facts about the work,
+// but not on the map.
+export const AREA_PRECISIONS = Object.freeze(["country", "city"]);
+export const MAX_SPOT_AREA_KM2 = 20;
+
+// The verdict for a place the resolver wrote. Same evidence rules as `reviewPlace`, plus:
+// an area is never verified, and a missing coordinate is never a refusal (a later Wikidata
+// edit can supply it): the place keeps its status, or waits as pending; it is not drawn
+// either way. `area_km2` is the entity's P2046
+// in km², Infinity for a town or a region with none stated, absent otherwise.
+export function reviewResolvedPlace(place) {
+  // Infinity is allowed: it marks an entity whose type is an area but which states none.
+  const area = Number(place?.area_km2 ?? 0);
+  if (AREA_PRECISIONS.includes(place?.geocode_precision) || area > MAX_SPOT_AREA_KM2) {
+    return { status: STATUS.pending, score: 0, signals: [], reason: "area_not_a_spot" };
+  }
+  const verdict = reviewPlace(place);
+  if (verdict.status === STATUS.rejected && verdict.reason === "no_coordinate") {
+    return { ...verdict, status: place?.status === STATUS.verified ? STATUS.verified : STATUS.pending };
+  }
+  return verdict;
+}
