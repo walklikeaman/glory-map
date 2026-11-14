@@ -7,6 +7,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-14] decision | Works without a poster: the kind's icon on a neutral tile (UX-11)
+**Object**: `.poster-tile.is-blank` in `app/globals.css`; the film chip's fallback tile in `app/components/SceneMapApp.jsx` (`kindIcon`).
+**Scenario**: UX pass, item UX-11 from `docs/ux-audit-2026-11-03.md`: a work without a poster showed a gold tile with initials ("G", "RH", "TS"), which read as unfinished artwork.
+**What happened**: The fallback tile is now neutral (faint fill, the panel's line colour), and it shows the work's kind icon (film, series or book), the same icon as the kind badge. The `code` initials field was only used by that tile, so it is gone from the fallback films and from the chips built from locations.
+**Outcome**: ✅ checked in Playwright at 1440 and 390 px; screenshots in `docs/media/ux-11/`. That closes the UX pass (UX-1..UX-11). Next come the features, in PRIORITIES order.
+
 ## [2026-11-13] decision | Desktop: the section rail sits on the left edge, a section replaces the panel (UX-10)
 **Object**: `.app-nav`, `.section-sheet`, `.command-panel` in `app/globals.css`; new `--rail-width` token (76px desktop, 0 at 860px and below).
 **Scenario**: UX pass, item UX-10 from `docs/ux-audit-2026-11-03.md` (the rail floated between the panel and the map; Routes opened a third column on the right).
