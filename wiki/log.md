@@ -7,6 +7,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-13] decision | Desktop: the section rail sits on the left edge, a section replaces the panel (UX-10)
+**Object**: `.app-nav`, `.section-sheet`, `.command-panel` in `app/globals.css`; new `--rail-width` token (76px desktop, 0 at 860px and below).
+**Scenario**: UX pass, item UX-10 from `docs/ux-audit-2026-11-03.md` (the rail floated between the panel and the map; Routes opened a third column on the right).
+**What happened**: On a desktop the rail is a full-height strip on the screen's left edge. The map panel moved right by the rail's width. An open section (Routes, Add, Collection, Profile) now sits exactly where the panel is, and the panel hides while it is open, so the map keeps the same width whatever is open. The place card stays on the right. Phone and tablet layouts are unchanged (the rail width is 0 there and the bottom bar is as before). Pure CSS, no state change.
+**Outcome**: ✅ checked in Playwright at 1440 and 390 px; screenshots in `docs/media/ux-10/`.
+
 ## [2026-11-13] update | The project scheme: rules, method, skills, hooks, a wiki test
 
 Nikita's "project scheme" kit, applied on top of the existing Codex framework, adding only what was missing.

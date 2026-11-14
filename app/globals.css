@@ -6,6 +6,8 @@
   color-scheme: dark;
   /* The section bar's height on a phone (#22); zero where there is no bottom bar. */
   --app-nav-height: 0px;
+  /* The section rail on a desktop's left edge (UX-10); 0 on a phone, where it is the bottom bar. */
+  --rail-width: 76px;
   --bg: #080909;
   --panel: rgba(16, 18, 18, 0.88);
   --panel-solid: #111414;
@@ -460,8 +462,8 @@ img {
 
 .command-panel {
   top: 24px;
-  left: 24px;
-  width: min(410px, calc(100vw - 48px));
+  left: calc(var(--rail-width) + 16px);
+  width: min(410px, calc(100vw - var(--rail-width) - 40px));
   max-height: calc(100vh - 48px);
   overflow: auto;
   border-radius: 8px;
@@ -5525,20 +5527,23 @@ figcaption a {
 
 /* --- Sections: Map / Routes / Add / Collection / Profile (#22) ------------------ */
 
-/* Desktop: a rail beside the panel — the walk control holds the bottom centre and
-   "Only my films" the top centre. */
+/* Desktop: a rail on the screen's left edge (UX-10). It used to float between the panel
+   and the map, and a section opened as a third column on the right; now a section takes
+   the panel's place, so the map keeps the same width whichever section is open. */
 .app-nav {
   position: absolute;
-  top: 24px;
-  left: calc(24px + min(410px, calc(100vw - 48px)) + 12px);
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--rail-width);
   z-index: 760;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  backdrop-filter: blur(18px);
+  padding: 16px 6px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel-solid);
 }
 
 .app-nav button {
@@ -5563,12 +5568,12 @@ figcaption a {
 
 .section-sheet {
   position: absolute;
+  /* Exactly where the panel is: a section replaces it rather than opening beside it. */
   top: 24px;
-  /* Left of the map's own buttons, which run down the right edge. */
-  right: 72px;
+  left: calc(var(--rail-width) + 16px);
   bottom: 24px;
   z-index: 750;
-  width: min(430px, calc(100vw - 96px));
+  width: min(410px, calc(100vw - var(--rail-width) - 40px));
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
@@ -5635,6 +5640,8 @@ figcaption a {
 .section-row-main span { color: var(--muted); font-size: 0.78rem; overflow-wrap: anywhere; }
 .section-list > .section-row .icon-button { margin-right: 4px; }
 
+.scene-shell.is-in-section .command-panel { visibility: hidden; }
+
 .profile-head { grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
 
 .profile-avatar {
@@ -5671,7 +5678,7 @@ figcaption a {
 /* Phone: the bar along the bottom, where a thumb is; a section is a full screen over the
    map, above the bar, and the map's own overlays step aside while it is open. */
 @media (max-width: 860px) {
-  :root { --app-nav-height: calc(62px + env(safe-area-inset-bottom)); }
+  :root { --app-nav-height: calc(62px + env(safe-area-inset-bottom)); --rail-width: 0px; }
 
   .app-nav {
     position: fixed;
@@ -5679,14 +5686,16 @@ figcaption a {
     left: 0;
     right: 0;
     bottom: 0;
+    width: auto;
     z-index: 900;
+    display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
     height: var(--app-nav-height);
     /* The 4 px keep the active pill off the bar's top edge and the screen's sides. */
     padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
-    border-width: 1px 0 0;
-    border-radius: 0;
+    border: 0;
+    border-top: 1px solid var(--line);
     background: var(--panel-solid);
   }
 
@@ -5705,8 +5714,7 @@ figcaption a {
     padding-top: env(safe-area-inset-top);
   }
 
-  .scene-shell.is-in-section .walk-controls,
-  .scene-shell.is-in-section .command-panel { visibility: hidden; }
+  .scene-shell.is-in-section .walk-controls { visibility: hidden; }
 }
 
 /* The film strip on a phone (mobile review, 2026-10-13): one row that scrolls sideways,
