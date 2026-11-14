@@ -1,3 +1,9 @@
+---
+type: source
+created: 2026-07-22
+updated: 2026-07-22
+sources: [web, research]
+---
 # Personal collections source matrix
 
 Research 22.07.2026 (9 agents, key facts verified with live queries).

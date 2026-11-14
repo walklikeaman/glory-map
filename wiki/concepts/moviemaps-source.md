@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-05
+updated: 2026-08-05
+sources: [code, log]
+---
 # MovieMaps — strong on geometry, silent on licence
 
 Code: `tools/scraperai/`, `app/lib/moviemaps-source.mjs`,

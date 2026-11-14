@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-19
+updated: 2026-09-10
+sources: [code, log]
+---
 # The directory — a city is a point, not a name
 
 **What it answers.** Until 18.08 the product had two surfaces: the map (`/`) and the film

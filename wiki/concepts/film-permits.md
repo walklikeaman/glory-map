@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-04
+updated: 2026-08-04
+sources: [code, log]
+---
 # Filming permits — the only primary source in the project
 
 Code: `app/lib/film-permits.mjs`, `scripts/ingest-film-permits.mjs`.

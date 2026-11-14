@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-08
+updated: 2026-08-08
+sources: [code, log]
+---
 # Fact architecture — a work has many facts, a place has many works
 
 Issue #129. Step 1 of that issue asks for the current schema worked through **on paper**

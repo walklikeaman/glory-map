@@ -1,3 +1,9 @@
+---
+type: handoff
+created: 2026-08-05
+updated: 2026-10-13
+sources: [sessions, log]
+---
 # Handoff — 2026-09-20, after the text sources learned to read
 
 Written because a session ended, not because the work did. `wiki/log.md` is the
@@ -67,7 +73,7 @@ nohup bash scripts/enrich-loop.sh --limit 5500 >> ~/enrich.log 2>&1 &
 
 **Start it through the loop, not directly.** The run was always resumable and nothing ever
 resumed it, which is the whole of the 16.09 loss.
-[scripts/enrich-loop.sh](scripts/enrich-loop.sh) runs the script again every two minutes
+[scripts/enrich-loop.sh](../scripts/enrich-loop.sh) runs the script again every two minutes
 until it prints its own `Nothing to enrich.`, finds the env file by asking which one holds a
 `service_role` key for `quvxxqxowathrcyshhwj` rather than by path, and stops itself if ten
 runs in a row die inside ninety seconds — that pattern is a broken configuration, and
@@ -77,7 +83,7 @@ the work list is chosen once per attempt and a second copy would spend the same 
 reading the same articles.
 
 **And the machine restarting is covered too, by a LaunchAgent.**
-[scripts/install-enrich-agent.sh](scripts/install-enrich-agent.sh) writes
+[scripts/install-enrich-agent.sh](../scripts/install-enrich-agent.sh) writes
 `~/Library/LaunchAgents/com.glorymap.enrich.plist` and loads it; `--status` says whether it
 is loaded and running, `--remove` takes it away. Two things about it are worth knowing
 before trusting it. **It starts at LOGIN, not at boot** — a machine left at the login window
@@ -429,9 +435,9 @@ Only Supabase support can close it. Everything else the advisor reported — fun
 
 ## Plaques: what was done and where the ceiling is
 
-Two shipped pieces, both live: [app/lib/plaque-source.mjs](app/lib/plaque-source.mjs)
+Two shipped pieces, both live: [app/lib/plaque-source.mjs](../app/lib/plaque-source.mjs)
 matches a plaque to a work we already hold, and
-[app/lib/plaque-title-resolve.mjs](app/lib/plaque-title-resolve.mjs) turns a title written
+[app/lib/plaque-title-resolve.mjs](../app/lib/plaque-title-resolve.mjs) turns a title written
 on a wall into a NEW work carrying a real Wikidata id. Result: 53 plaques across 40 works,
 and works with a `wikidata_id` went 15 → 28.
 

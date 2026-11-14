@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # External services (besides Wikidata and OpenAI)
 
 Separate pages: [[wikidata]], [[openai]]. Here is everything else that

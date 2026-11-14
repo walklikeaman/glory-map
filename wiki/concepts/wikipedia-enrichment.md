@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-02
+updated: 2026-08-02
+sources: [code, log]
+---
 # Wikipedia prose as a source (#47)
 
 Wikidata's P915 covers a few thousand films. Thousands more describe where they were shot

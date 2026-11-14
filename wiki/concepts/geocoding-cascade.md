@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-02
+updated: 2026-09-12
+sources: [code, log]
+---
 # Geocoding — turning a place NAME into a point
 
 A model may name a place. It may never say where the place is. Every path that produces
