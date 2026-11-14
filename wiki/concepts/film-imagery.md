@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Film still for a location — vision gate with a capability token
 
 Goal: show in the location card a still shot filmed right here, not a random

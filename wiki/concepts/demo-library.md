@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-09-11
+updated: 2026-09-12
+sources: [code, log]
+---
 # The demo library — a real export, locally, never committed
 
 `scripts/seed-demo-library.mjs` + a dev-only effect in `SceneMapApp`. Related:

@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-27
+updated: 2026-08-05
+sources: [code, log]
+---
 # Place precision — when a pin may move, and when two pins are one place
 
 Two operations touch a place's identity: **snapping** it onto a building footprint

@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # GloryMap — the product
 
 A map of real places from your favorite films, series, and books: personal

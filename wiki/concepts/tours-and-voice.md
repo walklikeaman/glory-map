@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Tours and voice — route, timed tour, AI tour, audio guide
 
 Four related features in [[frontend]]; the server side is `/api/route`,

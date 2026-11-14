@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-08
+updated: 2026-08-14
+sources: [code, log]
+---
 # Reviewing the queue — what a rule may decide, and what nobody can
 
 44,098 submissions arrived across five ingests and not one had ever been looked at. The

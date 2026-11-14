@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-07
+updated: 2026-08-07
+sources: [code, log]
+---
 # ReelStreets — prose, photographs of today, and no coordinates at all
 
 Code: `tools/scraperai/reelstreets.py`, `tools/scraperai/extract_places.py`,

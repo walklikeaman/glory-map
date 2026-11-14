@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-08-04
+sources: [code, log]
+---
 # Location search — three paths with an anti-hallucination gate
 
 All paths normalize into one location record with `relation_kind`

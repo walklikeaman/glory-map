@@ -13,6 +13,68 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 **What happened**: On a desktop the rail is a full-height strip on the screen's left edge. The map panel moved right by the rail's width. An open section (Routes, Add, Collection, Profile) now sits exactly where the panel is, and the panel hides while it is open, so the map keeps the same width whatever is open. The place card stays on the right. Phone and tablet layouts are unchanged (the rail width is 0 there and the bottom bar is as before). Pure CSS, no state change.
 **Outcome**: ✅ checked in Playwright at 1440 and 390 px; screenshots in `docs/media/ux-10/`.
 
+## [2026-11-13] update | The project scheme: rules, method, skills, hooks, a wiki test
+
+Nikita's "project scheme" kit, applied on top of the existing Codex framework, adding only what was missing.
+- New: `docs/RULES.md` (every rule with date and reason, §3 from the project instructions and memory), `docs/agent-method.md`, `.loops/experience.md`, `.claude/commands/ship.md`, skills `gm-knowledge-lookup` (+ `search.sh`) and `gm-harness-reflect`, a SessionStart guardrail count and a Stop reminder in `.claude/settings.json`.
+- `test/wiki.test.mjs` (the kit's Python test, ported to `node:test` so CI runs it) found real defects, all fixed: 4 out-of-order log blocks (re-sorted, stable within a day, no line lost), two entries inside the log's "Format:" line, an unindexed page, 5 broken relative links, 4 dangling `[[links]]`. All 43 pages got frontmatter, dates from git history.
+- Ingest: [[agent-harness]], [[autonomous-operations]], [[cloud-environment]] (from project memory), [[scenemap-brief]], [[planning-docs]]. Four new guardrails. `AGENTS.md` keeps its full content (Codex reads nothing else) and points at RULES.
+
+## [2026-11-13] Web research live, and street addresses get points
+
+- Nikita said yes: the `web_research` enum value and its evidence check are applied in prod (two migrations, `20261113200000`/`200100`). The 10 test works wrote 102 new rows and 9 second-source confirmations.
+- Placed rows need `geocode_license` (`location_submissions_geocode_provenance`): CC0 for Wikidata, "unstated" for a model's point.
+- `app/lib/nominatim.mjs` + `scripts/geocode-addresses.mjs`: the address is asked alone first ("Jesse Pinkman's house, 322 16th St" finds nothing, the bare address finds the house). Area results and answers more than 5 km apart are refused. 1 request a second. 48 of 87 research rows placed.
+- Nominatim was added to the allowlist mid-session: curl reached it, Node's fetch did not (DNS). `NODE_USE_ENV_PROXY=1` routes fetch through the proxy.
+
+## [2026-11-13] Web research of filming locations
+
+- `app/lib/web-research.mjs` + `scripts/research-locations.mjs`: Haiku 5.5 with `web_search_20260209` reads fan sites, location blogs and wikis for one work at a time and returns places with the page that names each. Rows land as `web_research`, `pending` ("Unconfirmed" on the map when they have a point). A name we already hold from another source becomes a `corroborated_by` entry on that row, which `corroborate-sources.mjs` now keeps on rerun, so the review counts the page as a second source.
+- `web_fetch_20260209` is refused for requests from a restricted-network sandbox (400). Search only.
+- 8,000 max_tokens truncated 4 of 10 answers; 16,000 plus "do not narrate" fixed all four.
+- 10 works cost $0.89 in total (about $0.06 each). They returned 111 places, 20 of them with a point. The model gives street addresses (Breaking Bad: 21 Albuquerque addresses) but rarely coordinates, and we have no street geocoder in the cloud network.
+- Coordinates: the gazetteer hit must lie within 40 km of the named city; the model's own point is kept only under the same check.
+- The source kind needs two migrations: the enum value, then the evidence check (`else false` refuses unknown kinds). The SQL waits in /mnt/project-files/glorymap-research/ for Nikita's yes.
+
+## [2026-11-13] decision | Picking a work shows ALL its places; "Unconfirmed places" is a map setting; search zooms by size
+**Scenario**: Nikita: "even unconfirmed points must be listed, as unconfirmed; maybe a setting to show them on the
+map", and "I still don't get how to work by film". Checked on the live DB: picking Twin Peaks over London left
+the map on London with nothing of Twin Peaks on it. It has 5 confirmed places and 46 unconfirmed rows, and the
+map drew neither (the queue layer skips a work-scoped view; the camera never moved).
+**Decisions**:
+- Picking a work frames its places once per pick (`boundsOfPositions`), padded around the panel, the rail, the
+  phone sheet and the bottom buttons (`paddingForCovers`). The farthest 10% stay on the map but out of the frame
+  (Twin Peaks' lone New York pin). A shared link that carries a view is not re-framed.
+- The work's unconfirmed rows from `/api/work` are drawn as hollow pins (`workCandidatesAsLocations`) under the
+  same "Unconfirmed places" switch, listed in Places, and deduped against its confirmed places (name or ~50 m).
+- That switch now also sits at the top of the map's layers menu (same state as the panel switch, which stays).
+- Picking a place zooms to its size (`zoomForPlace` / `zoomForBoundingBox`): France z6, London z12, a street z16.
+  It used to pan only. Picking a place also clears the picked work: a new question, not a narrower one.
+- The OpenStreetMap address lookup is offered under the Wikidata rows every time, not only when they are empty
+  (Wikidata never lists "12 Fournier Street"). A street or a house is named as itself, not as its city.
+- On a phone, a pick from search closes the sheet so the answer is visible.
+**Not done**: a sheet left open past mid-screen is not padded for; antimeridian-spanning works frame the globe.
+
+## [2026-11-13] incident | Coverage audit; country-sized pins off the map; Wikidata locations for the whole catalogue
+**Scenario**: Nikita asked whether capitals, US cities, Europe, Game of Thrones and Stranger Things
+had been checked. Nobody had checked them. Audit = works with a place within 20 km of the centre.
+**Coverage** (after this run): world capitals 204 → 124 empty, 42 with 1–4 works, 21 with 5–19, 17 with 20+
+(empty ones are mostly Africa, Asia, Oceania). Top-55 US cities: 1 empty (Mesa), 21 thin. 43 big European
+cities: 1 empty (Cologne), 20 thin. GoT: every region is present with correct coordinates (Dubrovnik,
+N. Ireland, Iceland, Seville, Girona, Malta, Morocco), but only 27 places are confirmed and 129 are
+moviemaps-only "Unconfirmed". Stranger Things: Jackson GA, Atlanta, Vilnius present; 7 confirmed, 74 unconfirmed.
+Missing from `works`: Peaky Blinders, The Wire, Succession, Dark, Squid Game. Friends has 0 places.
+**Incident**: 86 verified places were whole areas from Wikidata P915 ("Israel" with 12 films, "Spain",
+"London" at the centre with 11 films), because resolver places were verified by hand.
+**Fix**: `reviewResolvedPlace` (place-review.mjs) + `scripts/review-resolved-places.mjs`: country/city
+precision, an area type (settlement, admin entity, archipelago, peninsula, desert, oasis, river, range,
+valley, plain, coast) or P2046 > 20 km² stays pending (`area_not_a_spot`); a structure or an
+archaeological site stays a spot. `resolve-works.mjs --source any --unlinked` ran over 5,009 works
+($0): 1,800 got places, then 366 new spots were verified (Emily in Paris 0 → ~35 in Paris, No Time to Die,
+The Last of Us, Wednesday, Money Heist). Snapshot: /mnt/project-files/glorymap-backfill/2026-11-13-coverage/.
+**Rule from now on**: after any resolver run, run `review-resolved-places.mjs --write`; never verify
+resolver places by hand.
+
 ## [2026-11-12] decision | City page: posters, a small map and "Walk <city>" (UX-8)
 **Object**: `app/city/[slug]/page.jsx`, `app/api/directory/city/route.js` (`loadPosters`), `cityBox` / `cityMapPoints` in `app/lib/directory.mjs`, `WorkMiniMap` (now takes `center` + `zoom`).
 **Scenario**: UX pass, item UX-8 from `docs/ux-audit-2026-11-03.md` (the city page was a text-only list of films).
@@ -208,6 +270,7 @@ the site itself (a native Geolocation plugin would fix that, not done).
 **Decision**: a guest sees ONE welcome screen ("the map shows all of them; sign in to pick your own films"), with Skip pinned in the top corner. Picking films belongs to an account: after sign-in with an empty library the deck is offered once per device (`deckOffered`). The deck now has two answers, right = "On my map" and left = "Not for me", spelled out under the card and on two big buttons, and it deals 20 posters, not 60. A signed-in reader with a library opens on "Only my films" once per page load; a guest keeps the whole map.
 **Why the tour repeated**: the email link and Google sign-in open in Safari (see the iPhone app entry), a separate storage with no first-run record. The welcome now holds back when storage has a Supabase session (`sb-*-auth-token`) or the URL carries `code=` / `access_token=` / `token_hash=`, and a welcome still open when the session arrives is closed.
 **Kept**: old records with "known"/"saved" answers still count as "mine".
+
 ## [2026-11-07] decision | Linking Letterboxd / IMDb accounts: RSS by username now, Trakt/Simkl later
 **Scenario**: Nikita asked for a way to connect Letterboxd or IMDb beyond file export.
 **Findings**: Letterboxd API is private, approval-only. IMDb has no user API; ratings/watchlist
@@ -280,15 +343,6 @@ Gotchas: from the shared cloud egress both the Wikipedia and Wikidata action API
 Gotcha: from a network-restricted cloud sandbox the Claude API refuses image URL sources (400 "not allowed to use URL sources"), so the Claude classifier now downloads each image and sends it as base64. Story trails need `en.wikipedia.org` for the plot, which the cloud allowlist does not include yet (403), so that half of the pilot waits on it. `pendingWorks` claims to order by place count but has no ORDER BY, so the queue is arbitrary.
 **Updated**: `app/lib/still-classify.mjs`, `app/api/enrich/stills/route.js`, `test/still-classify.test.mjs`.
 
-## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
-**Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
-**Scenario**: tooling
-**Outcome**: ✅ success
-**What happened**: `CLAUDE.md` imports `AGENTS.md` and adds commands, a code map and the cloud-session differences. A SessionStart hook (cloud only) runs `npm ci` and seeds `.env.local` from `.env.example`. Verified in a fresh container: hook from scratch, then `npm test` 1830/1830 and `npm run build` green.
-
-Gotcha worth keeping: the default cloud network reaches only package registries. Supabase, Wikidata, Wikipedia, TMDB and OpenAI are refused by the proxy, so `/api/map/works` returns 502 there while the page itself serves 200. The fix is the environment's network allowlist, not code.
-**Updated**: `CLAUDE.md`, `.claude/`.
-
 ## [2026-11-03] update | Routine QA: sitemaps, 404 on a DB timeout, the work chip
 **Object**: `app/sitemap.js`, `app/lib/page-load.mjs`, city/place/letter pages, `app/lib/filter-url.mjs`.
 **Scenario**: QA (desktop 1366 + phone 390, local prod build on the live DB)
@@ -318,17 +372,39 @@ Claude is now a third provider. A careful task (story trails) and still classifi
 Gotchas: Node's `fetch` in the cloud needs `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`. The `places.wikidata_id` column is unique, and another row already holds the NYPL Q-id, so a duplicate place exists there.
 **Updated**: `.env.example`, `wiki/log.md`.
 
-## [2026-10-13] update | Sixteen cities checked against the live graph: unconfirmed pins and plaques on the wrong film
-**Object**: `app/lib/map-points.mjs`, `app/lib/map-layer.mjs`, `app/lib/plaque-source.mjs`.
-**Scenario**: content audit + bugfix
-**Outcome**: ⚠️ partial — code fixed; the wrong links already in production are listed, not deleted
-**What happened**: the cloud reaches no Supabase/Wikidata/TMDB, but the Supabase MCP reads production, so the map RPCs (`map_points_in_view`, `map_candidate_points_in_view`) were called directly for Edinburgh, Prague, Rome, Tokyo, Reykjavik, Dubrovnik, Marrakech, Sydney, Budapest, Wellington, Istanbul, Havana, Mumbai, Berlin, Oxford and Seville (≈12×9 km box, z14). Graph pins: Berlin 16, Prague 11, Rome 9, Oxford 9, Edinburgh 8, Seville 7; Dubrovnik, Wellington, Havana and Mumbai 0 (queue rows only).
+## [2026-11-03] decision | Visitors' shots on a place, and "recreate" any shot (#157)
+**Object**: `place_shots` table + private `place-shots` bucket (migration `20261103100000`, **not applied**), `app/api/shots/route.js`, `app/lib/place-shots.mjs`, `app/lib/shot-moderation.mjs`, `app/components/VisitorShots.jsx`, the recreate dialog.
+**Scenario**: imagery / community
+**Outcome**: 🟡 built and tested offline + Playwright with mocked API; waiting on the owner's yes to apply the migration
+**What happened**: Nikita asked (2026-11-03) that readers can add their own shots to a place, and recreate either the film frame or somebody else's shot. The card now has a "Visitors' shots" strip; each shot has "Recreate", and "Add your shot" opens the same dialog without a reference. Sharing needs sign-in.
 
-Found:
-1. `pointBadge` called every `none` place `exact`, so 860 unconfirmed places read "Filmed here" with a raw "none" under them. Eight different Vienna places (Votivkirche, Zollamtssteg…) share one coordinate in the Prater; Parliament Square and Trafalgar Square share one too. New `unconfirmed` badge, same rule as `isPinnable`.
-2. `matchPlaque` ignored the plaque's years and verb, which `chooseWork` already used: The Wicked Lady 1983 on Gainsborough Studios 1924–1949 (#8600), The Saint 1997 film for Roger Moore's 1962–9 TV series (#2361), the film You Only Live Twice for Fleming writing the novel (#3288).
-3. Not fixed: 643 pairs of places at an identical coordinate; 156 share a name head ("Casa de Pilatos" + "Casa de Pilatos, Plaza de Pilatos, Seville"), so one film shows two pins. Books: only 4 have narrative links.
-**Updated**: as listed, plus tests.
+Decisions worth keeping:
+- A shot belongs to the **place** (`loc_wikidata_id`), not the film. A pin with no stable id has no shots.
+- Upload goes browser → private bucket under `<uid>/`, then `POST /api/shots` records it under the reader's token (RLS) as `pending`. The browser re-encodes through a canvas, which strips EXIF/GPS. Approved shots are served through 1-hour signed URLs.
+- No manual moderation (owner, 2026-10-13): Claude Haiku looks at the **image only**. approve → public, reject → row rejected and the file deleted, unsure/failed/over the limit → stays pending, visible to its author ("held back for a closer look"). Place and work names stay out of the prompt, because the browser supplies them and they could carry instructions.
+- Spend guard: 200 checks per UTC day across all users (`SHOT_MODERATION_DAILY_LIMIT`), 20 shares per account per day.
+- Not built: re-checking pending shots later, and a "delete my shot" button (the storage policy already allows it).
+**Updated**: `wiki/log.md`, `.env.example`.
+
+## [2026-11-03] decision | Then/now wipe on the place card (#57)
+**Object**: `app/components/ThenNowWipe.jsx`, `app/lib/then-now-wipe.mjs`, place card in `SceneMapApp.jsx`.
+**Scenario**: imagery
+**Outcome**: ✅ success (tests + desktop/390 px Playwright, frame mocked)
+**What happened**: when a card has both a matched film frame and a "place today" photo, the two are shown as one 16:9 wipe with a draggable divider instead of side by side. With only one image, or with either URL known broken, the old pair stays, because a wipe over half an error icon is worse than the pair that already says what is missing.
+
+Decisions worth keeping:
+- Keyboard and screen readers drive a native `<input type=range>` under the image (it takes no pointer events); the drag lives on the wrapper. `touch-action: pan-y` keeps vertical swipes scrolling the sheet.
+- A touch never jumps the divider on touch-down, only on a sideways move: a scroll that starts on the image must not move it. A mouse click does jump.
+- Both captions (frame source, Commons credit) stay under the wipe; attribution travels with the layout.
+- No alignment step: there is no vision-verified camera alignment in the data to use. The wipe uses only frames that already passed the matcher, so it is honest but rare. Issue #57's comment still applies: matched frames with wide shots of the location are the bottleneck, not the UI.
+**Updated**: `wiki/log.md`.
+
+## [2026-11-03] decision | What the AI cannot decide goes to a person, with what is wrong with it
+**Object**: `app/lib/suggestion-ai-review.mjs` (`readSource`, `problems`), `app/api/review/suggestions/ai/route.js`, `/review`, column `ai_problems`.
+**Scenario**: feature
+**Outcome**: ⚠️ ready, still not switched on
+**What happened**: The owner: an unclear source still has to be dealt with; what the AI can't settle stays for manual moderation, and the checker should see what is wrong with each one. The model now returns `problems` (one sentence each) beside its verdict, and code adds what it can see itself: no source link, the work not in the graph, the source not opening, the source page not naming the place. The server now **opens the reader's source** (public http(s) hosts only, no IPs or internal names, redirects re-checked, 8 s, first 8k characters of text) and the model reads the page. An "unsure" row stays pending with `ai_problems`, and `/review` shows them on the card. A confident pass whose page does not name the place goes to a person instead of the map.
+**Updated**: as listed, plus `test/suggestion-ai-review.test.mjs` and `app/globals.css`.
 
 ## [2026-10-18] update | TMDB ids for the catalogue, through Wikidata
 **Object**: `works.tmdb_id`, `poster_path`, `backdrop_path` (production).
@@ -357,38 +433,17 @@ Decisions worth keeping: the first unfiltered pass would have moved "Dorchester 
 Data gaps, not fixed here because they need DB writes: 9 of 12 works have no `tmdb_id` (no poster, no stills); duplicate graph places with an address suffix (Casa de Pilatos ×2, Plaza de España ×2, Villa del Balbianello ×2, Broadgate Tower ×2, Carlo IV ×2); The Shard pinned on the Tower of London; five London rows on the city centroid at Charing Cross; 113 verified London places graded `none`, so a plain London plan is all queue rows. `/api/film-image` matches only pairs Wikidata lists in P915, so graph-verified pairs (Roman Holiday at the Spanish Steps) never get a frame.
 **Updated**: `app/api/{trip/plan,work}/route.js`, `app/lib/{trip-plan,model-client}.mjs`, tests.
 
-## [2026-11-03] decision | Visitors' shots on a place, and "recreate" any shot (#157)
-**Object**: `place_shots` table + private `place-shots` bucket (migration `20261103100000`, **not applied**), `app/api/shots/route.js`, `app/lib/place-shots.mjs`, `app/lib/shot-moderation.mjs`, `app/components/VisitorShots.jsx`, the recreate dialog.
-**Scenario**: imagery / community
-**Outcome**: 🟡 built and tested offline + Playwright with mocked API; waiting on the owner's yes to apply the migration
-**What happened**: Nikita asked (2026-11-03) that readers can add their own shots to a place, and recreate either the film frame or somebody else's shot. The card now has a "Visitors' shots" strip; each shot has "Recreate", and "Add your shot" opens the same dialog without a reference. Sharing needs sign-in.
+## [2026-10-13] update | Sixteen cities checked against the live graph: unconfirmed pins and plaques on the wrong film
+**Object**: `app/lib/map-points.mjs`, `app/lib/map-layer.mjs`, `app/lib/plaque-source.mjs`.
+**Scenario**: content audit + bugfix
+**Outcome**: ⚠️ partial — code fixed; the wrong links already in production are listed, not deleted
+**What happened**: the cloud reaches no Supabase/Wikidata/TMDB, but the Supabase MCP reads production, so the map RPCs (`map_points_in_view`, `map_candidate_points_in_view`) were called directly for Edinburgh, Prague, Rome, Tokyo, Reykjavik, Dubrovnik, Marrakech, Sydney, Budapest, Wellington, Istanbul, Havana, Mumbai, Berlin, Oxford and Seville (≈12×9 km box, z14). Graph pins: Berlin 16, Prague 11, Rome 9, Oxford 9, Edinburgh 8, Seville 7; Dubrovnik, Wellington, Havana and Mumbai 0 (queue rows only).
 
-Decisions worth keeping:
-- A shot belongs to the **place** (`loc_wikidata_id`), not the film. A pin with no stable id has no shots.
-- Upload goes browser → private bucket under `<uid>/`, then `POST /api/shots` records it under the reader's token (RLS) as `pending`. The browser re-encodes through a canvas, which strips EXIF/GPS. Approved shots are served through 1-hour signed URLs.
-- No manual moderation (owner, 2026-10-13): Claude Haiku looks at the **image only**. approve → public, reject → row rejected and the file deleted, unsure/failed/over the limit → stays pending, visible to its author ("held back for a closer look"). Place and work names stay out of the prompt, because the browser supplies them and they could carry instructions.
-- Spend guard: 200 checks per UTC day across all users (`SHOT_MODERATION_DAILY_LIMIT`), 20 shares per account per day.
-- Not built: re-checking pending shots later, and a "delete my shot" button (the storage policy already allows it).
-**Updated**: `wiki/log.md`, `.env.example`.
-
-## [2026-11-03] decision | Then/now wipe on the place card (#57)
-**Object**: `app/components/ThenNowWipe.jsx`, `app/lib/then-now-wipe.mjs`, place card in `SceneMapApp.jsx`.
-**Scenario**: imagery
-**Outcome**: ✅ success (tests + desktop/390 px Playwright, frame mocked)
-**What happened**: when a card has both a matched film frame and a "place today" photo, the two are shown as one 16:9 wipe with a draggable divider instead of side by side. With only one image, or with either URL known broken, the old pair stays, because a wipe over half an error icon is worse than the pair that already says what is missing.
-
-Decisions worth keeping:
-- Keyboard and screen readers drive a native `<input type=range>` under the image (it takes no pointer events); the drag lives on the wrapper. `touch-action: pan-y` keeps vertical swipes scrolling the sheet.
-- A touch never jumps the divider on touch-down, only on a sideways move: a scroll that starts on the image must not move it. A mouse click does jump.
-- Both captions (frame source, Commons credit) stay under the wipe; attribution travels with the layout.
-- No alignment step: there is no vision-verified camera alignment in the data to use. The wipe uses only frames that already passed the matcher, so it is honest but rare. Issue #57's comment still applies: matched frames with wide shots of the location are the bottleneck, not the UI.
-**Updated**: `wiki/log.md`.
-## [2026-11-03] decision | What the AI cannot decide goes to a person, with what is wrong with it
-**Object**: `app/lib/suggestion-ai-review.mjs` (`readSource`, `problems`), `app/api/review/suggestions/ai/route.js`, `/review`, column `ai_problems`.
-**Scenario**: feature
-**Outcome**: ⚠️ ready, still not switched on
-**What happened**: The owner: an unclear source still has to be dealt with; what the AI can't settle stays for manual moderation, and the checker should see what is wrong with each one. The model now returns `problems` (one sentence each) beside its verdict, and code adds what it can see itself: no source link, the work not in the graph, the source not opening, the source page not naming the place. The server now **opens the reader's source** (public http(s) hosts only, no IPs or internal names, redirects re-checked, 8 s, first 8k characters of text) and the model reads the page. An "unsure" row stays pending with `ai_problems`, and `/review` shows them on the card. A confident pass whose page does not name the place goes to a person instead of the map.
-**Updated**: as listed, plus `test/suggestion-ai-review.test.mjs` and `app/globals.css`.
+Found:
+1. `pointBadge` called every `none` place `exact`, so 860 unconfirmed places read "Filmed here" with a raw "none" under them. Eight different Vienna places (Votivkirche, Zollamtssteg…) share one coordinate in the Prater; Parliament Square and Trafalgar Square share one too. New `unconfirmed` badge, same rule as `isPinnable`.
+2. `matchPlaque` ignored the plaque's years and verb, which `chooseWork` already used: The Wicked Lady 1983 on Gainsborough Studios 1924–1949 (#8600), The Saint 1997 film for Roger Moore's 1962–9 TV series (#2361), the film You Only Live Twice for Fleming writing the novel (#3288).
+3. Not fixed: 643 pairs of places at an identical coordinate; 156 share a name head ("Casa de Pilatos" + "Casa de Pilatos, Plaza de Pilatos, Seville"), so one film shows two pins. Books: only 4 have narrative links.
+**Updated**: as listed, plus tests.
 
 ## [2026-10-13] decision | A model pre-checks readers' suggestions; nobody reviews by hand for now
 **Object**: `app/lib/suggestion-ai-review.mjs`, `app/api/review/suggestions/ai/route.js`, columns `ai_reviewed_at` / `ai_note` in `20261013000100_reader_suggestions_reviewed.sql`.
@@ -486,6 +541,15 @@ Gotcha worth keeping: a library row now carries `kind: "book"` when it is a book
 
 Still open: the review step (promote a verified row into `location_submissions` and set `submission_id`) runs under the service role and has no UI yet.
 **Updated**: as listed, plus `app/components/AppSections.jsx` and `test/suggestions.test.mjs`.
+
+## [2026-10-11] update | Claude Code can work on the repo from cloud sessions (Projects)
+**Object**: `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/session-start.sh`.
+**Scenario**: tooling
+**Outcome**: ✅ success
+**What happened**: `CLAUDE.md` imports `AGENTS.md` and adds commands, a code map and the cloud-session differences. A SessionStart hook (cloud only) runs `npm ci` and seeds `.env.local` from `.env.example`. Verified in a fresh container: hook from scratch, then `npm test` 1830/1830 and `npm run build` green.
+
+Gotcha worth keeping: the default cloud network reaches only package registries. Supabase, Wikidata, Wikipedia, TMDB and OpenAI are refused by the proxy, so `/api/map/works` returns 502 there while the page itself serves 200. The fix is the environment's network allowlist, not code.
+**Updated**: `CLAUDE.md`, `.claude/`.
 
 ## [2026-10-11] update | ShotSync: the film frame over the live camera
 **Object**: `app/components/ShotSync.jsx`, `app/lib/shot-sync.mjs`, the Recreate dialog.
@@ -2429,148 +2493,6 @@ rather than a rule.
 
 **Updated**: `test/cross-source.test.mjs`, `wiki/concepts/movielocations-source.md`
 
-## [2026-08-07] ingest | movie-locations.com, and three defects caught at the door
-
-**Object**: `tools/scraperai/{movielocations,crawler}.py`,
-`app/lib/movielocations-source.mjs`, `scripts/ingest-movielocations{,-works}.mjs`,
-`scripts/ingest-reelstreets.mjs`, `supabase/migrations/20260807165200|165213`
-**Scenario**: ingest · **Outcome**: ✅ success
-**Code changes**: this commit
-
-**A fifth source that needs no model at all.** movie-locations.com writes its
-captions as "<film> filming location: <scene>: <address>", so a regex finds the
-place during the scrape — no rate limit, no 14 hours, no chance of an invented
-place. 1,870 films, 6,200 locations, every one photographed, every film with a
-year. 657 works created and 5,783 submissions across 1,474 works.
-
-**1,590 of 1,870 films matched, 85%, against ReelStreets' 7.5% on its first
-run.** The matcher is the same one, unchanged. What changed is the catalogue: it
-had already grown past 7,000 works, so a new source finally has something to
-attach to. Worth remembering when judging the next source by its match rate.
-
-**Three defects, none of which announced itself.** 519 of 1,870 records — 28% —
-arrived as mojibake because the site declares UTF-8 in a `<meta>` tag and sends
-no charset header, so `requests` follows RFC 2616 and assumes ISO-8859-1. "Léon"
-was on its way into the catalogue as "LÃ©on", and the cache held the mis-decoded
-text too, so it had to be dropped and the site re-harvested. The crawler now
-trusts the header when it says something and the document when it does not,
-which is right for every site rather than this one.
-
-The other two were caught by their own output. A bracketed alternative title —
-"Harry Potter And The Philosopher's Stone (…Sorcerer's Stone)" — did not match
-the work we already hold and was proposed for creation, which is exactly the
-duplicate the works ingest is written timidly to avoid. And the ingest died on
-"ON CONFLICT DO UPDATE command cannot affect row a second time" because this
-site lists "Transformers: The Last Knight" twice, both entries matched one work,
-and `(work_id, place_key)` is a global key while the dedup was per film. The
-ReelStreets ingest carried the same latent bug and was fixed with it; it had
-simply not met a collision yet.
-
-**A concurrent session added a sixth kind while this landed.** `open_plaques`
-rewrote the same evidence constraint. Verified against the live database before
-shipping: all six kinds appear in both the enum and the constraint, so neither
-session's branch was lost.
-
-**Updated**: `wiki/concepts/movielocations-source.md` (new), `wiki/index.md`,
-`test/movielocations-source.test.mjs`
-
-## [2026-08-06] ingest | ReelStreets: prose a model had to read, and a 20/min ceiling
-
-**Object**: `tools/scraperai/{reelstreets,extract_places,state}.py`,
-`app/lib/reelstreets-source.mjs`, `scripts/ingest-reelstreets{,-works}.mjs`,
-`supabase/migrations/20260806143719|143733`
-**Scenario**: ingest · **Outcome**: ⚠️ partial — 465 of 3,536 films extracted so far
-**Code changes**: this commit
-
-**A fourth source, and the first whose addresses are sentences.** ReelStreets
-gives 3,536 films and 95,258 captures with no IMDb id and no coordinate; only
-1.5% of captions end in anything postcode-shaped, and one of the samples is a
-studio set rather than a place. So a model reads the place out of each caption —
-once per film, batching ~25, so 3,536 calls rather than 95,258 — and names it
-only. The geocoding cascade locates, separately. What ReelStreets has that
-nothing else does is 53,126 photographs of the place as it is today.
-
-**Three failures worth writing down, all of which only appear at scale.** An
-early prompt asked for a `kind` field beside the place; on films with 40+
-captions the free model silently stopped emitting it and every real place was
-recorded as unknown — 0% real, and it looked like a working run. Removing the
-redundancy rather than working around it took it to 89%. Malformed JSON
-reproduced byte for byte on retry at temperature 0, so batches now **split**
-instead of repeat. And `Connection error` was landing in the "model could not
-serialise this" branch, discarding 110 captions across 8 films before anyone
-noticed; transient errors now back off and retry.
-
-**The 20/min ceiling is per account, not per model.** OpenRouter's
-`free-models-per-min` is a shared bucket, so switching to another free model —
-including the cheap Chinese ones — changes nothing. Paid options were measured
-rather than chosen off the price list: `ling-2.6-flash` is twenty times cheaper
-than `qwen3.7-flash` and matches its recall, but drops the postcode, which is the
-difference between an address a geocoder resolves and a street name repeated
-across a city. The free model keeps it, so free won on quality as well as cost —
-at 4 films a minute, 14 hours.
-
-**Incremental collection, per Nikita 2026-08-06.** Both sites expose the right
-signal — MovieMaps dates every sitemap entry, ReelStreets' API takes
-`modified_after` — but timestamps lie in both directions, so `state.py` also
-fingerprints what was extracted. The ReelStreets fingerprint covers the captions
-alone, so a film that merely gained a photograph is not re-read by the model.
-That is where it pays: a full pass is 14 hours, forty changed captions is
-seconds.
-
-Result: 354 works created, 8,063 submissions across 380 works, all `pending`,
-every one with imagery. The works ingest creates only where no work with that
-title exists, because with no external id there is no unique index to lean on —
-verified after the fact that none of the catalogue's 159 duplicate
-`(title_norm, year)` groups involves a row it created.
-
-**Updated**: `wiki/concepts/reelstreets-source.md` (new), `wiki/index.md`,
-`.gitignore`, `test/reelstreets-source.test.mjs`, `scripts/set-openrouter-key.sh`
-
-## [2026-08-05] ingest | MovieMaps: 18k geocoded places, and a licence nobody wrote
-
-**Object**: `tools/scraperai/`, `app/lib/moviemaps-source.mjs`,
-`scripts/ingest-moviemaps.mjs`, `scripts/ingest-moviemaps-works.mjs`,
-`scripts/check-service-key.mjs`, `supabase/migrations/20260805003943|003954|120555`
-**Scenario**: ingest · **Outcome**: ✅ success
-**Code changes**: `d1d9077`, `b5720e6`, `9f8540b`, `cbffe3f`
-
-**The coordinates were never in the HTML.** MovieMaps draws its map client-side, so a
-parser reading the rendered page gets names and no points. Every detail page ends with
-the call the site makes to its own JavaScript — `moviemaps.loadPublic('MovieDetail', …)`
-— carrying coordinates, city, country, Street View camera pose and the fictional name
-each place plays. One movie page geocodes an entire film. Reading that instead of the
-markup is the difference between a gazetteer with invisible holes and 18,048 locations
-where **every single one** has both a coordinate and a street address. Full harvest:
-24,089 pages, 0 errors, 102 minutes, 90,764 frames.
-
-**The site publishes no licence at all** — /about, /terms, /legal and /copyright all 404.
-So every row carries `source_license = 'unstated'`: not a guess at a permissive one, and
-not the `CC BY-SA 4.0` default removed when [[film-permits]] landed, for exactly this
-reason. A MovieMaps row is a lead, not licensed content. Its 90,738 frame links are
-stored for the **reviewer** and never enter `work_images` — that is the Film-Grab
-refusal in [[moviemaps-source]]'s sibling page applied, not waived: a permissive footer
-grants nothing when the copyright is the studio's, and here there is not even a footer.
-
-**A CASE with no ELSE let a whole source owe no evidence.** Adding `moviemaps` to
-`submission_source_kind` opened a hole in the provenance rule written one migration
-earlier: the evidence CHECK is a CASE over `source_kind` with no ELSE, a CASE that
-matches nothing returns NULL, and a CHECK treats NULL as **passed**. Every moviemaps row
-would have satisfied the rule by not being named in it. It now ends in `else false`.
-
-Two more worth keeping. **A check that ran a select proved nothing** — `works` is
-publicly readable, so the anon key passed the "can this key write" test; it now probes a
-write and reads the JWT's own role claim. And **`works.source` had to exist before the
-import**, because the catalogue was 15 deliberate rows and became 6,044; without the
-column nobody could later tell a curated work from a scraped one.
-
-Result: 6,029 works (5,380 films, 649 series) and 30,170 submissions, all `pending`,
-reconciling exactly with the harvest — 30,386 links less 216 duplicate place keys. The 15
-curated rows kept their `wikidata_id` and `tmdb_id`; the works ingest inserts and never
-updates.
-
-**Updated**: `wiki/concepts/moviemaps-source.md` (new), `wiki/index.md`,
-`wiki/sources/source-evaluation.md`, `.gitignore`, `test/moviemaps-source.test.mjs`
-
 ## [2026-08-08] incident | The names were not the problem, and the first diagnosis said they were
 
 **Object**: `app/lib/place-name-head.mjs`, `scripts/geocode-submissions.mjs`,
@@ -2819,6 +2741,51 @@ argument for doing this at all: a rule you cannot read is a rule you cannot chec
 dropped by `content_graph`, so the file would recreate dead history, and its comments are
 in Russian, which the repo does not allow.
 
+## [2026-08-07] ingest | movie-locations.com, and three defects caught at the door
+
+**Object**: `tools/scraperai/{movielocations,crawler}.py`,
+`app/lib/movielocations-source.mjs`, `scripts/ingest-movielocations{,-works}.mjs`,
+`scripts/ingest-reelstreets.mjs`, `supabase/migrations/20260807165200|165213`
+**Scenario**: ingest · **Outcome**: ✅ success
+**Code changes**: this commit
+
+**A fifth source that needs no model at all.** movie-locations.com writes its
+captions as "<film> filming location: <scene>: <address>", so a regex finds the
+place during the scrape — no rate limit, no 14 hours, no chance of an invented
+place. 1,870 films, 6,200 locations, every one photographed, every film with a
+year. 657 works created and 5,783 submissions across 1,474 works.
+
+**1,590 of 1,870 films matched, 85%, against ReelStreets' 7.5% on its first
+run.** The matcher is the same one, unchanged. What changed is the catalogue: it
+had already grown past 7,000 works, so a new source finally has something to
+attach to. Worth remembering when judging the next source by its match rate.
+
+**Three defects, none of which announced itself.** 519 of 1,870 records — 28% —
+arrived as mojibake because the site declares UTF-8 in a `<meta>` tag and sends
+no charset header, so `requests` follows RFC 2616 and assumes ISO-8859-1. "Léon"
+was on its way into the catalogue as "LÃ©on", and the cache held the mis-decoded
+text too, so it had to be dropped and the site re-harvested. The crawler now
+trusts the header when it says something and the document when it does not,
+which is right for every site rather than this one.
+
+The other two were caught by their own output. A bracketed alternative title —
+"Harry Potter And The Philosopher's Stone (…Sorcerer's Stone)" — did not match
+the work we already hold and was proposed for creation, which is exactly the
+duplicate the works ingest is written timidly to avoid. And the ingest died on
+"ON CONFLICT DO UPDATE command cannot affect row a second time" because this
+site lists "Transformers: The Last Knight" twice, both entries matched one work,
+and `(work_id, place_key)` is a global key while the dedup was per film. The
+ReelStreets ingest carried the same latent bug and was fixed with it; it had
+simply not met a collision yet.
+
+**A concurrent session added a sixth kind while this landed.** `open_plaques`
+rewrote the same evidence constraint. Verified against the live database before
+shipping: all six kinds appear in both the enum and the constraint, so neither
+session's branch was lost.
+
+**Updated**: `wiki/concepts/movielocations-source.md` (new), `wiki/index.md`,
+`test/movielocations-source.test.mjs`
+
 ## [2026-08-07] decision | Handoff rewritten to the state that actually exists
 
 **Object**: `wiki/handoff.md`, `wiki/sources/commemorative-plaques.md`
@@ -2848,6 +2815,103 @@ Also recorded where it will be found: a merge into `main` does not reliably depl
 production and `commits/<sha>/status` goes green on the Preview check; constraints exist
 in the live database that no migration in git describes; and the Open Plaques dump ships
 its own Null Island.
+
+## [2026-08-06] ingest | ReelStreets: prose a model had to read, and a 20/min ceiling
+
+**Object**: `tools/scraperai/{reelstreets,extract_places,state}.py`,
+`app/lib/reelstreets-source.mjs`, `scripts/ingest-reelstreets{,-works}.mjs`,
+`supabase/migrations/20260806143719|143733`
+**Scenario**: ingest · **Outcome**: ⚠️ partial — 465 of 3,536 films extracted so far
+**Code changes**: this commit
+
+**A fourth source, and the first whose addresses are sentences.** ReelStreets
+gives 3,536 films and 95,258 captures with no IMDb id and no coordinate; only
+1.5% of captions end in anything postcode-shaped, and one of the samples is a
+studio set rather than a place. So a model reads the place out of each caption —
+once per film, batching ~25, so 3,536 calls rather than 95,258 — and names it
+only. The geocoding cascade locates, separately. What ReelStreets has that
+nothing else does is 53,126 photographs of the place as it is today.
+
+**Three failures worth writing down, all of which only appear at scale.** An
+early prompt asked for a `kind` field beside the place; on films with 40+
+captions the free model silently stopped emitting it and every real place was
+recorded as unknown — 0% real, and it looked like a working run. Removing the
+redundancy rather than working around it took it to 89%. Malformed JSON
+reproduced byte for byte on retry at temperature 0, so batches now **split**
+instead of repeat. And `Connection error` was landing in the "model could not
+serialise this" branch, discarding 110 captions across 8 films before anyone
+noticed; transient errors now back off and retry.
+
+**The 20/min ceiling is per account, not per model.** OpenRouter's
+`free-models-per-min` is a shared bucket, so switching to another free model —
+including the cheap Chinese ones — changes nothing. Paid options were measured
+rather than chosen off the price list: `ling-2.6-flash` is twenty times cheaper
+than `qwen3.7-flash` and matches its recall, but drops the postcode, which is the
+difference between an address a geocoder resolves and a street name repeated
+across a city. The free model keeps it, so free won on quality as well as cost —
+at 4 films a minute, 14 hours.
+
+**Incremental collection, per Nikita 2026-08-06.** Both sites expose the right
+signal — MovieMaps dates every sitemap entry, ReelStreets' API takes
+`modified_after` — but timestamps lie in both directions, so `state.py` also
+fingerprints what was extracted. The ReelStreets fingerprint covers the captions
+alone, so a film that merely gained a photograph is not re-read by the model.
+That is where it pays: a full pass is 14 hours, forty changed captions is
+seconds.
+
+Result: 354 works created, 8,063 submissions across 380 works, all `pending`,
+every one with imagery. The works ingest creates only where no work with that
+title exists, because with no external id there is no unique index to lean on —
+verified after the fact that none of the catalogue's 159 duplicate
+`(title_norm, year)` groups involves a row it created.
+
+**Updated**: `wiki/concepts/reelstreets-source.md` (new), `wiki/index.md`,
+`.gitignore`, `test/reelstreets-source.test.mjs`, `scripts/set-openrouter-key.sh`
+
+## [2026-08-05] ingest | MovieMaps: 18k geocoded places, and a licence nobody wrote
+
+**Object**: `tools/scraperai/`, `app/lib/moviemaps-source.mjs`,
+`scripts/ingest-moviemaps.mjs`, `scripts/ingest-moviemaps-works.mjs`,
+`scripts/check-service-key.mjs`, `supabase/migrations/20260805003943|003954|120555`
+**Scenario**: ingest · **Outcome**: ✅ success
+**Code changes**: `d1d9077`, `b5720e6`, `9f8540b`, `cbffe3f`
+
+**The coordinates were never in the HTML.** MovieMaps draws its map client-side, so a
+parser reading the rendered page gets names and no points. Every detail page ends with
+the call the site makes to its own JavaScript — `moviemaps.loadPublic('MovieDetail', …)`
+— carrying coordinates, city, country, Street View camera pose and the fictional name
+each place plays. One movie page geocodes an entire film. Reading that instead of the
+markup is the difference between a gazetteer with invisible holes and 18,048 locations
+where **every single one** has both a coordinate and a street address. Full harvest:
+24,089 pages, 0 errors, 102 minutes, 90,764 frames.
+
+**The site publishes no licence at all** — /about, /terms, /legal and /copyright all 404.
+So every row carries `source_license = 'unstated'`: not a guess at a permissive one, and
+not the `CC BY-SA 4.0` default removed when [[film-permits]] landed, for exactly this
+reason. A MovieMaps row is a lead, not licensed content. Its 90,738 frame links are
+stored for the **reviewer** and never enter `work_images` — that is the Film-Grab
+refusal in [[moviemaps-source]]'s sibling page applied, not waived: a permissive footer
+grants nothing when the copyright is the studio's, and here there is not even a footer.
+
+**A CASE with no ELSE let a whole source owe no evidence.** Adding `moviemaps` to
+`submission_source_kind` opened a hole in the provenance rule written one migration
+earlier: the evidence CHECK is a CASE over `source_kind` with no ELSE, a CASE that
+matches nothing returns NULL, and a CHECK treats NULL as **passed**. Every moviemaps row
+would have satisfied the rule by not being named in it. It now ends in `else false`.
+
+Two more worth keeping. **A check that ran a select proved nothing** — `works` is
+publicly readable, so the anon key passed the "can this key write" test; it now probes a
+write and reads the JWT's own role claim. And **`works.source` had to exist before the
+import**, because the catalogue was 15 deliberate rows and became 6,044; without the
+column nobody could later tell a curated work from a scraped one.
+
+Result: 6,029 works (5,380 films, 649 series) and 30,170 submissions, all `pending`,
+reconciling exactly with the harvest — 30,386 links less 216 duplicate place keys. The 15
+curated rows kept their `wikidata_id` and `tmdb_id`; the works ingest inserts and never
+updates.
+
+**Updated**: `wiki/concepts/moviemaps-source.md` (new), `wiki/index.md`,
+`wiki/sources/source-evaluation.md`, `.gitignore`, `test/moviemaps-source.test.mjs`
 
 ## [2026-08-05] ingest | Titles on plaques became works, and the rules that made them true
 

@@ -127,6 +127,12 @@ test("every submission in the group files its own evidence", () => {
   assert.equal(evidence[0].snippet, 'Appears as "the ballroom".');
 });
 
+// Somebody did search for a web_research row, so its evidence says so.
+test("a web research row files web_search_cited evidence", () => {
+  const [evidence] = evidenceFromRows("p1", [{ ...biltmoreA, source_kind: "web_research" }]);
+  assert.equal(evidence.method, "web_search_cited");
+});
+
 // Two sources naming the same film at the same address are one claim, not two.
 test("one link per work, at the strongest confidence for it", () => {
   const rows = [biltmoreA, { ...biltmoreB, work_id: "w1" }];

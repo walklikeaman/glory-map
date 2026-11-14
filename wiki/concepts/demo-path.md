@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Demo path (sacred)
 
 The one scenario that must work on stage (the "Project" section in

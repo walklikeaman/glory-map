@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-20
+updated: 2026-11-13
+sources: [code, log]
+---
 # GloryMap — project overview
 
 Synthesis as of 22.07.2026, after a full read-through of the code (89 tests, ~4400 lines excluding
@@ -5,6 +11,13 @@ the frontend). Product: [[glorymap-app]] — a map of real places from your favo
 films, series, and books; a walking "story route" is built from a personal collection.
 Brand: SceneMap → **GloryMap** (PR #31; internal names and localStorage keys
 `scenemap-*` were kept on purpose).
+
+> **State on 2026-11-13** (this page is the July synthesis; newer facts are in the
+> [log](log.md)): the map is MapLibre, not Leaflet; the app has accounts, account
+> connections (Letterboxd RSS, Simkl), visitors' shots and an iPhone shell; the
+> catalogue holds ~8k works and the harvest queue 55k+ rows. The project runs
+> autonomously under [[autonomous-operations]]; how the agents are organised is
+> [[agent-harness]].
 
 ## How it works (one paragraph)
 

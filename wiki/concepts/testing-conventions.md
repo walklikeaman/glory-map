@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-07-28
+sources: [code, log]
+---
 # Testing conventions — 559 tests, node:test, zero network
 
 Run: `npm test` (`node --test test/*.test.mjs`). No jest/vitest and no

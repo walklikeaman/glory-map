@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-07
+updated: 2026-08-08
+sources: [code, log]
+---
 # movie-locations.com — captions a regex can read
 
 Code: `tools/scraperai/movielocations.py`, `app/lib/movielocations-source.mjs`,
@@ -66,7 +72,7 @@ source.** It shipped, passed tests, and lived a day in the database.
 
 Nothing local caught it: the rows looked plausible, and the tests exercised the
 caption format that had been anticipated. It surfaced only when
-[[cross-source]] matching put these place names beside another site's, where
+`cross-source` matching put these place names beside another site's, where
 `Skyfall location: Silva escapes into the underground system: …` could not be
 mistaken for an address. Repaired from cache with no network, the broken rows
 deleted and the source re-ingested: median place name 84 → 37 characters.

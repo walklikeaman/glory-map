@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Supabase — auth and cloud libraries (since the evening of 22.07)
 
 UPDATED: after PR #42/#43 Supabase is used at runtime — **Supabase Auth**

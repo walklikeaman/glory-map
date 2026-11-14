@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-19
+updated: 2026-09-10
+sources: [code, log]
+---
 # The place card — tabs, a takeable coordinate, and two different numbers
 
 What the card does now, and the bugs found while making it do it (#160, then #129 step 4).
@@ -12,7 +18,7 @@ place out of sight. It is now **Details / Route**.
 
 **There is no Discussion tab.** The reference has one and #157 is not built; a tab that
 opens onto nothing is the padding this project refuses elsewhere. `PLACE_TABS` in
-[app/lib/place-card.mjs](app/lib/place-card.mjs) is where it goes the day #157 lands, one
+[app/lib/place-card.mjs](../../app/lib/place-card.mjs) is where it goes the day #157 lands, one
 line, without rearranging the card again.
 
 **The card reopens on Details whenever the place changes.** Otherwise clicking a new pin

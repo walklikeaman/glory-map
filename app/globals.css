@@ -4160,6 +4160,44 @@ figcaption a {
 
 .map-layers-option.is-active small { opacity: 0.75; }
 
+/* The unconfirmed switch at the top of the map's settings, and the small heading that
+   separates it from the base maps under it. */
+.map-layers-switch {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  max-width: 16rem;
+}
+.map-layers-switch:hover { background: rgba(255, 255, 255, 0.08); }
+.map-layers-switch input { accent-color: var(--accent, #f0a83c); width: 16px; height: 16px; margin: 0; }
+.map-layers-switch span:last-child { display: grid; gap: 1px; }
+.map-layers-switch strong { font-size: 0.82rem; font-weight: 600; }
+.map-layers-switch small { font-size: 0.7rem; opacity: 0.62; }
+/* The pin it governs, drawn as it is on the map: hollow with an amber ring. */
+.map-layers-swatch.is-unconfirmed {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #f7b733;
+  background: rgba(247, 183, 51, 0.12);
+}
+.location-unconfirmed { font-style: normal; color: #f7b733; }
+
+.map-layers-heading {
+  margin: 0.3rem 0.7rem 0.1rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 0.45rem;
+}
+
 /* Bottom-right, under the zoom stack: the legend is consulted once and then stops being
    needed, so collapsed is its resting state and it never holds a corner of the map open. */
 .map-key {

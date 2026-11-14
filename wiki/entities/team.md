@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Team — who does what (per git history)
 
 Roles in TASKS.md are not formally filled in; the actual split is visible from the

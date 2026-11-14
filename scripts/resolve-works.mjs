@@ -4,6 +4,11 @@
 //
 //   node --env-file=.env.local scripts/resolve-works.mjs --source wikidata --limit 10
 //   node --env-file=.env.local scripts/resolve-works.mjs --source wikidata
+//   node --env-file=.env.local scripts/resolve-works.mjs --source any --unlinked --limit 10
+//   node --env-file=.env.local scripts/resolve-works.mjs --wikidata Q23572,Q19798734
+//
+// `--source any` takes every source; `--unlinked` skips works that already have a place;
+// `--wikidata` names the works outright (any source).
 //
 // The route resolves a work's own Wikidata filming locations (P915) into places, links
 // and evidence, and only for a signed-in reader. A catalogue import has no reader, so
@@ -16,6 +21,7 @@ import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 
 import { createResolveHandler } from "../app/api/resolve/route.js";
+import { parseQids, pickWorkIds } from "../app/lib/resolve-selection.mjs";
 import { resolveWorkPlaces } from "../app/lib/location-resolver.mjs";
 import { CONTACT_USER_AGENT } from "../app/lib/user-agent.mjs";
 
@@ -25,12 +31,14 @@ const arg = (name, fallback = null) => {
   return index === -1 ? fallback : argv[index + 1];
 };
 const SOURCE = arg("source");
+const WIKIDATA = parseQids(arg("wikidata"));
+const UNLINKED = argv.includes("--unlinked");
 const LIMIT = Number(arg("limit", 0)) || null;
 const BATCH = 20;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-if (!SOURCE) {
-  console.error("Pass --source <works.source>, e.g. --source wikidata");
+if (!SOURCE && !WIKIDATA.length) {
+  console.error("Pass --source <works.source|any> or --wikidata Q1,Q2");
   process.exit(1);
 }
 
@@ -39,13 +47,28 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABA
 });
 
 async function workIds() {
-  const ids = [];
+  const rows = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from("works").select("id")
-      .eq("source", SOURCE).not("wikidata_id", "is", null).order("id").range(from, from + 999);
+    let query = db.from("works").select("id, wikidata_id, source")
+      .not("wikidata_id", "is", null).order("id").range(from, from + 999);
+    if (WIKIDATA.length) query = query.in("wikidata_id", WIKIDATA);
+    else if (SOURCE !== "any") query = query.eq("source", SOURCE);
+    const { data, error } = await query;
     if (error) throw new Error(`works read failed: ${error.message}`);
-    ids.push(...(data ?? []).map((row) => row.id));
-    if ((data?.length ?? 0) < 1000) return LIMIT ? ids.slice(0, LIMIT) : ids;
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  const linked = UNLINKED ? await linkedWorkIds() : new Set();
+  return pickWorkIds(rows, { linked, limit: LIMIT });
+}
+
+async function linkedWorkIds() {
+  const ids = new Set();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from("work_place_links").select("work_id").order("id").range(from, from + 999);
+    if (error) throw new Error(`links read failed: ${error.message}`);
+    for (const row of data ?? []) ids.add(row.work_id);
+    if ((data?.length ?? 0) < 1000) return ids;
   }
 }
 
@@ -71,7 +94,7 @@ const handle = createResolveHandler({
 
 async function main() {
   const ids = await workIds();
-  console.log(`${ids.length} works with source = '${SOURCE}'`);
+  console.log(`${ids.length} works (${WIKIDATA.length ? `wikidata ${WIKIDATA.join(",")}` : `source = '${SOURCE}'`}${UNLINKED ? ", no place yet" : ""})`);
   const totals = { places: 0, links: 0, evidence: 0, withPlaces: 0, failed: 0 };
   for (let index = 0; index < ids.length; index += BATCH) {
     const request = new Request("http://local/api/resolve", {

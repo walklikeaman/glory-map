@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-09-10
+updated: 2026-09-10
+sources: [code, log]
+---
 # Studio lots — a fence is a polygon, and Los Angeles is why it matters
 
 The question the product answers in Los Angeles is not *"was this filmed here"* — almost
@@ -18,7 +24,7 @@ Related: [[three-axes]], [[place-card]], [[queue-review]], [[directory]].
 
 ## Why a polygon, and not a name
 
-[[work-profile]] already records what a name test costs: the old scene-image matcher ran
+`work-profile` already records what a name test costs: the old scene-image matcher ran
 `/studio/i` over place names, which calls the Studio Ghibli Museum a soundstage. Measured
 on the **5,266 Los Angeles rows** in the queue, the same regex gets it wrong in both
 directions:

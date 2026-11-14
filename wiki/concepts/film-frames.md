@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-28
+updated: 2026-07-28
+sources: [code, log]
+---
 # Film frames — three tiers, and what each may claim
 
 A picture from a film can be shown in three different ways, and they are not

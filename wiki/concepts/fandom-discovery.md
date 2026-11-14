@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-09-12
+updated: 2026-09-12
+sources: [code, log]
+---
 # Fandom at scale — where to read, and what prose costs
 
 `app/lib/fandom-discovery.mjs` + `scripts/discover-fandom.mjs`, and the `--prose` branch of

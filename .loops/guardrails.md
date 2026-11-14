@@ -33,7 +33,7 @@ integrate, or isolate the work so every teammate's contribution is preserved.
 Never run `next build` while `next dev` or another build uses the same checkout.
 They share `.next` and concurrent writers can corrupt the dev/runtime manifest.
 
-## Worktree falls back to its own branch — keep that branch on main
+## Guardrail: Worktree falls back to its own branch — keep that branch on main
 
 The agent worktree (`.claude/worktrees/<name>`) is bound to a branch such as
 `claude/hackathon-prep-<id>`. Something in the environment periodically restores the
@@ -59,3 +59,30 @@ git branch -f claude/hackathon-prep-<id> origin/main
 
 **Habit:** after any long tool run, check `git log --oneline -1` before editing. A
 sudden drop in the test count is the loudest symptom.
+
+## Guardrail: Supabase migrations without `drop`
+Added: 2026-11-13 (seen 2026-10-13 and 2026-11-03)
+The Supabase MCP asks for confirmation on statements with `drop`, and that dialog
+never reaches Nikita; it times out, and `apply_migration` also timed out twice.
+Use `if not exists`, `alter policy`, a new policy; `execute_sql` with begin/commit
+works. A drop that cannot be avoided → send him the SQL and the SQL Editor link
+(`docs/RULES.md` §3.4).
+
+## Guardrail: Ten items and a price before any paid bulk run
+Added: 2026-11-13
+Every paid model run starts on 10 items, with the cost reported, and stays under
+~$5 per run (`docs/RULES.md` §3.5). Why: the stills, trails and web-research
+pilots each found a defect (truncated answers, image URLs refused, a 400 from
+web_fetch) on the first ten that would have been paid for thousands of times.
+
+## Guardrail: Never verify resolver places by hand
+Added: 2026-11-13
+After every `scripts/resolve-works.mjs` run, run
+`scripts/review-resolved-places.mjs --write`. Why: 86 "verified" Wikidata places
+were whole countries or cities (Israel, Spain, central London).
+
+## Guardrail: `wiki/log.md` entries go right below the `---` line
+Added: 2026-11-13
+Never above it (two entries once landed inside the "Format:" line) and never out
+of date order (parallel threads left four blocks out of order). When two branches
+both add entries, keep both sides. `test/wiki.test.mjs` fails on either mistake.

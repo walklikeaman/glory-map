@@ -1,3 +1,9 @@
+---
+type: source
+created: 2026-08-06
+updated: 2026-08-07
+sources: [web, research]
+---
 # Commemorative plaques — the claim is written on the wall
 
 **Built in #138 and extended in #140: 53 rows across 40 works are in the live queue**, and

@@ -41,6 +41,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] UX-9 Onboarding: one welcome screen for guests, a 20-poster left/right deck after sign-in, Skip in the top corner, no repeat after sign-in
 - [x] UX-10 Desktop: section rail on the screen edge, sections replace the left panel
 - [ ] UX-11 Works without a poster: kind icon on a neutral tile
+- [x] UX-12 Work picked from search frames ALL its places (incl. its unconfirmed ones); "Unconfirmed places" in the map's layers menu; places zoom by size; address lookup always offered (2026-11-13)
 
 **Features, after the UX pass (order from PRIORITIES.md):**
 - [x] #57 + #157 then/now wipe and visitors' shots (PR #340)
@@ -63,6 +64,18 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] (04.11) The directory letter pages still hit a statement timeout now and then at runtime (`/directory/films/n?page=2` answered 500, then 0.23 s on the next 8 asks). `catalogue_letter` reads the `catalogue_index` view, which groups every `location_submissions` row on each call. Fix in the DB: a materialized view refreshed after ingest, or an index on `directory_sort_key(title_norm)`. Needs the schema owner.
 - [x] (07.11) Hebrew Wikipedia read for the Israeli catalogue: 636 works, 253 places queued, 136 with a point; candidates in Israel 43 → 116 (PR #360, #362). The prompt now keeps names in the article's script, so drops for an English name on a Hebrew quote went from 75 to 2.
 - [ ] Production (`glory-map.vercel.app`) is not reachable from cloud sessions; QA runs a local prod build against the live DB. Add the domain to the cloud allowlist to test the real deploy.
+
+## Data coverage (audit 2026-11-13, numbers in wiki/log.md)
+
+- [x] Country and city "pins" off the map; Wikidata filming locations resolved for all 5,009 works (PR #377)
+- [ ] GoT 129 and Stranger Things 74 places are moviemaps-only "Unconfirmed": find a second source (Wikidata P915 on the place, fandom, reelstreets) so they can be confirmed
+- [x] Add missing big series: Peaky Blinders, The Wire, Succession, Dark, Squid Game (`ingest-country-works.mjs --works`)
+- [ ] Web research of filming locations, most IMDb votes first (`scripts/research-locations.mjs`, Haiku + web search, ~$0.06 per work, ~80 works per $5 night, scheduled task "Исследование локаций" nightly). Source kind `web_research` live 2026-11-13. Progress: ledger in /mnt/project-files/glorymap-research/
+- [x] Street addresses → points via Nominatim (`scripts/geocode-addresses.mjs`, run with NODE_USE_ENV_PROXY=1 until a new session resolves the host). 48 of 87 research rows placed
+- [ ] Geocode the ~19k older rows with an address and no point (reelstreets 7.6k, wikipedia 7.4k, movielocations 4k), ~2,000 a night
+- [ ] 124 of 204 world capitals have no works (mostly Africa, Asia, Oceania): `ingest-country-works.mjs` per country, then the resolver
+- [ ] Paris candidates have lower-case address names ("2 rue françois ier, 75008 paris"): give them a real name
+- [ ] Places whose Wikidata entity has no English label stay in their own script ("замок де Сонне"): read the label by Q-id, not by search
 
 ## In progress
 

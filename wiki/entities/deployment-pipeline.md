@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-08-07
+sources: [code, log]
+---
 # Deployment — Vercel + GitHub Actions with gates
 
 Vercel project `codex-hackathon-starter` (id `prj_FM31BOAjGEmwLlOFFK0zcpzcqStE`,

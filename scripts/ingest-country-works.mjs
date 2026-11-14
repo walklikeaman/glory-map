@@ -6,6 +6,9 @@
 //   node --env-file=.env.local scripts/ingest-country-works.mjs --country Q801 --limit 10
 //   node --env-file=.env.local scripts/ingest-country-works.mjs --country Q801 \
 //        --category "Films shot in Israel" --category "Films set in Tel Aviv"
+//   node --env-file=.env.local scripts/ingest-country-works.mjs --works Q14944179,Q478360
+//
+// `--works` names the works outright (a missing hit series), with or without a country.
 //
 // Two lists are read from Wikidata and merged: the country's own productions (P495,
 // with an English Wikipedia article) and the members of each English Wikipedia category
@@ -23,6 +26,7 @@ import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 
 import { candidatesFromBindings, newRows, workRowFrom } from "../app/lib/country-works.mjs";
+import { parseQids } from "../app/lib/resolve-selection.mjs";
 import { CONTACT_USER_AGENT, WIKIDATA_SPARQL } from "../app/lib/user-agent.mjs";
 
 const argv = process.argv.slice(2);
@@ -31,13 +35,14 @@ const arg = (name, fallback = null) => {
   return index === -1 ? fallback : argv[index + 1];
 };
 const COUNTRY = arg("country");
+const WORKS = parseQids(arg("works"));
 const CATEGORIES = argv.flatMap((value, index) => (argv[index - 1] === "--category" ? [value] : []));
 const LIMIT = Number(arg("limit", 0)) || null;
 const DRY_RUN = argv.includes("--dry-run");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-if (!/^Q\d+$/.test(COUNTRY ?? "")) {
-  console.error("Pass --country <Q-id>, e.g. --country Q801 for Israel");
+if (!/^Q\d+$/.test(COUNTRY ?? "") && !WORKS.length) {
+  console.error("Pass --country <Q-id> (e.g. Q801 for Israel) or --works Q1,Q2");
   process.exit(1);
 }
 
@@ -103,9 +108,11 @@ async function heldIds(db) {
 }
 
 async function main() {
-  const ids = new Set();
-  for (const row of await sparql(OWN_PRODUCTIONS(COUNTRY))) ids.add(row.item.value.split("/").pop());
-  console.log(`${ids.size} productions of ${COUNTRY} with an English article`);
+  const ids = new Set(WORKS);
+  if (COUNTRY) {
+    for (const row of await sparql(OWN_PRODUCTIONS(COUNTRY))) ids.add(row.item.value.split("/").pop());
+    console.log(`${ids.size} productions of ${COUNTRY} with an English article`);
+  }
   for (const category of CATEGORIES) {
     await sleep(1500);
     const before = ids.size;

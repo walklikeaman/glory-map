@@ -7,6 +7,11 @@ description of the method —
 [`docs/agent-framework.md`](docs/agent-framework.md).
 As soon as the idea is locked in, fill out the **Project** block right away.
 
+Where the rules live: the full text of every project rule, with dates and reasons, is
+[`docs/RULES.md`](docs/RULES.md) (it wins if this file disagrees); the short method is
+[`docs/agent-method.md`](docs/agent-method.md); Claude Code reads [`CLAUDE.md`](CLAUDE.md),
+which imports this file.
+
 ---
 
 ## Project (fill in at the start — 2 minutes)

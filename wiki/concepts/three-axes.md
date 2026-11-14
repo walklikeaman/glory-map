@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-05
+updated: 2026-08-05
+sources: [code, log]
+---
 # Three axes, and why they are never one number
 
 A place on this map is judged on three separate questions. Code: `place-review.mjs`

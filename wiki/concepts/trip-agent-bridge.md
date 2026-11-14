@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-09-11
+updated: 2026-09-11
+sources: [code, log]
+---
 # The trip-agent bridge — one plan, four possible transports
 
 `POST /api/trip/plan` + [app/lib/trip-plan.mjs](../../app/lib/trip-plan.mjs). The door an
@@ -68,7 +74,7 @@ Each was invisible in a unit test and obvious the moment the planner met the rea
    Theatre five times over, with a one-minute walk. Withholding the id is what makes a
    multi-film stop one stop.
 2. **Three spellings of that theatre were still three stops.** Two sources name the same
-   building three ways 11 m apart. `dedupePlaces` collapses nothing here — [[place-dedup]]'s
+   building three ways 11 m apart. `dedupePlaces` collapses nothing here — `place-dedup`'s
    rule turns on `geocode_precision` and `place_class`, which a queue row does not carry, so
    every candidate falls to precision "none" and is refused. Loosening `canMerge` would
    loosen it for the graph, where the six closest pairs are genuinely different places. So
