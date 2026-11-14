@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-09-11
+updated: 2026-09-11
+sources: [code, log]
+---
 # GloryMap as tools an agent can call
 
 `mcp/glorymap-server.mjs`. Six tools over the deployed API, for a Claude agent that plans

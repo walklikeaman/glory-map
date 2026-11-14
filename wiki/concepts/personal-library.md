@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-09-12
+sources: [code, log]
+---
 # Personal library — privacy as a principle
 
 The user's "My movies": import, storage, map filtering. Implementation:

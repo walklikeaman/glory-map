@@ -1,3 +1,9 @@
+---
+type: source
+created: 2026-08-04
+updated: 2026-09-11
+sources: [web, research]
+---
 # Sources we looked at and did not take
 
 ## Correction 05.08.2026: not a commercial project

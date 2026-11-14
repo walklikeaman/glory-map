@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # OpenAI — four roles in the product
 
 All calls are strictly server-side ([[api-layer]]); the key never reaches the

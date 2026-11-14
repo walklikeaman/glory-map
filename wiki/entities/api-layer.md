@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # API layer — 7 Next.js routes
 
 Backend-for-frontend: route handlers make the network calls, while all logic

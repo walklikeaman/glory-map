@@ -6,6 +6,27 @@
 Everything in it applies to Claude Code too. This file only adds what Claude needs
 on top: the commands, the map of the code, and how cloud sessions differ.
 
+## Where the rules live
+
+| What | Where |
+|---|---|
+| Every project rule, with its date and reason (wins over this file) | [`docs/RULES.md`](docs/RULES.md) |
+| Start ritual, task loop, wiki operations, `/ship` | [`docs/agent-method.md`](docs/agent-method.md) |
+| What the project knows | [`wiki/index.md`](wiki/index.md), newest-first [`wiki/log.md`](wiki/log.md) |
+| Hard bans and process lessons | [`.loops/guardrails.md`](.loops/guardrails.md), [`.loops/experience.md`](.loops/experience.md) |
+| `/ship` and the skills | `.claude/commands/ship.md`, `.claude/skills/gm-knowledge-lookup`, `.claude/skills/gm-harness-reflect` |
+
+The short version of `docs/RULES.md` §3, for cloud threads:
+
+- **Autonomous mode:** take the top item from `TASKS.md`, build, test, check web + phone
+  with Playwright, open a PR, **merge it yourself on green tests**.
+- **Production DB migrations need Nikita's yes.** Write them without `drop`: the
+  Supabase MCP confirmation dialog never reaches him.
+- **Paid AI: ~$5 per run, ~$150 per month, 10 items first.** The key is
+  `GLORYMAP_ANTHROPIC_KEY`, passed to scripts as `ANTHROPIC_API_KEY`.
+- **Moderation is AI-only;** publishing AI-verified places nightly is allowed.
+- **Never print secrets. Talk to Nikita in Russian, short, only for decisions.**
+
 ## Commands
 
 | What | Command |
@@ -38,6 +59,8 @@ every push and PR. Node 22.
 - `tools/scraperai/` — Python crawlers for source harvests.
 - `wiki/`, `ARCHITECTURE.md`, `ROADMAP.md`, `PRIORITIES.md` — decisions and plans.
   `wiki/log.md` is newest-first; read its headings before re-deriving anything.
+  `test/wiki.test.mjs` (part of `npm test`) checks wiki frontmatter, index, log order,
+  links and obvious secrets.
 - `.loops/guardrails.md` — hard constraints learned the hard way. Read it.
 
 ## Environment

@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # "What's nearby" — geolocation (issue #17, PR #25)
 
 The CTA requests geolocation only on click; the states locating / denied /

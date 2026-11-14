@@ -11,6 +11,19 @@ Full rebuild on 22.07.2026 after reading through all the code; kept current sinc
 
 - [overview.md](overview.md) — synthesis: how everything is wired + facts that are easy to forget
 
+## How agents work here
+
+Rules: [`docs/RULES.md`](../docs/RULES.md) · method: [`docs/agent-method.md`](../docs/agent-method.md)
+· bans and lessons: [`.loops/`](../.loops/guardrails.md). Every page carries frontmatter
+(`type`, `created`, `updated`, `sources`); `test/wiki.test.mjs` checks it.
+
+- [agent-harness](concepts/agent-harness.md) — which layer answers which question; the
+  habits before, during and after a task; what enforces them
+- [autonomous-operations](concepts/autonomous-operations.md) — the three daily routines,
+  what has a standing yes and what still needs Nikita, moderation, money
+- [cloud-environment](concepts/cloud-environment.md) — what the cloud container reaches,
+  the key-name workaround, DB writes, browser checks
+
 ## Entities (what exists)
 
 - [glorymap-app](entities/glorymap-app.md) — the product, the graph hub
@@ -67,8 +80,14 @@ Full rebuild on 22.07.2026 after reading through all the code; kept current sinc
   outside agent can act on, the four refusals it prints, and the four defects live Los
   Angeles found; the transport that wraps it is still the owner's open question
 - [testing-conventions](concepts/testing-conventions.md) — node:test, zero network, DI pattern
+- [fandom-discovery](concepts/fandom-discovery.md) — where to read Fandom, and what prose costs
 
 ## Sources (external knowledge)
+
+- [scenemap-brief](sources/scenemap-brief.md) — the July brief in `Context/`: the idea,
+  the sacred demo path, the data contract that is history now
+- [planning-docs](sources/planning-docs.md) — TASKS, PRIORITIES, ROADMAP, IDEAS,
+  ARCHITECTURE, GUIDE: which one answers what, and which are stale
 
 - [personal-collections-matrix](sources/personal-collections-matrix.md) —
   where to read personal collections from (research 22.07, verified live) + ideas
@@ -83,4 +102,7 @@ Full rebuild on 22.07.2026 after reading through all the code; kept current sinc
 - `Context/brief-scenemap-design.md` — the original product brief
 - `.planning/codebase/` — 7 reference documents (ARCHITECTURE, CONCERNS…)
 - `wiki/log.md` — the chronicle of decisions (append-only, newest on top)
-- [[fandom-discovery]] — where to read Fandom, and what prose costs
+
+## Superseded
+
+- (none yet)

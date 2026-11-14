@@ -1,3 +1,9 @@
+---
+type: handoff
+created: 2026-09-02
+updated: 2026-09-11
+sources: [sessions, log]
+---
 # Working locally, and what step 4 of #129 cost there
 
 Written mid-task as a handoff, kept after it was finished because the reason it existed is

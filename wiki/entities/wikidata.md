@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Wikidata — the canonical source of locations
 
 The single source of truth about the "work → place" link (LLM web research is

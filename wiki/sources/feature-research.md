@@ -1,7 +1,13 @@
+---
+type: source
+created: 2026-07-22
+updated: 2026-07-22
+sources: [web, research]
+---
 # Feature research — competitors, approaches, legal notes
 
 Research 22.07.2026 (5 parallel agents, live web sources) behind the
-[[roadmap]] ([`ROADMAP.md`](../../ROADMAP.md)). Feeds the backlog issues #44–#77.
+the roadmap ([`ROADMAP.md`](../../ROADMAP.md)). Feeds the backlog issues #44–#77.
 Related: [[personal-collections-matrix]], [[film-imagery]], [[tours-and-voice]].
 
 ## Competitor map

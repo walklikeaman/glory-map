@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-18
+updated: 2026-08-18
+sources: [code, log]
+---
 # The search box — one field, two kinds of answer, two latencies
 
 Issue #145. The box is the only way into everything this project holds: 7,063 works,

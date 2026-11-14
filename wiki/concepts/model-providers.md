@@ -1,3 +1,9 @@
+---
+type: concept
+created: 2026-08-04
+updated: 2026-09-12
+sources: [code, log]
+---
 # Which model answers, and how the question is asked
 
 One place decides the provider, the model and the request shape:

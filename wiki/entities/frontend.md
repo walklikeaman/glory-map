@@ -1,3 +1,9 @@
+---
+type: entity
+created: 2026-07-22
+updated: 2026-07-22
+sources: [code, log]
+---
 # Frontend — SceneMapApp
 
 A single client-side monolith `app/components/SceneMapApp.jsx` (~2050 lines) +
