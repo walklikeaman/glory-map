@@ -344,35 +344,30 @@ const fallbackFilms = [
     id: "notting-hill",
     title: "Notting Hill",
     year: 1999,
-    code: "NH",
     tmdbId: "509",
   },
   {
     id: "skyfall",
     title: "Skyfall",
     year: 2012,
-    code: "007",
     tmdbId: "37724",
   },
   {
     id: "harry-potter",
     title: "Harry Potter",
     year: 2001,
-    code: "HP",
     tmdbId: "671",
   },
   {
     id: "sherlock",
     title: "Sherlock Holmes",
     year: 2009,
-    code: "SH",
     tmdbId: "10528",
   },
   {
     id: "love-actually",
     title: "Love Actually",
     year: 2003,
-    code: "LA",
     tmdbId: "508",
   },
 ].map((work) => ({ ...work, kind: "film" }));
@@ -500,8 +495,12 @@ const fallbackLocations = [
 // The label is still there for anybody who cannot see the icon. `aria-label` on the span
 // rather than visually-hidden text, so it does not land in the middle of a sentence when a
 // screen reader reads the line around it.
+function kindIcon(kind) {
+  return kind === "series" ? Tv : kind === "book" ? BookOpen : Film;
+}
+
 function WorkKindMark({ kind }) {
-  const Icon = kind === "series" ? Tv : kind === "book" ? BookOpen : Film;
+  const Icon = kindIcon(kind);
   return (
     <span className={`work-kind kind-${kind}`} aria-label={kindLabel(kind)} title={kindLabel(kind)}>
       <Icon size={13} aria-hidden="true" />
@@ -629,10 +628,9 @@ function worksFromLocations(sourceLocations) {
       title: location.film,
       year: location.year,
       kind: location.kind ?? "film",
-      // Carried through so the chip can ask for a poster. The initials stay as the
-      // fallback: books have no TMDB entry at all, and a poster may simply not arrive.
+      // Carried through so the chip can ask for a poster. The blank kind tile stays as
+      // the fallback: books have no TMDB entry at all, and a poster may simply not arrive.
       tmdbId: location.filmTmdbId ?? null,
-      code: location.film.split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase(),
     },
   ])).values()];
 }
@@ -4554,9 +4552,11 @@ export default function SceneMapApp() {
                         type="button"
                         aria-pressed={selected}
                       >
-                        {/* The initials tile is the fallback, not the default: books have no
+                        {/* The blank tile is the fallback, not the default: books have no
                             TMDB poster, and a lookup can fail. A broken <img> would be worse
-                            than the tile, so a load error falls back to it too. */}
+                            than the tile, so a load error falls back to it too. It shows the
+                            work's kind on a neutral tile (UX-11): gold initials ("G", "RH")
+                            read as unfinished artwork. */}
                         {poster && !brokenImages.has(poster.thumb) ? (
                           <img
                             alt=""
@@ -4572,7 +4572,9 @@ export default function SceneMapApp() {
                             onError={() => setBrokenImages((current) => new Set(current).add(poster.thumb))}
                           />
                         ) : (
-                          <span className="poster-tile" aria-hidden="true">{film.code}</span>
+                          <span className={`poster-tile is-blank kind-${film.kind ?? "film"}`} aria-hidden="true">
+                            {(() => { const Icon = kindIcon(film.kind); return <Icon size={20} />; })()}
+                          </span>
                         )}
                         <span>
                           <strong>{film.title}</strong>
