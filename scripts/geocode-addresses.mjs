@@ -29,7 +29,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function search(q, attempt = 0) {
   const url = `${NOMINATIM_SEARCH}?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`;
-  const response = await fetch(url, { headers: { "User-Agent": AGENT, Accept: "application/json" } });
+  let response;
+  try {
+    response = await fetch(url, { headers: { "User-Agent": AGENT, Accept: "application/json" } });
+  } catch (failure) {
+    // A dropped connection is not an answer: wait and ask again, and only give up the run
+    // after the same retries a 5xx gets (2026-11-15: one "fetch failed" ended a whole run).
+    if (attempt >= 3) throw failure;
+    await sleep(30000 * (attempt + 1));
+    return search(q, attempt + 1);
+  }
   if (response.status === 429 || response.status >= 500) {
     if (attempt >= 3) throw new Error(`nominatim ${response.status}`);
     await sleep(30000 * (attempt + 1));
