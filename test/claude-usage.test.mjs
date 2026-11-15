@@ -18,3 +18,14 @@ test("a model with no known price reports its tokens and no invented dollars", (
   meter.record("claude-unknown", { input_tokens: 5, output_tokens: 5 });
   assert.equal(meter.summary()[0].dollars, null);
 });
+
+test("cached tokens are priced as what they cost, not as plain input", () => {
+  const meter = createUsageMeter();
+  meter.record("claude-opus-5-5", {
+    input_tokens: 0, cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000, output_tokens: 0,
+  });
+  const [row] = meter.summary();
+  assert.equal(row.cacheWrite, 1_000_000);
+  assert.equal(row.cacheRead, 1_000_000);
+  assert.equal(row.dollars, 4 * 1.25 + 0.2);
+});

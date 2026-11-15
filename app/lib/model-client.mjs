@@ -267,6 +267,18 @@ export async function parseStructured({
   };
 }
 
+// A system prompt as one block marked for prompt caching. Claude caches the request's
+// prefix (tools, then system) up to the marker, and the next call with the same prefix
+// within 5 minutes reads it at a tenth of the input price or less. Measured 15.11 on the
+// nightly web research (10 works, Haiku): input cost down 39%, because the server-side
+// search loop also reuses the cache between its own steps. A prefix under the model's
+// minimum (512 tokens on the 5.5 models) is simply not cached: no error, no extra cost.
+// The prompt must stay byte-identical between calls; anything that varies goes in the
+// user message.
+export function cachedSystem(text) {
+  return [{ type: "text", text, cache_control: { type: "ephemeral" } }];
+}
+
 // The same contract on Claude: structured output through `output_config.format`, the
 // same result shape, and the Zod schema still checked here rather than trusted.
 //
@@ -278,7 +290,7 @@ async function parseWithClaude({ runtime, schema, instructions, input, maxTokens
     message = await runtime.client.messages.parse({
       model: runtime.model,
       max_tokens: Math.max(maxTokens, 16_000),
-      system: instructions,
+      system: cachedSystem(instructions),
       messages: [{ role: "user", content: input }],
       output_config: { format: zodOutputFormat(schema), effort: runtime.effort },
     }, { timeout });

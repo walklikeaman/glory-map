@@ -373,7 +373,8 @@ test("Claude is asked for structured output and the answer is still checked by t
   assert.deepEqual(result.parsed, { places: ["Rome"] });
   assert.equal(result.servedBy, "anthropic");
   const body = built[0].lastCall.body;
-  assert.equal(body.system, "list them");
+  // The instructions go as one cached block, so repeated calls read them from the cache.
+  assert.deepEqual(body.system, [{ type: "text", text: "list them", cache_control: { type: "ephemeral" } }]);
   assert.equal(body.output_config.format.type, "json_schema");
   assert.equal(body.output_config.effort, "medium");
   assert.ok(body.max_tokens >= 16000, "thinking needs room in the budget");

@@ -1,7 +1,16 @@
 # Wiki Log
 
 Append-only, newest-first. One entry per meaningful operation.
-Format: `## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
+Format: `## [2026-11-15] decision | Prompt caching on the paid Claude calls
+**Object**: `cachedSystem()` in `app/lib/model-client.mjs`; `inputDollars()` and cache prices in `app/lib/claude-usage.mjs`; `costOf` in `app/lib/web-research.mjs`; `scripts/research-locations.mjs`; `app/api/enrich/stills/route.js`.
+**Scenario**: The Claude Console wrote that the cache hit rate is low and caching could save up to 27% of direct API spend. The nightly web research (Haiku 5.5 + web_search, ~$4.6 a night) is almost all of it. Its prefix (web_search tool definition + system prompt) is 6.3k tokens, the same for every work, and the server-side search loop re-reads the whole conversation at every step (28k input tokens for a work with two searches).
+**Decisions**:
+- The system prompt goes as one block with `cache_control: ephemeral` (5-minute TTL; the run is continuous, 3 works at a time). With that marker the server also caches between the search loop's own steps. A top-level auto marker on top gave the same within noise, so it is left out.
+- The same marker on `parseStructured` (Claude path) and the stills classifier (708-token prefix with the schema). Prompts under 512 tokens (translate-display-text) silently don't cache, at no cost. Shot moderation (rare single uploads) is left as it is.
+- Cost counting now prices cache writes at 1.25x and reads at the model's read price (Haiku $0.01, Sonnet $0.10, Opus 5.5 $0.20 per MTok). Before, writes were counted at 1x, so the $5 guard would have under-counted a cached run.
+**Outcome**: ✅ Measured on the same 10 works (15.11, ~$1.20): input cost $0.067 → $0.031 (−39%; −42% with the auto marker). Input is ~66% of token spend, so tokens cost ~26% less, matching the Console's 27%. Web search fees ($0.01 a search) are ~75% of the research bill and caching doesn't touch them, so the full nightly bill drops ~7–9%. A 3-work dry run of the real script worked end to end.
+
+## [YYYY-MM-DD] {update|ingest|decision|incident} | <short title>`
 
 Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 

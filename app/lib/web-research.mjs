@@ -7,6 +7,7 @@
 // page saying so is a lead, not a fact (Nikita, 13.11: keep every point, mark the
 // unconfirmed ones as unconfirmed).
 
+import { inputDollars } from "./claude-usage.mjs";
 import { finiteOrNull } from "./numbers.mjs";
 
 export const SOURCE_KIND = "web_research";
@@ -19,18 +20,16 @@ export const MAX_LOCATIONS = 40;
 // Prices for the run's spend guard (claude-haiku-5-5, 2026-11). Web search is billed per
 // search; web fetch only through the tokens it adds.
 export const PRICES = Object.freeze({
-  "claude-haiku-5-5": { input: 0.10, output: 0.50 },
-  "claude-sonnet-5-5": { input: 2.00, output: 10.00 },
+  "claude-haiku-5-5": { input: 0.10, output: 0.50, cacheRead: 0.01 },
+  "claude-sonnet-5-5": { input: 2.00, output: 10.00, cacheRead: 0.10 },
 });
 export const PER_SEARCH = 0.01;
 
 export function costOf(usage, model) {
   const price = PRICES[model] ?? PRICES["claude-sonnet-5-5"];
-  const input = (usage?.input_tokens ?? 0) + (usage?.cache_creation_input_tokens ?? 0)
-    + (usage?.cache_read_input_tokens ?? 0) * 0.1;
   const output = usage?.output_tokens ?? 0;
   const searches = usage?.server_tool_use?.web_search_requests ?? 0;
-  return (input * price.input + output * price.output) / 1e6 + searches * PER_SEARCH;
+  return inputDollars(usage, price) + output * price.output / 1e6 + searches * PER_SEARCH;
 }
 
 export const SYSTEM = `You research where films and TV series were filmed, for a map people walk with.
