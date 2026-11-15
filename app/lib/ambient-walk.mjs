@@ -36,6 +36,7 @@
 import { haversineKm, isLatLng } from "./geo.mjs";
 import { DEFAULT_TRIGGER_RADIUS_M, isUsableFix } from "./geo-trigger.mjs";
 import { describedFilms, sceneNote, sourceLabel } from "./place-note.mjs";
+import { studioLotAccessNote, studioLotAt, studioLotSentence } from "./studio-lots.mjs";
 
 export const AMBIENT_RADIUS_M = DEFAULT_TRIGGER_RADIUS_M;
 
@@ -102,6 +103,7 @@ export function nearbyFromMapResponse(payload) {
       position: [lat, lng],
       workCount: Number(props.work_count) || 0,
       shotOnSet: props.shot_on_set === true,
+      placeClass: props.place_class ?? null,
     });
   }
   for (const feature of Array.isArray(payload?.candidates) ? payload.candidates : []) {
@@ -126,6 +128,44 @@ export function nearbyFromMapResponse(payload) {
 // Among places in range the better-evidenced one wins: a checked place over a queue
 // point, then the place more works were shot at, then the nearer. Nearest-first alone
 // would pick whichever pin the geocoder happened to put closest to the pavement.
+// What a place IS, said before anything about it (#96). The graph classifies its places
+// (`place_class`), and the ear needs that more than the eye: on the map a studio or a
+// story setting has its own badge, but a walker hearing "X was filmed here" in front of a
+// gate, or in front of a street the film only pretended to be, has nothing to correct it.
+//
+//   fictional  — never spoken. There is no "here" to stand in.
+//   studio     — a soundstage or a lot (the row's own flag, its class, or, when nobody
+//                classified it, the point being inside a lot's fence). Spoken, but it
+//                says so first and says whether anyone can get in.
+//   setting    — set here in the story, not necessarily filmed here. Says so first.
+//   filmed     — everything else, as before.
+//
+// An explicit class outranks the fence, the same order `placeRole` uses in work-profile.
+export function ambientRole(place) {
+  const placeClass = place?.placeClass ?? null;
+  if (placeClass === "fictional") return { role: "fictional", lot: null };
+  if (placeClass === "narrative_real") return { role: "setting", lot: null };
+  const [lat, lng] = Array.isArray(place?.position) ? place.position : [];
+  const unclassified = !placeClass || placeClass === "unknown";
+  const lot = place?.shotOnSet || placeClass === "studio_interior" || unclassified
+    ? studioLotAt(lat, lng)
+    : null;
+  if (place?.shotOnSet || placeClass === "studio_interior" || lot) return { role: "studio", lot };
+  return { role: "filmed", lot: null };
+}
+
+// The sentence said before the telling, or null when the place is simply where filming
+// happened. It is a fact we hold for certain (a class, a fence), so it may come before an
+// unchecked listing's own "Not confirmed yet."
+export function roleLeadIn({ role, lot }, name = null) {
+  if (role === "studio") {
+    if (lot) return `${studioLotSentence(lot, name)} ${studioLotAccessNote(lot)}`;
+    return "Filmed on a studio set, not on the street in front of you.";
+  }
+  if (role === "setting") return "This place is in the story. The filming may have happened somewhere else.";
+  return null;
+}
+
 export function pickAmbient(places, position, {
   radiusM = AMBIENT_RADIUS_M,
   spoken = [],
@@ -143,15 +183,20 @@ export function pickAmbient(places, position, {
   const inRange = [];
   for (const place of Array.isArray(places) ? places : []) {
     if (!place?.id || spokenIds.has(place.id)) continue;
+    const { role } = ambientRole(place);
+    if (role === "fictional") continue;
     const distance = metres(at, place.position);
     if (distance === null || distance > radiusM) continue;
     // The same building under another name, already told.
     if (spokenSpots.some((spot) => (metres(spot, place.position) ?? Infinity) <= SAME_SPOT_M)) continue;
-    inRange.push({ place, distance });
+    inRange.push({ place, distance, studio: role === "studio" });
   }
 
+  // A studio speaks last: within 45 m of a fence the walker is on the street outside it,
+  // and the street's own places are the ones they can see.
   inRange.sort((left, right) =>
-    Number(right.place.checked) - Number(left.place.checked)
+    Number(left.studio) - Number(right.studio)
+    || Number(right.place.checked) - Number(left.place.checked)
     || right.place.workCount - left.place.workCount
     || left.distance - right.distance);
 
@@ -245,11 +290,21 @@ export function spokenSeconds(text) {
 // means there is nothing sourced to say, and then nothing is said.
 export async function tellingFor(place, { fetchImpl = (...args) => fetch(...args), signal } = {}) {
   if (!place) return null;
-  if (!place.checked) return candidatePlaceText(place);
-  const response = await fetchImpl(`/api/place?id=${encodeURIComponent(place.placeId)}`, { signal });
-  if (!response?.ok) return null;
-  const payload = await response.json();
-  return checkedPlaceText({ facts: payload?.facts });
+  const role = ambientRole(place);
+  if (role.role === "fictional") return null;
+  let body;
+  if (!place.checked) {
+    body = candidatePlaceText(place);
+  } else {
+    const response = await fetchImpl(`/api/place?id=${encodeURIComponent(place.placeId)}`, { signal });
+    if (!response?.ok) return null;
+    const payload = await response.json();
+    body = checkedPlaceText({ facts: payload?.facts });
+  }
+  // Nothing sourced to say is still nothing: a lead-in alone is not a telling.
+  if (!body) return null;
+  const leadIn = roleLeadIn(role, place.name);
+  return leadIn ? `${leadIn} ${body}` : body;
 }
 
 // The map endpoint the feed reads, for a box around the walker. Zoom 17 so the answer is

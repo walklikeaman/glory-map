@@ -7,6 +7,18 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-15] decision | The walking guide reads place_class: studios and story settings say so first (#96)
+**Object**: `ambientRole`, `roleLeadIn`, `pickAmbient`, `tellingFor` in `app/lib/ambient-walk.mjs`; the role label in `app/components/AmbientGuide.jsx`.
+**Scenario**: The next feature after the UX pass. #97 (the numbered story-trail line) was already on the map since #71/#74, and its issue was closed on 2026-10-03, so the TASKS line was stale. The next item was #96/#190: the ambient guide ignored `place_class` and `shot_on_set`. Standing at a lot's gate it would say "X lists this as a filming location", and it said nothing to mark a story setting.
+**Decisions**:
+- `fictional` is never spoken: there is no "here" to stand in.
+- A studio (the row's `shot_on_set`, `studio_interior`, or, for an unclassified row, the point inside a lot's fence from `studio-lots.mjs`) still speaks. It opens with the lot sentence and its access note, e.g. "New York Street, inside Paramount Pictures Studios — a studio lot. The camera was here; what it filmed is set somewhere else. A studio tour goes inside. Book ahead." It also ranks last among the places in range, because within 45 m of a fence the walker is on the street outside.
+- `narrative_real` opens with "This place is in the story. The filming may have happened somewhere else."
+- The lead-in is a fact we hold for certain (a class or a fence), so it can come before a listing's "Not confirmed yet.". A lead-in never plays on its own: with no sourced sentence, nothing is said.
+- An explicit class outranks the fence, the same order `placeRole` uses.
+- The screen shows "Studio lot ·" / "Story setting ·" before the confirmed or unconfirmed line.
+**Outcome**: ✅ 5 new tests. Checked in Playwright with GPS fixed inside Paramount: the narration request carried the lead-in, and the panel read "Studio lot · Reported by a source · unconfirmed" at 1440 and 390 px. Screenshots are in `docs/media/ambient-roles/`. Still open from #96: the offline tour manifest (#70) and server-side ambient narration with a cache.
+
 ## [2026-11-14] decision | Works without a poster: the kind's icon on a neutral tile (UX-11)
 **Object**: `.poster-tile.is-blank` in `app/globals.css`; the film chip's fallback tile in `app/components/SceneMapApp.jsx` (`kindIcon`).
 **Scenario**: UX pass, item UX-11 from `docs/ux-audit-2026-11-03.md`: a work without a poster showed a gold tile with initials ("G", "RH", "TS"), which read as unfinished artwork.

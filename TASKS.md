@@ -46,8 +46,8 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 **Features, after the UX pass (order from PRIORITIES.md):**
 - [x] #57 + #157 then/now wipe and visitors' shots (PR #340)
 - [x] #48 AI pre-moderation of suggestions (PR #327)
-- [ ] #97 story trail: the numbered polyline on the map
-- [ ] #96 / #190 ambient audio that reads place_class
+- [x] #97 story trail: the numbered polyline on the map (already shipped in #71/#74, `StoryTrail.jsx`; issue closed 2026-10-03, line was stale)
+- [x] #96 / #190 ambient audio that reads place_class: fictional never speaks, a studio lot or a story setting says so first (2026-11-15)
 - [x] #92 Letterboxd linked by username (public RSS, re-syncs on open) (PR #349)
 - [x] #92 Simkl sign-in, Netflix CSV, own CSV/JSON list; connections only for signed-in users, kept on the account (PR #357)
 - [ ] #92 connectors: Trakt, Kinopoisk, Open Library, Last.fm

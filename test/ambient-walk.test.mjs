@@ -3,8 +3,8 @@ import test from "node:test";
 
 import {
   AMBIENT_RADIUS_M, FEED_HALF_SIZE_M, FEED_REFRESH_M, MAX_SPOKEN_FILMS, QUIET_GAP_MS, SAME_SPOT_M,
-  candidatePlaceText, checkedPlaceText, feedBox, feedNeedsRefresh, feedUrl,
-  nearbyFromMapResponse, pickAmbient, spokenSeconds, tellingFor,
+  ambientRole, candidatePlaceText, checkedPlaceText, feedBox, feedNeedsRefresh, feedUrl,
+  nearbyFromMapResponse, pickAmbient, roleLeadIn, spokenSeconds, tellingFor,
 } from "../app/lib/ambient-walk.mjs";
 
 // Hollywood Blvd, by the Pantages — the real shapes /api/map/points returns there.
@@ -233,4 +233,70 @@ test("a trail stop says its own film's sentence, and nothing when it has none", 
   assert.equal(trailStopText({ sentence: "  " }), null);
   assert.equal(trailStopText({}), null);
   assert.equal(trailStopText(null), null);
+});
+
+// #96: the graph's place_class decides what the guide may say, before it says anything.
+// Two points inside real lot fences (Warner Bros. Burbank and Paramount, both ticketed).
+const WARNER = [34.1463, -118.3367];
+const PARAMOUNT = [34.0837, -118.3189];
+
+test("the feed carries each checked place's class", () => {
+  const places = nearbyFromMapResponse({
+    features: [{ geometry: { coordinates: [HERE[1], HERE[0]] }, properties: { place_id: "p", place_class: "narrative_real" } }],
+  });
+  assert.equal(places[0].placeClass, "narrative_real");
+});
+
+test("a place's role: fictional, a story setting, a studio by flag, class or fence, else filmed", () => {
+  assert.equal(ambientRole({ placeClass: "fictional", position: HERE }).role, "fictional");
+  assert.equal(ambientRole({ placeClass: "narrative_real", position: HERE }).role, "setting");
+  assert.equal(ambientRole({ placeClass: "studio_interior", position: HERE }).role, "studio");
+  assert.equal(ambientRole({ shotOnSet: true, position: HERE }).role, "studio");
+  assert.equal(ambientRole({ placeClass: "real_exterior", position: HERE }).role, "filmed");
+  // Nobody classified it, and the point is inside a lot: the fence answers.
+  const unclassified = ambientRole({ placeClass: null, position: WARNER });
+  assert.equal(unclassified.role, "studio");
+  assert.equal(unclassified.lot.slug, "warner-bros-burbank");
+  // An explicit class outranks the fence.
+  assert.equal(ambientRole({ placeClass: "real_exterior", position: WARNER }).role, "filmed");
+});
+
+test("a fictional place never speaks, and a studio speaks after the street's own places", () => {
+  const fictional = { id: "f", checked: true, placeClass: "fictional", position: HERE, workCount: 9 };
+  assert.equal(pickAmbient([fictional], fix(HERE)), null);
+
+  const studio = { id: "s", checked: true, shotOnSet: true, position: HERE, workCount: 9 };
+  const street = { id: "q", checked: false, position: north(20), workCount: 1 };
+  assert.equal(pickAmbient([studio, street], fix(HERE)).place.id, "q");
+  assert.equal(pickAmbient([studio], fix(HERE)).place.id, "s");
+});
+
+test("a studio says so first, with whether anyone can get in", () => {
+  const { role, lot } = ambientRole({ position: PARAMOUNT });
+  const lead = roleLeadIn({ role, lot }, "New York Street");
+  assert.match(lead, /^New York Street, inside Paramount/);
+  assert.match(lead, /set somewhere else/);
+  assert.match(lead, /studio tour/);
+  assert.equal(roleLeadIn({ role: "studio", lot: null }), "Filmed on a studio set, not on the street in front of you.");
+  assert.match(roleLeadIn({ role: "setting", lot: null }), /^This place is in the story/);
+  assert.equal(roleLeadIn({ role: "filmed", lot: null }), null);
+});
+
+test("the lead-in comes before the telling, and never stands alone", async () => {
+  const listing = { id: "c", checked: false, name: "New York Street", position: PARAMOUNT, films: PANTAGES_FILMS.slice(0, 1) };
+  const told = await tellingFor(listing);
+  assert.match(told, /^New York Street, inside Paramount.*Not confirmed yet\./);
+
+  const silent = { ...listing, films: [] };
+  assert.equal(await tellingFor(silent), null);
+
+  const setting = { id: "p", placeId: "p", checked: true, placeClass: "narrative_real", position: HERE };
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ facts: [{ subject_type: "work", sentence: "Notting Hill is set on this street" }] }) });
+  assert.equal(await tellingFor(setting, { fetchImpl }),
+    "This place is in the story. The filming may have happened somewhere else. Notting Hill is set on this street.");
+
+  let fetched = false;
+  const fictional = { id: "f", placeId: "f", checked: true, placeClass: "fictional", position: HERE };
+  assert.equal(await tellingFor(fictional, { fetchImpl: async () => { fetched = true; } }), null);
+  assert.equal(fetched, false);
 });
