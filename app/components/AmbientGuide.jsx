@@ -19,10 +19,14 @@ import { Headphones, SkipForward, Square } from "lucide-react";
 import useTellingPlayer from "./useTellingPlayer.js";
 import useWakeLock from "./useWakeLock.js";
 import {
-  QUIET_GAP_MS, feedNeedsRefresh, feedUrl, nearbyFromMapResponse, pickAmbient, tellingFor,
+  QUIET_GAP_MS, ambientRole, feedNeedsRefresh, feedUrl, nearbyFromMapResponse, pickAmbient, tellingFor,
 } from "../lib/ambient-walk.mjs";
 import { hasMovedEnough, isUsableFix } from "../lib/geo-trigger.mjs";
 import { ROAD_SAFETY_REMINDER } from "../lib/walk-mode.mjs";
+
+// What the spoken lead-in says, written too (#96): a studio or a story setting is not
+// "where it was filmed", and the walker glancing at the screen should read the same.
+const ROLE_LABELS = { studio: "Studio lot · ", setting: "Story setting · " };
 
 export default function AmbientGuide({ onPlace, onListeningChange }) {
   const [listening, setListening] = useState(false);
@@ -53,7 +57,7 @@ export default function AmbientGuide({ onPlace, onListeningChange }) {
     onPlaceRef.current?.(place);
     setTold((count) => count + 1);
     playerRef.current.say({
-      meta: { name: place.name, checked: place.checked },
+      meta: { name: place.name, checked: place.checked, role: ambientRole(place).role },
       resolveText: (signal) => tellingFor(place, { signal }),
     });
   }, []);
@@ -157,6 +161,7 @@ export default function AmbientGuide({ onPlace, onListeningChange }) {
           {/* The hollow pin cannot be seen while listening, so its meaning is written. */}
           <small className={current.checked ? "ambient-checked" : "ambient-unchecked"}>
             {status === "preparing" ? "Getting ready… · " : ""}
+            {ROLE_LABELS[current.role] ?? ""}
             {current.checked ? "Confirmed place" : "Reported by a source · unconfirmed"}
           </small>
           <button aria-label="Skip this place" className="walk-stop" onClick={player.skip} type="button">
