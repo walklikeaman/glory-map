@@ -93,6 +93,11 @@ test("cost counts tokens and searches", () => {
   assert.equal(Number(costOf(usage, "claude-haiku-5-5").toFixed(4)), 0.2);
 });
 
+test("cost prices cache writes at 1.25x and cache reads at the read price", () => {
+  const usage = { input_tokens: 0, cache_creation_input_tokens: 1_000_000, cache_read_input_tokens: 1_000_000, output_tokens: 0 };
+  assert.equal(Number(costOf(usage, "claude-haiku-5-5").toFixed(4)), 0.135);
+});
+
 test("the prompt names the work and what we already hold", () => {
   const prompt = userPrompt({ title: "Twin Peaks", year: 1990, kind: "series", imdb_id: "tt0098936" }, ["Double R Diner"]);
   assert.match(prompt, /TV series "Twin Peaks" \(1990\) \[IMDb tt0098936\]/);

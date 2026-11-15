@@ -102,6 +102,6 @@ while (left > 0) {
 }
 
 for (const row of meter.summary()) {
-  console.log(`${row.model}: ${row.calls} calls, ${row.input} in / ${row.output} out tokens, `
+  console.log(`${row.model}: ${row.calls} calls, ${row.input} in + ${row.cacheWrite} cache write + ${row.cacheRead} cache read / ${row.output} out tokens, `
     + `${row.dollars === null ? "price unknown" : `$${row.dollars.toFixed(4)}`}`);
 }

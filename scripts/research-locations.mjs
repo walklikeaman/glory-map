@@ -33,6 +33,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 
 import { createGeocoder } from "../app/lib/geocode-client.mjs";
+import { cachedSystem } from "../app/lib/model-client.mjs";
 import { parseQids } from "../app/lib/resolve-selection.mjs";
 import {
   choosePoint, costOf, parseResearch, submissionRow, SOURCE_KIND, SYSTEM, userPrompt,
@@ -125,7 +126,8 @@ async function research(work, knownNames) {
   let cost = 0;
   let response;
   for (let turn = 0; turn < 4; turn += 1) {
-    response = await anthropic.messages.create({ model: MODEL, max_tokens: 16000, system: SYSTEM, tools: TOOLS, messages });
+    // The tools and system prompt (~6.3k tokens) are the same for every work: cached.
+    response = await anthropic.messages.create({ model: MODEL, max_tokens: 16000, system: cachedSystem(SYSTEM), tools: TOOLS, messages });
     cost += costOf(response.usage, MODEL);
     if (response.stop_reason !== "pause_turn") break;
     messages.push({ role: "assistant", content: response.content });

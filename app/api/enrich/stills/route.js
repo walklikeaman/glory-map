@@ -15,7 +15,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { createClient } from "@supabase/supabase-js";
 
-import { DEFAULT_CLAUDE_MODEL } from "../../../lib/model-client.mjs";
+import { cachedSystem, DEFAULT_CLAUDE_MODEL } from "../../../lib/model-client.mjs";
 import {
   buildClassificationContent,
   buildClaudeClassificationContent,
@@ -126,7 +126,7 @@ function createClassifier(env, { createOpenAIClient, createAnthropicClient, fetc
         model: env.ANTHROPIC_VISION_MODEL || env.ANTHROPIC_MODEL || DEFAULT_CLAUDE_MODEL,
         // Thinking counts against this budget too; the verdicts alone are small.
         max_tokens: 16_000,
-        system: classificationInstructions(),
+        system: cachedSystem(classificationInstructions()),
         messages: [{ role: "user", content: buildClaudeClassificationContent(images) }],
         output_config: { format: zodOutputFormat(stillClassificationSchema), effort: "low" },
       }, { timeout: 120_000 });
