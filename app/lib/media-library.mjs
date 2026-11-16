@@ -181,6 +181,9 @@ export function upgradeLibraryScale(library) {
   });
 }
 
+// Goodreads writes the shelf as "to-read", Open Library as "Want to Read".
+const WANT_TO_READ = new Set(["to-read", "want to read", "want-to-read"]);
+
 export function parseMediaCsv(text, source) {
   if (!isMediaSource(source)) throw new Error("Unsupported media source");
   const [headerRow, ...dataRows] = parseCsvRows(text);
@@ -192,8 +195,9 @@ export function parseMediaCsv(text, source) {
     const record = Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""]));
     const rawTitle = firstValue(record, ["name", "title", "original title"]);
     if (!rawTitle) return [];
-    // Goodreads exports the want-to-read shelf too. The library is what you have read.
-    if (firstValue(record, ["exclusive shelf"]) === "to-read") return [];
+    // Goodreads and Open Library export the want-to-read shelf too. The library is what you
+    // have read.
+    if (WANT_TO_READ.has((firstValue(record, ["exclusive shelf", "bookshelf"]) ?? "").toLowerCase())) return [];
     const title = kind === "book"
       ? bookTitle(rawTitle)
       : mediaSource(source).episodeTitles ? seriesTitle(rawTitle) : rawTitle;
@@ -201,9 +205,9 @@ export function parseMediaCsv(text, source) {
     const imdbId = firstValue(record, ["const", "imdb id", "imdb_id", "imdbid", "imdb"]);
     // Converted to ten points here and nowhere else, so no caller ever has to ask which
     // service a number came from.
-    const rating = toTenPoint(numberValue(firstValue(record, ["rating", "your rating", "my rating", "user_rating"])), source);
+    const rating = toTenPoint(numberValue(firstValue(record, ["rating", "your rating", "my rating", "my ratings", "user_rating"])), source);
     // For a book, the year the work first came out, not the year of the edition on the shelf.
-    const year = numberValue(firstValue(record, ["year", "release year", "original publication year", "year published"]));
+    const year = numberValue(firstValue(record, ["year", "release year", "original publication year", "first publish year", "year published"]));
     const watchedDate = firstValue(record, ["watched date", "date rated", "date read", "date"]);
     const url = firstValue(record, ["letterboxd uri", "url"]);
 

@@ -16,6 +16,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-16] decision | Open Library reading log as a books source (#92)
+**Object**: `MEDIA_SOURCES.openlibrary` in `app/lib/media-sources.mjs`; `parseMediaCsv` aliases in `app/lib/media-library.mjs`; `test/openlibrary-import.test.mjs`.
+**Scenario**: Next feature in PRIORITIES: the #92 connectors. Of those still open, Open Library is the only one with a file the reader can download and no key needed: Account → Import and Export → "Export your Reading Log", a CSV. Trakt's JSON export already parses through "Other list". A live Trakt sign-in needs an OAuth app registered by the owner. Kinopoisk has no export and no public API. Last.fm is music.
+**What happened**: Open Library became one row in `MEDIA_SOURCES` (kind `book`, 5-star scale, `OL` logo, export link). Its card and export link appear on their own. The parser gained aliases for the log's header (`My Ratings`, `First Publish Year`) and a shared want-to-read filter: Goodreads writes `to-read` in "Exclusive Shelf", Open Library writes `Want to Read` in "Bookshelf". A live API by username was not possible: openlibrary.org is blocked from the cloud egress (403), so the file is the path.
+**Outcome**: ✅ 4 tests. In Playwright, with a signed-in session faked in localStorage, a reading-log CSV was uploaded through the Open Library card at 1440 and 390 px. The result: "2 books imported · we hold 1 of them, with 3 places between them", matched against the live catalogue. Screenshots are in `docs/media/openlibrary/`.
+
 ## [2026-11-15] decision | The walking guide reads place_class: studios and story settings say so first (#96)
 **Object**: `ambientRole`, `roleLeadIn`, `pickAmbient`, `tellingFor` in `app/lib/ambient-walk.mjs`; the role label in `app/components/AmbientGuide.jsx`.
 **Scenario**: The next feature after the UX pass. #97 (the numbered story-trail line) was already on the map since #71/#74, and its issue was closed on 2026-10-03, so the TASKS line was stale. The next item was #96/#190: the ambient guide ignored `place_class` and `shot_on_set`. Standing at a lot's gate it would say "X lists this as a filming location", and it said nothing to mark a story setting.

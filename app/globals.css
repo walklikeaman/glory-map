@@ -2131,6 +2131,14 @@ figcaption a {
   font-weight: 700;
 }
 
+.connector-logo.is-openlibrary {
+  color: #fff;
+  background: #2d5e8c;
+  font-family: Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
 /* Link Letterboxd by username: a label row, then the field and its button. */
 .letterboxd-link {
   display: grid;

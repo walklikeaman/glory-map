@@ -52,6 +52,19 @@ export const MEDIA_SOURCES = Object.freeze({
     kind: "book",
     exportUrl: "https://www.goodreads.com/review/import",
   }),
+  openlibrary: Object.freeze({
+    label: "Open Library",
+    // Whole stars, 1 to 5; an empty cell is read and not rated.
+    scale: 5,
+    blurb: "Reading log CSV, the books you have read",
+    accept: ".csv,text/csv",
+    archive: false,
+    logoText: "OL",
+    // Books, like Goodreads: matched against books only.
+    kind: "book",
+    // Account → Import and Export → "Export your Reading Log".
+    exportUrl: "https://openlibrary.org/account/import",
+  }),
   netflix: Object.freeze({
     label: "Netflix",
     // The viewing history carries no ratings; the scale is only here to be declared.
