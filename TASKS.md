@@ -50,7 +50,8 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] #96 / #190 ambient audio that reads place_class: fictional never speaks, a studio lot or a story setting says so first (2026-11-15)
 - [x] #92 Letterboxd linked by username (public RSS, re-syncs on open) (PR #349)
 - [x] #92 Simkl sign-in, Netflix CSV, own CSV/JSON list; connections only for signed-in users, kept on the account (PR #357)
-- [ ] #92 connectors: Trakt, Kinopoisk, Open Library, Last.fm
+- [x] #92 Open Library reading-log CSV, as a books source beside Goodreads (2026-11-16)
+- [ ] #92 connectors left: Trakt live sign-in (needs a Trakt OAuth app; its JSON export already works through "Other list"), Kinopoisk (no export or public API), Last.fm (music, unclear fit)
 - [ ] #95 growth: budgeted web search + GeoCLIP grounding
 - [ ] #47 Wikipedia-prose enrichment (spike)
 - [ ] Recreate 2.0: #51 edge-ghost, #52 compass, #53 AI coach, #54 share diptych
