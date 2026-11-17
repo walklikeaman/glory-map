@@ -52,9 +52,10 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] #92 Simkl sign-in, Netflix CSV, own CSV/JSON list; connections only for signed-in users, kept on the account (PR #357)
 - [x] #92 Open Library reading-log CSV, as a books source beside Goodreads (2026-11-16)
 - [ ] #92 connectors left: Trakt live sign-in (needs a Trakt OAuth app; its JSON export already works through "Other list"), Kinopoisk (no export or public API), Last.fm (music, unclear fit)
-- [ ] #95 growth: budgeted web search + GeoCLIP grounding
+- [ ] #95 growth: budgeted web search + GeoCLIP grounding. Web search runs nightly (data routine); GeoCLIP is blocked in the cloud (huggingface.co answers 403), so it needs the allowlist or a Mac run
 - [ ] #47 Wikipedia-prose enrichment (spike)
-- [ ] Recreate 2.0: #51 edge-ghost, #52 compass, #53 AI coach, #54 share diptych
+- [x] Recreate 2.0 #51: outline ghost (Sobel edges on the device), Photo/Outlines switch, thirds grid with a horizon line (2026-11-17)
+- [ ] Recreate 2.0: #52 compass, #53 AI coach, #54 share diptych
 - [ ] #114 rest: tablet, landscape, ≤360 px, PWA install
 - [ ] #65 streaming narration, #70 offline tours
 
