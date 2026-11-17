@@ -16,6 +16,16 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-17] decision | Recreate 2.0: an outline ghost and a thirds grid in the live camera (#51)
+**Object**: `app/lib/edge-ghost.mjs` (`edgeSize`, `sobelEdges`), `app/components/ShotSync.jsx`, `.shotsync-modes`/`.shotsync-grid` in `app/globals.css`, `test/edge-ghost.test.mjs`.
+**Scenario**: The faded photo ghost hides the live scene exactly where you need to see it. Issue #51 asked for an edge map computed on the device, a toggle between the photo and the edges, and an optional thirds grid with a horizon, with no heavy CV library.
+**Decisions**:
+- A plain 3x3 Sobel on luma, in ~60 lines of JS. The frame is scaled to at most 640 px on its long side first, so it runs once in a few milliseconds on a phone; edges under a magnitude of 80 are dropped so sky and walls stay clean. Lines are cyan (64, 232, 255), which stands out on both daylight and night camera images.
+- The edge map keeps the frame's aspect, so it fills the same box as the photo: the ghost's drag/pinch/twist and `snapshotLayout` work unchanged, and "Take photo" draws the outlines into the composite when they are on.
+- It needs the frame's pixels, so a host without CORS makes `getImageData` throw. Then the Outlines button turns off with a one-line note, and the photo ghost stays.
+- The grid (thirds plus a dashed middle horizon) is CSS over the stage, never drawn into the photo.
+**Outcome**: ✅ 4 new tests, 2169 pass, build green; checked with a fake camera on desktop and at 390 px (screenshots in `docs/media/recreate-edges/`).
+
 ## [2026-11-16] decision | Open Library reading log as a books source (#92)
 **Object**: `MEDIA_SOURCES.openlibrary` in `app/lib/media-sources.mjs`; `parseMediaCsv` aliases in `app/lib/media-library.mjs`; `test/openlibrary-import.test.mjs`.
 **Scenario**: Next feature in PRIORITIES: the #92 connectors. Of those still open, Open Library is the only one with a file the reader can download and no key needed: Account → Import and Export → "Export your Reading Log", a CSV. Trakt's JSON export already parses through "Other list". A live Trakt sign-in needs an OAuth app registered by the owner. Kinopoisk has no export and no public API. Last.fm is music.

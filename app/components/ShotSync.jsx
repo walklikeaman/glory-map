@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Download, RotateCcw, Share2 } from "lucide-react";
+import { Camera, Download, Grid3x3, RotateCcw, Share2 } from "lucide-react";
+
+import { edgeSize, sobelEdges } from "../lib/edge-ghost.mjs";
 
 import {
   CAMERA_CONSTRAINTS,
@@ -43,6 +45,25 @@ function loadCorsImage(src) {
   });
 }
 
+// Recreate 2.0 (#51): the frame as bright outlines instead of a faded photo, so the
+// live scene stays readable while you line up edges. Computed once, on the device.
+async function edgeGhost(src) {
+  const image = await loadCorsImage(src);
+  const size = edgeSize(image.naturalWidth, image.naturalHeight);
+  if (!size) throw new Error("no size");
+  const canvas = document.createElement("canvas");
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, size.width, size.height);
+  // Throws SecurityError when the host sends no CORS header: the toggle then stays off.
+  const pixels = ctx.getImageData(0, 0, size.width, size.height);
+  const edges = sobelEdges(pixels.data, size.width, size.height);
+  ctx.clearRect(0, 0, size.width, size.height);
+  ctx.putImageData(new ImageData(edges, size.width, size.height), 0, 0);
+  return { canvas, url: canvas.toDataURL("image/png") };
+}
+
 function stopStream(stream) {
   stream?.getTracks().forEach((track) => track.stop());
 }
@@ -70,6 +91,31 @@ export default function ShotSync({ location, onUsePhoto, onUpload }) {
     setTransformState(value);
   }, []);
   const [result, setResult] = useState(null);
+  const [ghostMode, setGhostMode] = useState("photo"); // photo | edges
+  const [edges, setEdges] = useState({ status: "idle" }); // idle | working | ready | failed
+  const [showGrid, setShowGrid] = useState(false);
+
+  // Outlines belong to one frame: a trace of another place's frame is never shown.
+  const src = location.backdrop;
+  const edgesFresh = edges.src === src;
+
+  async function chooseGhost(mode) {
+    setGhostMode(mode);
+    if (mode !== "edges" || (edgesFresh && edges.status !== "idle")) return;
+    setEdges({ status: "working", src });
+    let next;
+    try {
+      next = { status: "ready", src, ...(await edgeGhost(src)) };
+    } catch {
+      next = { status: "failed", src };
+    }
+    // A trace that lands after the place changed is dropped.
+    setEdges((current) => (current.src === src ? next : current));
+    if (next.status === "failed") setGhostMode("photo");
+  }
+  const edgesOn = ghostMode === "edges" && edgesFresh && edges.status === "ready";
+  const edgesBusy = edgesFresh && edges.status === "working";
+  const edgesFailed = edgesFresh && edges.status === "failed";
 
   useEffect(() => {
     setSupport(cameraSupport({ navigator, isSecureContext: window.isSecureContext }));
@@ -182,7 +228,9 @@ export default function ShotSync({ location, onUsePhoto, onUpload }) {
       ctx.translate(ghost.centerX, ghost.centerY);
       ctx.rotate(ghost.rotation);
       ctx.scale(ghost.scale, ghost.scale);
-      ctx.drawImage(frame, -ghost.width / 2, -ghost.height / 2, ghost.width, ghost.height);
+      // The edge map keeps the frame's shape, so it fills the same box.
+      const art = edgesOn ? edges.canvas : frame;
+      ctx.drawImage(art, -ghost.width / 2, -ghost.height / 2, ghost.width, ghost.height);
       ctx.restore();
       composite = await toBlob(canvas).catch(() => null);
     }
@@ -313,11 +361,51 @@ export default function ShotSync({ location, onUsePhoto, onUpload }) {
           aria-hidden="true"
           className="shotsync-ghost"
           draggable={false}
-          src={location.backdrop}
+          src={edgesOn ? edges.url : location.backdrop}
           style={{ opacity: opacity / 100, transform: transformCss(transform) }}
         />
+        {showGrid && (
+          <div aria-hidden="true" className="shotsync-grid">
+            <span className="shotsync-horizon" />
+          </div>
+        )}
       </div>
       <div className="shotsync-controls">
+        <div className="shotsync-modes">
+          <div aria-label="Film frame style" className="shotsync-toggle" role="group">
+            <button
+              aria-pressed={ghostMode === "photo"}
+              className="ghost-button"
+              onClick={() => chooseGhost("photo")}
+              type="button"
+            >
+              Photo
+            </button>
+            <button
+              aria-pressed={ghostMode === "edges"}
+              className="ghost-button"
+              disabled={edgesFailed || edgesBusy}
+              onClick={() => chooseGhost("edges")}
+              type="button"
+            >
+              {edgesBusy ? "Tracing…" : "Outlines"}
+            </button>
+          </div>
+          <button
+            aria-pressed={showGrid}
+            className="ghost-button shotsync-grid-toggle"
+            onClick={() => setShowGrid((on) => !on)}
+            type="button"
+          >
+            <Grid3x3 size={16} />
+            Grid
+          </button>
+        </div>
+        {edgesFailed && (
+          <span className="shotsync-note">
+            This frame's host doesn't allow tracing outlines, so the photo ghost stays on.
+          </span>
+        )}
         <label className="recreate-opacity">
           <span>Film frame opacity</span>
           <input
