@@ -39,7 +39,15 @@ async function search(q, attempt = 0) {
     await sleep(30000 * (attempt + 1));
     return search(q, attempt + 1);
   }
-  if (response.status === 429 || response.status >= 500) {
+  if (response.status === 429) {
+    // The cloud egress IP is shared, so Nominatim throttles it for minutes at a time
+    // (2026-11-16..18: three nights cut short). Wait 2, 5, then 10 minutes; after that
+    // the run stops cleanly and the rest waits for the next night.
+    if (attempt >= 3) throw Object.assign(new Error("nominatim 429"), { throttled: true });
+    await sleep([120000, 300000, 600000][attempt]);
+    return search(q, attempt + 1);
+  }
+  if (response.status >= 500) {
     if (attempt >= 3) throw new Error(`nominatim ${response.status}`);
     await sleep(30000 * (attempt + 1));
     return search(q, attempt + 1);
@@ -66,18 +74,30 @@ async function main() {
   console.log(`${todo.length} ${SOURCE} rows without a point; about ${Math.ceil((todo.length * 1.5 * NOMINATIM_GAP_MS) / 60000)} min`);
 
   const totals = { placed: 0, refused: {} };
+  let stopped = false;
   for (const row of todo) {
+    if (stopped) break;
     let placed = null;
     let why = "no_query";
     for (const [index, q] of queriesFor(row).entries()) {
       await sleep(NOMINATIM_GAP_MS);
-      const { point, refused } = chooseResult(await search(q));
+      let results;
+      try {
+        results = await search(q);
+      } catch (failure) {
+        if (!failure.throttled) throw failure;
+        console.log("nominatim still throttling after 17 min of waiting: stopping, the rest waits for the next run");
+        stopped = true;
+        break;
+      }
+      const { point, refused } = chooseResult(results);
       if (point) {
         placed = geocodePatch(point, index);
         break;
       }
       why = refused;
     }
+    if (stopped) break;
     if (!placed) {
       totals.refused[why] = (totals.refused[why] ?? 0) + 1;
       continue;
