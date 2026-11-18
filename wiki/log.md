@@ -16,6 +16,17 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-18] decision | Recreate 2.0: a compass guide walks you to the pin (#52)
+**Object**: `app/lib/compass.mjs` (bearing, turn, heading from DeviceOrientation, guide text), `app/components/CompassGuide.jsx`, `.compass-guide` in `app/globals.css`, `test/compass.test.mjs`.
+**Scenario**: The hardest part of recreating a shot is finding where the camera stood. We have the pin, so the phone's GPS and compass can walk the person there.
+**Decisions**:
+- One row at the top of the Recreate dialog: "Guide me to the spot" → an arrow that turns with the phone, plus "110 m, turn 90° left" / "straight ahead" / "behind you". Within 20 m (more on a poor GPS fix, up to 40 m) it says "You're at the spot" and hands over to the camera.
+- Heading: iOS gives `webkitCompassHeading`; elsewhere only an **absolute** event's alpha is tied to north (`deviceorientationabsolute` on Android Chrome), with the screen rotation added back. A relative alpha is ignored, because it points wherever the phone faced at load.
+- `DeviceOrientationEvent.requestPermission()` is asked from the tap. Gotcha: current Chromium has this call too and answers "prompt" or "denied"; only "denied" turns the compass off.
+- No compass reading after 2.5 s → fallback "110 m to the north", which is distance plus a map direction. Areas (`display: "area"`, a town or a park) get no guide, because a centroid is not a camera position.
+- Not done: the direction and tilt hint at the spot. We store no camera heading or tilt for any place yet, so that needs recreations to save them first.
+**Outcome**: ✅ 9 new tests, 2178 pass, build green. Checked in Playwright on desktop and at 390 px with a fake GPS and a dispatched absolute orientation event. All three states work. Screenshots are in `docs/media/compass-guide/`.
+
 ## [2026-11-17] decision | Recreate 2.0: an outline ghost and a thirds grid in the live camera (#51)
 **Object**: `app/lib/edge-ghost.mjs` (`edgeSize`, `sobelEdges`), `app/components/ShotSync.jsx`, `.shotsync-modes`/`.shotsync-grid` in `app/globals.css`, `test/edge-ghost.test.mjs`.
 **Scenario**: The faded photo ghost hides the live scene exactly where you need to see it. Issue #51 asked for an edge map computed on the device, a toggle between the photo and the edges, and an optional thirds grid with a horizon, with no heavy CV library.
