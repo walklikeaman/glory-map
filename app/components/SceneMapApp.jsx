@@ -183,6 +183,8 @@ import { RATING_LABELS } from "../lib/work-ratings.mjs";
 
 // The camera code loads only when someone opens "Recreate this shot" (#50).
 const ShotSync = dynamic(() => import("./ShotSync.jsx"), { ssr: false });
+// The compass guide (#52) walks the person to the pin before the camera opens.
+const CompassGuide = dynamic(() => import("./CompassGuide.jsx"), { ssr: false });
 
 // A new `() => {}` every render is a changed prop, and a changed prop re-renders the whole
 // marker layer — which is the work this whole component is trying not to do. Clicking a pin
@@ -877,6 +879,8 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
             <X size={18} />
           </button>
         </header>
+
+        <CompassGuide location={location} />
 
         <div className="recreate-mode-switch" aria-label="How to recreate">
           <button
