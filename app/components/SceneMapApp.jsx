@@ -902,7 +902,13 @@ function RecreateShot({ location, onClose, userId = null, onRequestSignIn, onSha
         </div>
 
         {mode === "live" ? (
-          <ShotSync location={location} onUpload={() => setMode("upload")} onUsePhoto={usePhoto} />
+          <ShotSync
+            location={location}
+            onRequestSignIn={onRequestSignIn}
+            onUpload={() => setMode("upload")}
+            onUsePhoto={usePhoto}
+            signedIn={Boolean(userId)}
+          />
         ) : (
         <>
         <div className="recreate-stage">

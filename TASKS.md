@@ -56,7 +56,9 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] #47 Wikipedia-prose enrichment (spike)
 - [x] Recreate 2.0 #51: outline ghost (Sobel edges on the device), Photo/Outlines switch, thirds grid with a horizon line (2026-11-17)
 - [x] Recreate 2.0 #52: compass guide to the pin (GPS + compass arrow, distance and map direction without a compass, "You're at the spot") (2026-11-18)
-- [ ] Recreate 2.0: #52 rest, the camera direction and tilt at the spot (needs recreations to save heading + tilt first); #53 AI coach, #54 share diptych
+- [x] Recreate 2.0 #53: "Coach me" in the live camera, one Opus 5.5 call per tap (pan + distance + tilt, read aloud on the device), signed-in only, 15 a day per account, 60 a day per server (2026-11-19)
+- [ ] Recreate 2.0: #52 rest, the camera direction and tilt at the spot (needs recreations to save heading + tilt first); #54 OG image for a shared shot (needs a public page for a visitor shot)
+- [ ] #53 rest: a persistent coach counter (in-memory caps reset per server instance; a table needs a prod migration)
 - [ ] #114 rest: tablet, landscape, ≤360 px, PWA install
 - [ ] #65 streaming narration, #70 offline tours
 

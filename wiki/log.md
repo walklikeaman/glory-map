@@ -16,6 +16,28 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-19] decision | Recreate 2.0: "Coach me" in the live camera (#53)
+**Object**: `app/lib/align-coach.mjs`, `app/api/coach/route.js`, the coach row in `app/components/ShotSync.jsx`, `.shotsync-coach` in `app/globals.css`, `test/align-coach.test.mjs`.
+**Scenario**: A ghost overlay leaves you to line up by eye. One tap should get a spoken hint like "turn left a bit and step back".
+**Decisions**:
+- **The model measures and the code decides.** The model returns `dx`/`dy` (where landmarks sit in the camera view against the frame), `scale` and `same_place`, and `movesFromMeasure` turns those into "turn left / tilt down / step back". Asked for directions directly, Sonnet 5.5 got pan backwards, which is the mirror confusion. With signed numbers there is no ambiguity.
+- **Model: Opus 5.5 at effort low**, measured on a Before Sunrise frame against crops of itself (~$0.20 for the whole comparison):
+  - Opus 5.5 low read the shifted crop as "turn left a bit, step back a bit". That's right, and it costs ~$0.012 a call.
+  - Sonnet 5.5 with thinking got the main moves but added a wrong one to most answers, at ~$0.005 a call. With thinking off it missed the shifts.
+  - Haiku 5.5 called shifted crops "not the same place".
+  - **No model read a 9° roll** (two gave the wrong sign), so roll is left to the grid and horizon line on the device.
+  - Tilt is the weakest move: Opus missed it on the top crop.
+- Thinking settings that bit: with the default thinking, a 200-token cap was used up by thinking and there was no JSON. Haiku 5.5 takes `thinking: disabled`. Sonnet 5.5 400s on it and needs `between_tools`. Opus 5.5 can't turn thinking off, so we use `output_config.effort: "low"` and `max_tokens: 4000`.
+- Spend guard:
+  - Signed-in only, verified with Supabase `auth.getUser`.
+  - 15 calls a day per account and 60 a day per server instance (`COACH_DAILY_LIMIT`), which caps it at about $0.70 a day.
+  - Both caps are in memory, so they reset per instance. A persistent counter needs a table, which means a prod migration.
+- Privacy: both pictures are downscaled to 512 px on the device and sent inline. The server stores nothing. The frame must allow CORS, or the coach says it can't see it. The answer is read aloud with the browser's own `speechSynthesis` (free, on the device) rather than paid TTS, and the speaker button turns that off.
+**Outcome**: ✅ 10 new tests, 2188 pass, build green. Playwright, with a fake camera and a mocked `/api/coach`:
+- Desktop signed out shows "Sign in for the coach" and opens sign-in.
+- 390 px signed in sends two ~20 KB JPEGs and shows the answer.
+- Taking the photo still works.
+
 ## [2026-11-18] decision | Recreate 2.0: a compass guide walks you to the pin (#52)
 **Object**: `app/lib/compass.mjs` (bearing, turn, heading from DeviceOrientation, guide text), `app/components/CompassGuide.jsx`, `.compass-guide` in `app/globals.css`, `test/compass.test.mjs`.
 **Scenario**: The hardest part of recreating a shot is finding where the camera stood. We have the pin, so the phone's GPS and compass can walk the person there.

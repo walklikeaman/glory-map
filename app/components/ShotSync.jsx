@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Download, Grid3x3, RotateCcw, Share2 } from "lucide-react";
+import { Camera, Download, Grid3x3, RotateCcw, Share2, Sparkles, Volume2, VolumeX } from "lucide-react";
 
 import { edgeSize, sobelEdges } from "../lib/edge-ghost.mjs";
+import { getSupabaseBrowserClient } from "../lib/supabase-browser.mjs";
 
 import {
   CAMERA_CONSTRAINTS,
   IDENTITY,
+  coverCrop,
   OPACITY_DEFAULT,
   cameraErrorReason,
   cameraMessage,
@@ -64,11 +66,41 @@ async function edgeGhost(src) {
   return { canvas, url: canvas.toDataURL("image/png") };
 }
 
+// The coach (#53) gets two small JPEGs: the frame, and the part of the camera view with
+// the frame's shape, from the middle (where the ghost sits before it is moved).
+const COACH_SIDE = 512;
+
+function smallJpeg(source, sx, sy, sw, sh) {
+  const scale = Math.min(1, COACH_SIDE / Math.max(sw, sh));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sw * scale));
+  canvas.height = Math.max(1, Math.round(sh * scale));
+  canvas.getContext("2d").drawImage(source, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.8);
+}
+
+async function accessToken() {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token ?? null;
+}
+
+function speak(text) {
+  try {
+    if (!text || typeof window.speechSynthesis === "undefined") return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  } catch {
+    // No voice on this device: the sentence is on screen anyway.
+  }
+}
+
 function stopStream(stream) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-export default function ShotSync({ location, onUsePhoto, onUpload }) {
+export default function ShotSync({ location, onUsePhoto, onUpload, signedIn = false, onRequestSignIn }) {
   const videoRef = useRef(null);
   const stageRef = useRef(null);
   const streamRef = useRef(null);
@@ -94,6 +126,40 @@ export default function ShotSync({ location, onUsePhoto, onUpload }) {
   const [ghostMode, setGhostMode] = useState("photo"); // photo | edges
   const [edges, setEdges] = useState({ status: "idle" }); // idle | working | ready | failed
   const [showGrid, setShowGrid] = useState(false);
+  const [coach, setCoach] = useState({ status: "idle", text: "" }); // idle | asking | done | error
+  const [voice, setVoice] = useState(true);
+
+  async function askCoach() {
+    if (!signedIn) {
+      onRequestSignIn?.();
+      return;
+    }
+    const video = videoRef.current;
+    if (!video?.videoWidth || coach.status === "asking") return;
+    setCoach({ status: "asking", text: "Looking…" });
+    try {
+      const frame = await loadCorsImage(location.backdrop);
+      const reference = smallJpeg(frame, 0, 0, frame.naturalWidth, frame.naturalHeight);
+      const crop = coverCrop(video.videoWidth, video.videoHeight, frame.naturalWidth, frame.naturalHeight);
+      const camera = smallJpeg(video, crop.sx, crop.sy, crop.sw, crop.sh);
+      const token = await accessToken();
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ reference, camera }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "The coach couldn't answer. Try again in a moment.");
+      setCoach({ status: "done", text: payload.sentence });
+      if (voice) speak(payload.sentence);
+    } catch (error) {
+      // A frame host without CORS taints the canvas, and toDataURL throws SecurityError.
+      const text = error?.name === "SecurityError" || error?.message === "frame unavailable"
+        ? "This frame's host doesn't let the coach see it."
+        : error?.message || "The coach couldn't answer. Try again in a moment.";
+      setCoach({ status: "error", text });
+    }
+  }
 
   // Outlines belong to one frame: a trace of another place's frame is never shown.
   const src = location.backdrop;
@@ -401,6 +467,31 @@ export default function ShotSync({ location, onUsePhoto, onUpload }) {
             Grid
           </button>
         </div>
+        <div className="shotsync-coach">
+          <button
+            className="ghost-button"
+            disabled={coach.status === "asking"}
+            onClick={askCoach}
+            type="button"
+          >
+            <Sparkles size={16} />
+            {coach.status === "asking" ? "Looking…" : signedIn ? "Coach me" : "Sign in for the coach"}
+          </button>
+          <button
+            aria-label={voice ? "Don't read the coach aloud" : "Read the coach aloud"}
+            aria-pressed={voice}
+            className="ghost-button shotsync-voice"
+            onClick={() => setVoice((on) => !on)}
+            type="button"
+          >
+            {voice ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+        </div>
+        {coach.status !== "idle" && coach.status !== "asking" && (
+          <p aria-live="polite" className={`shotsync-coach-line${coach.status === "error" ? " is-error" : ""}`} role="status">
+            {coach.text}
+          </p>
+        )}
         {edgesFailed && (
           <span className="shotsync-note">
             This frame's host doesn't allow tracing outlines, so the photo ghost stays on.

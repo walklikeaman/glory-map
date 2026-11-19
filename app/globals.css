@@ -2875,6 +2875,41 @@ figcaption a {
   color: var(--gold-strong);
 }
 
+/* Alignment coach (#53): one button, a voice toggle, and the answer under them. */
+.shotsync-coach {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.shotsync-coach .ghost-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.shotsync-voice {
+  width: 52px;
+  padding: 0;
+}
+
+.shotsync-coach-line {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--gold-strong);
+  border-radius: 6px;
+  background: rgba(247, 183, 51, 0.08);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.shotsync-coach-line.is-error {
+  border-left-color: var(--muted);
+  color: var(--muted);
+}
+
 .shotsync-grid {
   position: absolute;
   inset: 0;
