@@ -6,6 +6,10 @@
 //   node --env-file=.env.local scripts/research-locations.mjs --top 80 --write --max-dollars 5
 //   node --env-file=.env.local scripts/research-locations.mjs --wikidata Q2085,Q22661229 --write
 //   node --env-file=.env.local scripts/research-locations.mjs --replay <run.json> --write
+//   node --env-file=.env.local scripts/research-locations.mjs --queue <cities/Q38.json> --top 130 --write
+//
+// `--queue` reads a city queue from ingest-city-works.mjs (most widely known first) and
+// takes the next --top works of it that the ledger has not written yet.
 //
 // The model (claude-haiku-5-5 with web search) reads fan sites, location
 // blogs and wikis and returns places with the page that names each one. The rules for
@@ -49,6 +53,7 @@ const OFFSET = Number(arg("offset", 0)) || 0;
 const WIKIDATA = parseQids(arg("wikidata"));
 const WORK_IDS = String(arg("work", "") || "").split(",").map((id) => id.trim()).filter(Boolean);
 const REPLAY = arg("replay");
+const QUEUE = arg("queue");
 const MAX_DOLLARS = Number(arg("max-dollars", 5));
 const CONCURRENCY = Number(arg("concurrency", 3)) || 3;
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
@@ -57,8 +62,8 @@ const AGAIN = argv.includes("--again");
 const DIR = arg("dir", "/mnt/project-files/glorymap-research/");
 const LEDGER = path.join(DIR, "ledger.json");
 
-if (!TOP && !WIKIDATA.length && !WORK_IDS.length && !REPLAY) {
-  console.error("Pass --top N, --wikidata Q1,Q2, --work <uuid> or --replay <run.json>");
+if (!TOP && !WIKIDATA.length && !WORK_IDS.length && !REPLAY && !QUEUE) {
+  console.error("Pass --top N, --wikidata Q1,Q2, --work <uuid>, --queue <file> or --replay <run.json>");
   process.exit(1);
 }
 
@@ -80,14 +85,27 @@ function writeLedger(ledger) {
   fs.writeFileSync(LEDGER, JSON.stringify(ledger, null, 1));
 }
 
+const fresh = (ledger, work) => work && (AGAIN || ledger[work.id]?.mode !== "write");
+
 async function selectWorks(ledger) {
   const works = [];
+  if (QUEUE) {
+    // In queue order; a work the catalogue lacks (no TMDB/IMDb id) is skipped.
+    const order = JSON.parse(fs.readFileSync(QUEUE, "utf8")).works.map((item) => item.wikidata_id);
+    for (let index = 0; index < order.length && works.length < (TOP || order.length); index += 200) {
+      const { data, error } = await db.from("works").select(WORK_COLUMNS).in("wikidata_id", order.slice(index, index + 200));
+      if (error) throw new Error(error.message);
+      const byQid = new Map(data.map((work) => [work.wikidata_id, work]));
+      works.push(...order.slice(index, index + 200).map((id) => byQid.get(id)).filter((work) => fresh(ledger, work)));
+    }
+    return works.slice(0, TOP || undefined);
+  }
   if (WORK_IDS.length || WIKIDATA.length) {
     let query = db.from("works").select(WORK_COLUMNS);
     query = WORK_IDS.length ? query.in("id", WORK_IDS) : query.in("wikidata_id", WIKIDATA);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    works.push(...data);
+    works.push(...data.filter((work) => fresh(ledger, work)));
   }
   if (TOP) {
     // Most IMDb votes first: the closest thing we hold to "what people have watched".
@@ -97,8 +115,8 @@ async function selectWorks(ledger) {
         .eq("source", "imdb").not("votes", "is", null)
         .order("votes", { ascending: false }).range(from, from + 999);
       if (error) throw new Error(error.message);
-      const fresh = data.map((row) => row.works).filter((work) => work && (AGAIN || ledger[work.id]?.mode !== "write"));
-      works.push(...fresh.slice(OFFSET && from === 0 ? OFFSET : 0));
+      const unread = data.map((row) => row.works).filter((work) => fresh(ledger, work));
+      works.push(...unread.slice(OFFSET && from === 0 ? OFFSET : 0));
       if (data.length < 1000) break;
     }
   }
