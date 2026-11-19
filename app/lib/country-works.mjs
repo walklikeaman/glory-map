@@ -100,3 +100,24 @@ export function newRows(rows, held = {}) {
   }
   return out;
 }
+
+// The city pass (2026-11-19, Nikita: "take each country's top-100 cities and the films
+// shot there"). Ten test cities (Rome, Milan, Naples, Turin, Palermo, Genoa, Bologna,
+// Florence, Venice, Oslo) named 1,142 works between Wikidata P915 and the English
+// Wikipedia's "Films shot in <city>" categories; the catalogue held 95 of them.
+//
+// The queue is what the paid web research reads after the free steps: every work a city
+// names, the most widely known first (Wikipedia language editions, a cheap stand-in for
+// popularity that new works without IMDb votes still have).
+export function cityQueue(rows, citiesByWork, sitelinksByWork) {
+  return rows
+    .filter(Boolean)
+    .map((row) => ({
+      wikidata_id: row.wikidata_id,
+      title: row.title,
+      year: row.year ?? null,
+      sitelinks: sitelinksByWork.get(row.wikidata_id) ?? 0,
+      cities: [...(citiesByWork.get(row.wikidata_id) ?? [])].sort(),
+    }))
+    .sort((a, b) => b.sitelinks - a.sitelinks || a.title.localeCompare(b.title));
+}

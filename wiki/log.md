@@ -16,6 +16,17 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-19] ingest | City pass: every country's top-100 cities and the works shot there
+**Object**: `scripts/ingest-city-works.mjs` (new), `cityQueue()` in `app/lib/country-works.mjs`, `--queue` in `scripts/research-locations.mjs`; queues in `/mnt/project-files/glorymap-research/cities/`.
+**Scenario**: Nikita: "for each country take its top-100 cities, see which films were shot there, and work through them in batches". The nightly web research went down the IMDb-votes list (875 of ~1000 done), which is Anglo-American by construction.
+**Decisions**:
+- Cities: Wikidata `P17` country + `P31/P279?` city (Q515), top N by `P1082`. Works per city: `P915` on the city or on a place inside it (`P131`), plus the English Wikipedia's "Films shot in <city>" category through the query service's MediaWiki bridge. One query per city: a whole-country query timed out (Italy, 90 s).
+- New works use the country ingest's own rules (film/series type, a TMDB or IMDb id, dedup on all three ids). The queue keeps every work the cities name, held or new, ordered by Wikipedia sitelinks (new works have no IMDb votes).
+- `research-locations.mjs --queue` takes the next works of a queue the ledger has not written; `--wikidata` and `--work` now also skip ledgered works unless `--again`.
+- The new script names itself with a generic client string (repo URL), not the contact address. Wikidata accepted it.
+- Country order: 197 sovereign states, a hand-ordered list of the big film countries first, then by population (`cities/countries.json`). The whole-country film count query timed out.
+**Outcome**: ✅ Test 19.11: Wikidata + categories for 10 cities (Rome … Oslo) named 1,142 works, of which the catalogue held 95. Italy's top 10 cities gave 1,017 works with an id, 932 new; 10 written. Research of the queue's first 10 (Ben-Hur, 8½, La Dolce Vita, Roman Holiday…) cost $0.52 and found 90 places, 19 with a point. From the next night: one country's cities a night, then research in that queue's order.
+
 ## [2026-11-19] decision | Recreate 2.0: "Coach me" in the live camera (#53)
 **Object**: `app/lib/align-coach.mjs`, `app/api/coach/route.js`, the coach row in `app/components/ShotSync.jsx`, `.shotsync-coach` in `app/globals.css`, `test/align-coach.test.mjs`.
 **Scenario**: A ghost overlay leaves you to line up by eye. One tap should get a spoken hint like "turn left a bit and step back".

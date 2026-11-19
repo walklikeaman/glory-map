@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  candidatesFromBindings, kindOf, newRows, titleFromArticle, workRowFrom,
+  candidatesFromBindings, cityQueue, kindOf, newRows, titleFromArticle, workRowFrom,
 } from "../app/lib/country-works.mjs";
 
 const uri = (id) => ({ value: `http://www.wikidata.org/entity/${id}` });
@@ -43,4 +43,16 @@ test("a row clashing on any held id, or repeated in the run, is dropped", () => 
     { wikidata_id: "Q4", imdb_id: null, tmdb_id: "7" },
   ];
   assert.deepEqual(newRows(rows, { tmdb_id: ["5"] }).map((row) => row.wikidata_id), ["Q1", "Q3"]);
+});
+
+test("the city queue puts the most widely known work first and names its cities", () => {
+  const rows = [
+    { wikidata_id: "Q1", title: "Small Film", year: 2001 },
+    { wikidata_id: "Q2", title: "Roman Holiday", year: 1953 },
+    null,
+  ];
+  const queue = cityQueue(rows, new Map([["Q2", new Set(["Rome", "Florence"])]]), new Map([["Q2", 60], ["Q1", 3]]));
+  assert.deepEqual(queue.map((item) => item.wikidata_id), ["Q2", "Q1"]);
+  assert.deepEqual(queue[0].cities, ["Florence", "Rome"]);
+  assert.deepEqual(queue[1].cities, []);
 });
