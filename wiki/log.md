@@ -16,6 +16,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-20] decision | "What's nearby" answers from our own records first
+
+**What**: the browse list (`/api/locations` without `q`) asked one live Wikidata geo query and nothing else; on 18.11 a new spot took 13–18 s and one answered 504, so the list emptied. Now the route reads `location_submissions` (not rejected, with a point) in the circle's box in parallel, through the `location_submissions_mappable_latlng_idx` index (~0.5 s for 400 rows in central London, which holds ~1,600). Once our rows are in, Wikidata gets 6 s to add to them; without any, it gets its full timeout as before. A Wikidata failure with our rows in hand is a warning, not a 502. Logic in `app/lib/nearby-own.mjs`, tests in `test/nearby-own.test.mjs`.
+**Measured (local prod build, live DB, 10 km)**: London 17 places, 15 from our queue, Wikidata in time, 7.7 s; Rome 27, all ours, Wikidata "slow", 7.1 s; Nairobi 11 (8 ours), 3.1 s. Response says `queued` and `wikidata: ok|slow|failed`.
+**Notes**: a full page (800 rows) means the box is too dense to be fair, since rows come back in index order (south first), so a box a third the size around the centre is asked once. Our rows group with Wikidata's by the work's `wikidata_id`; `isAlreadyShown` (same name within 150 m) drops doubles.
+
 ## [2026-11-19] ingest | City pass: every country's top-100 cities and the works shot there
 **Object**: `scripts/ingest-city-works.mjs` (new), `cityQueue()` in `app/lib/country-works.mjs`, `--queue` in `scripts/research-locations.mjs`; queues in `/mnt/project-files/glorymap-research/cities/`.
 **Scenario**: Nikita: "for each country take its top-100 cities, see which films were shot there, and work through them in batches". The nightly web research went down the IMDb-votes list (875 of ~1000 done), which is Anglo-American by construction.
