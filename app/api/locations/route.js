@@ -37,7 +37,16 @@ import {
 import { findInvertedPlaces } from "../../lib/inverted-places.mjs";
 import { DISPLAY, gradePlace } from "../../lib/place-grade.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { MATCHED_BY, selectSubmissionPlaces } from "../../lib/submission-places.mjs";
+import { MATCHED_BY, selectSubmissionPlaces, SUBMISSION_RELATION_KIND } from "../../lib/submission-places.mjs";
+import {
+  mergeNearby,
+  ownNearbyBox,
+  ownRowsToLocations,
+  OWN_NEARBY_LIMIT,
+  OWN_RETRY_SHRINK,
+  settleWithin,
+  WIKIDATA_WAIT_WITH_OWN_MS,
+} from "../../lib/nearby-own.mjs";
 import { normalizeWorkTitle } from "../../lib/content-graph.mjs";
 import { USER_AGENT, WIKIDATA_SPARQL } from "../../lib/user-agent.mjs";
 import { upstreamFailed } from "../../lib/upstream-error.mjs";
@@ -55,6 +64,10 @@ const SUBMISSION_FIELDS =
 const SUBMISSION_COLUMNS = `${SUBMISSION_FIELDS}, works!inner(imdb_id, title_norm, kind)`;
 // The own-records path needs the work's own identity, because Wikidata gave us none.
 const OWN_WORK_COLUMNS = `${SUBMISSION_FIELDS}, works!inner(id, title, title_norm, kind)`;
+// The nearby list needs the work's Wikidata id too, to share a group with Wikidata's rows.
+const NEARBY_OWN_COLUMNS = `${SUBMISSION_FIELDS}, works!inner(id, wikidata_id, title, year, kind)`;
+// The nearest this many of our rows go into the merge; the ranking keeps 5 works anyway.
+const OWN_NEARBY_KEEP = 200;
 
 // One identifier is not enough, and Doctor Who is why.
 //
@@ -515,6 +528,37 @@ async function findOwnWorkPlaces({ query, kind, center, env = process.env }) {
   }
 }
 
+// Queue rows in the circle's box, for the nearby list. A full page is a box too dense to
+// be fair (index order, south first), so a smaller box around the centre is asked once.
+// A failure costs these rows, never the answer.
+async function findOwnNearby({ lat, lng, radius, kind, env = process.env }) {
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return [];
+  const client = createClient(url, anonKey, { auth: { persistSession: false } });
+  const read = async (km) => {
+    const box = ownNearbyBox({ lat, lng, radius: km });
+    const ask = client
+      .from("location_submissions")
+      .select(NEARBY_OWN_COLUMNS)
+      .neq("status", "rejected")
+      .not("lat", "is", null)
+      .gte("lat", box.south).lte("lat", box.north)
+      .gte("lng", box.west).lte("lng", box.east);
+    const { data, error } = await (isEveryKind(kind) ? ask : ask.eq("works.kind", kind)).limit(OWN_NEARBY_LIMIT);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  };
+  try {
+    let rows = await read(radius);
+    if (rows.length >= OWN_NEARBY_LIMIT) rows = await read(radius / OWN_RETRY_SHRINK);
+    return ownRowsToLocations(rows, { kind });
+  } catch (error) {
+    console.warn("own nearby lookup failed", error?.message);
+    return [];
+  }
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const lat = numberInRange(searchParams.get("lat"), DEFAULTS.lat, { min: -90, max: 90 });
@@ -646,9 +690,25 @@ export async function GET(request) {
       workIds: [],
       excludeLocationId,
     });
-    const bindings = await fetchLocationBindings(query);
-    const normalized = normalizeWikidataLocations(bindings, { kind });
-    const nearby = locationsWithinRadius(normalized, { lat, lng }, radius);
+    // Our own records and Wikidata, side by side ([[nearby-own]]). Ours answer in well
+    // under a second; Wikidata took 13–18 s for a new spot on 18.11, so once ours are in
+    // hand it gets a short wait to add to them instead of the whole answer waiting on it.
+    const center = { lat, lng };
+    const wikidataRows = fetchLocationBindings(query)
+      .then((bindings) => locationsWithinRadius(normalizeWikidataLocations(bindings, { kind }), center, radius));
+    wikidataRows.catch(() => {}); // read below; this only keeps an early failure from going unhandled
+    const own = locationsWithinRadius(await findOwnNearby({ lat, lng, radius, kind }), center, radius)
+      .slice(0, OWN_NEARBY_KEEP);
+    const wikidata = await settleWithin(wikidataRows, own.length ? WIKIDATA_WAIT_WITH_OWN_MS : Infinity);
+    if (wikidata.error && !own.length) throw wikidata.error;
+    if (wikidata.error || wikidata.timedOut) {
+      console.warn("nearby: answering from our own records", {
+        wikidata: wikidata.timedOut ? "slow" : wikidata.error?.message,
+        own: own.length,
+      });
+    }
+
+    const nearby = locationsWithinRadius(mergeNearby(wikidata.value ?? [], own), center, radius);
     // With every kind merged the five-work cap has to be shared, or the biggest works in
     // the area take it and a whole kind disappears from a list that claims to hold all
     // three.
@@ -661,6 +721,9 @@ export async function GET(request) {
         kind,
         search_mode: "nearby",
         matched_work: null,
+        // How many of them came from our own queue, and whether Wikidata answered in time.
+        queued: locations.filter((location) => location.relation_kind === SUBMISSION_RELATION_KIND).length,
+        wikidata: wikidata.value ? "ok" : wikidata.timedOut ? "slow" : "failed",
         locations: addSceneMatchTokens(gradeLocations(locations)),
       },
       { headers: { "Cache-Control": SCENE_MATCH_TOKEN_CACHE_CONTROL } },
