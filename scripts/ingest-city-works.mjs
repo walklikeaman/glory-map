@@ -62,13 +62,31 @@ async function sparql(query) {
   throw new Error("Wikidata query service kept failing");
 }
 
-// A city: an instance of city (Q515) or of a direct subclass (big city, comune, capital…).
-const TOP_CITIES = (country, limit) => `SELECT ?city ?cityLabel ?pop WHERE {
+// A city, by population. Three class paths, asked one at a time and merged, because a
+// single query with all of them (or with P279*) times out on the US and France:
+//   - city (Q515) or a direct subclass (big city, comune, city of England…);
+//   - city of the United States (Q1093829) up to two subclass steps (Los Angeles is a
+//     charter city → city of California → city of the US; Q515 never reached it, 20.11);
+//   - big city (Q1549591) itself.
+// Dissolved places (P576) and metropolitan areas (Q1907114) are left out.
+const CITY_PATHS = [["Q515", "wdt:P31/wdt:P279?"], ["Q1093829", "wdt:P31/wdt:P279?/wdt:P279?"], ["Q1549591", "wdt:P31"]];
+const TOP_CITIES = (country, limit, [target, path]) => `SELECT ?city ?cityLabel ?pop WHERE {
   { SELECT ?city (MAX(?p) AS ?pop) WHERE {
-    ?city wdt:P17 wd:${country}; wdt:P1082 ?p; wdt:P31/wdt:P279? wd:Q515 .
+    ?city wdt:P17 wd:${country}; wdt:P1082 ?p; ${path} wd:${target} .
+    FILTER NOT EXISTS { ?city wdt:P576 [] }
+    FILTER NOT EXISTS { ?city wdt:P31 wd:Q1907114 }
   } GROUP BY ?city ORDER BY DESC(?pop) LIMIT ${limit} }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-} ORDER BY DESC(?pop)`;
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
+}`;
+
+async function topCities(country, limit) {
+  const byCity = new Map();
+  for (const classPath of CITY_PATHS) {
+    for (const row of await sparql(TOP_CITIES(country, limit, classPath))) byCity.set(row.city.value, row);
+    await sleep(1000);
+  }
+  return [...byCity.values()].sort((a, b) => Number(b.pop.value) - Number(a.pop.value)).slice(0, limit);
+}
 
 // One city at a time: the same query over a whole country times out (Italy, 90 s).
 const FILMED_IN = (city) => `SELECT DISTINCT ?item WHERE {
@@ -122,17 +140,18 @@ async function heldIds(db) {
 }
 
 async function main() {
-  const cities = await sparql(TOP_CITIES(COUNTRY, CITIES));
+  const cities = await topCities(COUNTRY, CITIES);
   console.log(`${cities.length} cities of ${COUNTRY}, ${cities[0]?.cityLabel.value ?? "none"} first`);
   const citiesByWork = new Map();
   for (const city of cities) {
     const name = city.cityLabel.value;
     const found = new Set();
     await sleep(1000);
-    for (const row of await sparql(FILMED_IN(qid(city.city.value)))) found.add(qid(row.item.value));
+    // A category member without a Wikidata item comes back with ?item unbound (New York City, 20.11).
+    for (const row of await sparql(FILMED_IN(qid(city.city.value)))) if (row.item) found.add(qid(row.item.value));
     if (!/^Q\d+$/.test(name)) {
       await sleep(1000);
-      for (const row of await sparql(CATEGORY_MEMBERS(`Films shot in ${name}`))) found.add(qid(row.item.value));
+      for (const row of await sparql(CATEGORY_MEMBERS(`Films shot in ${name}`))) if (row.item) found.add(qid(row.item.value));
     }
     for (const id of found) citiesByWork.set(id, (citiesByWork.get(id) ?? new Set()).add(name));
     if (found.size) console.log(`  ${String(found.size).padStart(4)}  ${name}`);
