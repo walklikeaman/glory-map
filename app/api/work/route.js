@@ -245,6 +245,18 @@ export function createWorkProfileHandler({
       }
     }
 
+    // Addressed by our uuid, a failed read leaves nothing true to print: no title, no TMDB
+    // id for stills, and an empty places list that reads as "this work has none". The work
+    // page took that 200 for "not found" and answered 404, which tells a crawler the URL
+    // is gone (QA). A 502 says "come back". A TMDB-keyed profile still answers thin, below:
+    // its poster and stills do not depend on our graph.
+    if (graphFailed && query.workId) {
+      return Response.json(
+        { error: "Could not load this work right now" },
+        { status: 502, headers: noStoreHeaders },
+      );
+    }
+
     // Addressed by uuid, the kind and TMDB id are only known once the row is loaded.
     const stillsKey = {
       kind: query.kind ?? work?.kind ?? null,
@@ -321,6 +333,9 @@ export function createWorkProfileHandler({
       candidates_total: submissions?.total ?? (Array.isArray(submissions) ? submissions.length : 0),
       stills,
       stills_verified: stillsVerified,
+      // True when our own data could not be read, so a caller can tell "no places" from
+      // "places unknown right now".
+      graph_failed: graphFailed,
       // The caption states exactly which of the two cases this is. Promising verified
       // frames when nothing has looked at them would be the same class of mistake as
       // pinning an unmatched frame to a street.
