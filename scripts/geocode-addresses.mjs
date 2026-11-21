@@ -5,9 +5,13 @@
 //   node --env-file=.env.local scripts/geocode-addresses.mjs --source web_research --dry-run
 //   node --env-file=.env.local scripts/geocode-addresses.mjs --source web_research --write
 //   node --env-file=.env.local scripts/geocode-addresses.mjs --source reelstreets --limit 2000 --write
+//   node --env-file=.env.local scripts/geocode-addresses.mjs --source web_research --retry --write
 //
-// Nominatim allows one request a second, so 2,000 rows is about an hour. A row that
-// found nothing is retried on a later run, which is right: OpenStreetMap grows.
+// Nominatim allows one request a second, so 2,000 rows is about an hour. A row that found
+// nothing is marked `geocode_reason = nominatim_tried_<why>` and skipped on later runs:
+// 2026-11-21 the nightly web_research run re-asked 4,771 rows, ~80% of them already
+// refused, and took over two hours. `--retry` asks them again (OpenStreetMap grows;
+// once a month is plenty).
 // The rules are in app/lib/nominatim.mjs.
 
 import process from "node:process";
@@ -24,6 +28,8 @@ const arg = (name, fallback = null) => {
 const SOURCE = arg("source", "web_research");
 const LIMIT = Number(arg("limit", 0)) || 0;
 const WRITE = argv.includes("--write");
+const RETRY = argv.includes("--retry");
+const TRIED = "nominatim_tried_";
 const AGENT = "GloryMapBot/0.1 (+https://github.com/walklikeaman/glory-map; contact via repo issues)";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -62,10 +68,11 @@ async function main() {
   });
   const rows = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from("location_submissions")
+    let query = db.from("location_submissions")
       .select("id, place_name, area_hint")
-      .eq("source_kind", SOURCE).is("lat", null).not("area_hint", "is", null).neq("status", "rejected")
-      .order("id").range(from, from + 999);
+      .eq("source_kind", SOURCE).is("lat", null).not("area_hint", "is", null).neq("status", "rejected");
+    if (!RETRY) query = query.or(`geocode_reason.is.null,geocode_reason.not.like.${TRIED}*`);
+    const { data, error } = await query.order("id").range(from, from + 999);
     if (error) throw new Error(error.message);
     rows.push(...data);
     if (data.length < 1000 || (LIMIT && rows.length >= LIMIT)) break;
@@ -100,6 +107,11 @@ async function main() {
     if (stopped) break;
     if (!placed) {
       totals.refused[why] = (totals.refused[why] ?? 0) + 1;
+      if (WRITE) {
+        const { error } = await db.from("location_submissions")
+          .update({ geocode_reason: `${TRIED}${why}` }).eq("id", row.id).is("lat", null);
+        if (error) throw new Error(`${row.id}: ${error.message}`);
+      }
       continue;
     }
     totals.placed += 1;
