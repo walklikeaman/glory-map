@@ -446,3 +446,33 @@ test("the card is told how many sources back a place", () => {
   assert.equal(placeSummary(place({ evidence_count: 0 })).evidence_count, 0);
   assert.equal(placeSummary(place()).evidence_count, null);
 });
+
+test("a work addressed by our id answers 502 when the graph read fails, not an empty 200", async () => {
+  // The work page read that 200 (title null) as "no such work" and answered 404 (QA).
+  const down = handlerWith({
+    createStore: () => ({ loadWork: async () => { throw new Error("statement timeout"); } }),
+  });
+  const response = await down.handler(request("id=7f0c1e7a-0000-4000-8000-000000000001"));
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+
+  // The row loaded, then its places did not: still nothing true to print.
+  const half = handlerWith({
+    createStore: () => ({
+      loadWork: async () => ({ id: "w1", title: "Skyfall", kind: "film", tmdb_id: "37724" }),
+      loadRatings: async () => [], loadClassifiedImages: async () => [], loadPlaceFrames: async () => [],
+      loadPlaces: async () => { throw new Error("rpc failed"); },
+    }),
+  });
+  assert.equal((await half.handler(request("id=7f0c1e7a-0000-4000-8000-000000000001"))).status, 502);
+});
+
+test("a TMDB-keyed profile says its graph read failed while still answering", async () => {
+  const { handler } = handlerWith({
+    createStore: () => ({ loadWork: async () => { throw new Error("db down"); } }),
+  });
+  const body = await (await handler(request("film=509"))).json();
+  assert.equal(body.graph_failed, true);
+  const healthy = await (await handlerWith({ places: [place()] }).handler(request("film=509"))).json();
+  assert.equal(healthy.graph_failed, false);
+});

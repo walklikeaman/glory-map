@@ -25,6 +25,7 @@ import {
 } from "../../lib/work-card.mjs";
 import { placePath } from "../../lib/place-url.mjs";
 import { workIdFromSlug, workPath } from "../../lib/work-url.mjs";
+import { readRoute } from "../../lib/page-load.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +35,9 @@ async function loadWork(slug) {
   const response = await workRoute(
     new Request(`https://glorymap.local/api/work?id=${encodeURIComponent(id)}`),
   );
-  if (!response.ok) return null;
-  const payload = await response.json();
+  // Only the route's own "missing" is a 404; a failed read throws, and the error boundary
+  // answers 500 so a crawler comes back (see page-load.mjs).
+  const payload = await readRoute(response, "The work page");
   // `/api/work` ALWAYS returns a `work` object — for a work we do not hold it is that
   // object with every field null and `in_graph: false`, because the route is built to
   // still show a poster and links for a film reached live from Wikidata. Keying the page

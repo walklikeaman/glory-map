@@ -16,6 +16,11 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-21] decision | A work page answers 500, not 404, when the database fails
+
+**What**: `/api/work` swallowed a failed graph read and answered 200 with `work.title: null`; the work page took that for "no such work" and answered 404, which tells a crawler the URL is gone. Now a request by our uuid (`id=`) answers **502** (no-store) when any graph read fails, and `/work/<slug>` reads the route through `readRoute` like the city, place and letter pages: the route's own 404 is "not found", anything else throws and the error boundary answers 500. A TMDB-keyed profile (`film=`/`series=`, the live chips) still answers 200 with its poster and stills, now with `graph_failed: true`.
+**Checked (local prod build, live DB)**: Skyfall's page 200; an unknown uuid 404; the same page with a bad service key: API 502, page 500, `film=37724` still 200.
+
 ## [2026-11-20] decision | "What's nearby" answers from our own records first
 
 **What**: the browse list (`/api/locations` without `q`) asked one live Wikidata geo query and nothing else; on 18.11 a new spot took 13–18 s and one answered 504, so the list emptied. Now the route reads `location_submissions` (not rejected, with a point) in the circle's box in parallel, through the `location_submissions_mappable_latlng_idx` index (~0.5 s for 400 rows in central London, which holds ~1,600). Once our rows are in, Wikidata gets 6 s to add to them; without any, it gets its full timeout as before. A Wikidata failure with our rows in hand is a warning, not a 502. Logic in `app/lib/nearby-own.mjs`, tests in `test/nearby-own.test.mjs`.
