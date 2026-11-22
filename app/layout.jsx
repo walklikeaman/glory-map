@@ -5,6 +5,10 @@ import OfflineReady from "./components/OfflineReady.jsx";
 export const metadata = {
   title: "GloryMap",
   description: "Walk through places from your favourite films, series, and books",
+  // "Add to Home Screen" on an iPhone (#114): Safari ignores the manifest's SVG icon and
+  // would take a screenshot of the page instead, so `app/apple-icon.png` (180 px) is the
+  // icon, and these tags open it without Safari's bars, under a dark status bar.
+  appleWebApp: { capable: true, title: "GloryMap", statusBarStyle: "black-translucent" },
 };
 
 // viewport-fit=cover is what makes env(safe-area-inset-*) resolve to anything on a

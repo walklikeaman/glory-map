@@ -16,6 +16,12 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-22] update | Small screens, a phone on its side, tablets, and "Add to Home Screen" (#114)
+
+**What**: the touch audit (`pointer: coarse`, every visible control, horizontal overflow, controls past the edge) at 320×568, 360×740, 844×390, 768×1024 and 1024×768. No overflow anywhere, but **44 controls under 44 px**, summed over the five sizes: Filters and My movies (34), the Works/Places tabs (34), the "Known for" rows (28), a film chip's "About" button (26), "Plan a walk" (42). They were all added after the 44 px rule of 04.10 and restyled later in `globals.css`, so the rule lost on order. A new coarse-pointer block at the end of the file restates them; after it, 0. On a phone on its side, "What the pins mean" sat on the layers button: in a window under 500 px tall it moves one column left and the map buttons close up so the last one clears the collapsed sheet.
+**Install**: Chromium already called the app installable (`Page.getInstallabilityErrors` empty, the service worker registered). iPhone Safari ignores an SVG manifest icon, so `app/apple-icon.png` (180 px, rendered from `icon.svg` without the rounded corners, which iOS adds itself) and `appleWebApp` metadata (standalone, black-translucent status bar) were added.
+**Rule worth keeping**: a 44 px touch rule must come last in the stylesheet or be restated, because any later `.x .y { min-height: 34px }` beats it. `test/small-screens.test.mjs` checks the order.
+
 ## [2026-11-21] decision | A work page answers 500, not 404, when the database fails
 
 **What**: `/api/work` swallowed a failed graph read and answered 200 with `work.title: null`; the work page took that for "no such work" and answered 404, which tells a crawler the URL is gone. Now a request by our uuid (`id=`) answers **502** (no-store) when any graph read fails, and `/work/<slug>` reads the route through `readRoute` like the city, place and letter pages: the route's own 404 is "not found", anything else throws and the error boundary answers 500. A TMDB-keyed profile (`film=`/`series=`, the live chips) still answers 200 with its poster and stills, now with `graph_failed: true`.
