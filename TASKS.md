@@ -53,14 +53,14 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [x] #92 Open Library reading-log CSV, as a books source beside Goodreads (2026-11-16)
 - [ ] #92 connectors left: Trakt live sign-in (needs a Trakt OAuth app; its JSON export already works through "Other list"), Kinopoisk (no export or public API), Last.fm (music, unclear fit)
 - [ ] #95 growth: budgeted web search + GeoCLIP grounding. Web search runs nightly (data routine); GeoCLIP is blocked in the cloud (huggingface.co answers 403), so it needs the allowlist or a Mac run
-- [ ] #47 Wikipedia-prose enrichment (spike)
+- [x] #47 Wikipedia-prose enrichment: shipped 2026-08-01 (`scripts/enrich-from-wikipedia.mjs`, source kind `wikipedia`, ~7.4k rows; Hebrew read 07.11). Line was stale, closed 23.11
 - [x] Recreate 2.0 #51: outline ghost (Sobel edges on the device), Photo/Outlines switch, thirds grid with a horizon line (2026-11-17)
 - [x] Recreate 2.0 #52: compass guide to the pin (GPS + compass arrow, distance and map direction without a compass, "You're at the spot") (2026-11-18)
 - [x] Recreate 2.0 #53: "Coach me" in the live camera, one Opus 5.5 call per tap (pan + distance + tilt, read aloud on the device), signed-in only, 15 a day per account, 60 a day per server (2026-11-19)
 - [ ] Recreate 2.0: #52 rest, the camera direction and tilt at the spot (needs recreations to save heading + tilt first); #54 OG image for a shared shot (needs a public page for a visitor shot)
 - [ ] #53 rest: a persistent coach counter (in-memory caps reset per server instance; a table needs a prod migration)
 - [x] #114 rest (22.11): measured at 320, 360, 844×390, 768 and 1024 with the touch audit; 44 small controls (summed over the five sizes) → 0, the pin key no longer covers the layers button on its side, iPhone home-screen icon + standalone tags; Chromium reports the app installable. Still device-only: sheet swipe, soft keyboard, notch
-- [ ] #65 streaming narration, #70 offline tours
+- [ ] #65 streaming narration; #70 rest: narration audio kept with the walk (needs the stop texts known ahead and the TTS cache). Done 23.11: the walk's tiles in their own never-trimmed cache, real size on the card, "Remove offline copy", kept across reloads
 
 ## QA findings (routine check, 2026-11-03)
 

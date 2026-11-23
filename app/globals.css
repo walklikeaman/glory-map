@@ -5540,6 +5540,17 @@ figcaption a {
   font-size: 0.74rem;
   color: rgba(236, 232, 225, 0.62);
 }
+.kept-offline { flex-wrap: wrap; }
+/* The reader decides what this phone keeps (#70): a quiet link-weight button. */
+.kept-offline-remove {
+  padding: 0 0.2rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 /* Wide enough for a map beside the panel, too short or too narrow for the desktop
    layout: a tablet held upright, a phone on its side (#114). The bottom sheet rose to
@@ -6400,7 +6411,8 @@ figcaption a {
   .panel-toolbar .account-button,
   .results-tab,
   .notable-here .notable-row,
-  .plan-summary .ghost-button { min-height: 44px; }
+  .plan-summary .ghost-button,
+  .kept-offline-remove { min-height: 44px; }
   .notable-here .notable-row { align-items: center; }
   .film-chip-open { width: 44px; height: 44px; top: 0; right: 0; }
   /* The bigger corner button would sit on a long title; the title stops short of it. */

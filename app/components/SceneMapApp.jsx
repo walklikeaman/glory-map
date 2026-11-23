@@ -139,7 +139,9 @@ import {
   sortWorks,
 } from "../lib/library-view.mjs";
 import { describedFilms } from "../lib/place-note.mjs";
-import { keepTheWalk } from "../lib/keep-the-walk.mjs";
+import {
+  bytesLabel, forgetTheWalk, keepTheWalk, keptWalkSummary, openWalkCache, rememberKeptWalk,
+} from "../lib/keep-the-walk.mjs";
 import { corridorSizeLabel } from "../lib/tile-corridor.mjs";
 import { clearWalk, freezeWalk, loadWalk, saveWalk, walkAgeLabel } from "../lib/walk-store.mjs";
 import { getSupabaseBrowserClient } from "../lib/supabase-browser.mjs";
@@ -1857,6 +1859,14 @@ export default function SceneMapApp() {
   // fresh online session would be the product deciding where somebody is — `?city=london`
   // means London even if the last route was in Lisbon. Offline there is no other answer
   // available, and the frozen walk beats an empty map.
+  // A walk kept on an earlier visit still says so, with its size and a way to remove it.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof caches === "undefined") return;
+    keptWalkSummary(caches, window.localStorage)
+      .then((summary) => { if (summary) setKeptTiles((current) => current ?? summary); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined" || navigator.onLine !== false) return;
     const walk = loadWalk(window.localStorage);
@@ -2941,11 +2951,28 @@ export default function SceneMapApp() {
     }
 
     setKeptTiles({ working: true });
-    keepTheWalk(mapApi, positions)
-      .then((result) => setKeptTiles(result))
+    // Into the walk's own cache when the browser has one (#70), so panning the map before
+    // the walk cannot evict it; through the service worker's tile cache otherwise.
+    const cacheStorage = typeof caches === "undefined" ? null : caches;
+    (cacheStorage ? openWalkCache(cacheStorage).catch(() => null) : Promise.resolve(null))
+      .then((cache) => keepTheWalk(mapApi, positions, { cache }))
+      .then((result) => {
+        rememberKeptWalk(window.localStorage, result);
+        setKeptTiles(result);
+      })
       // A prefetch that fails costs nothing that was not already lost: the walk asks for
       // those tiles on the day, exactly as it did before this existed.
-      .catch(() => setKeptTiles({ kept: 0, failed: 0, reason: "unavailable" }));
+      .catch(() => {
+        rememberKeptWalk(window.localStorage, null);
+        setKeptTiles({ kept: 0, failed: 0, reason: "unavailable" });
+      });
+  }
+
+  // "Remove offline copy" (#70): the reader decides what this phone keeps.
+  function forgetKeptWalk() {
+    forgetTheWalk(typeof caches === "undefined" ? null : caches, window.localStorage)
+      .catch(() => {})
+      .finally(() => setKeptTiles({ removed: true }));
   }
 
   // Hand the walk to the reader's own maps app (#191): a GPX file for anything that
@@ -3596,13 +3623,21 @@ export default function SceneMapApp() {
           {keptTiles.skipped === "save_data" && <span>Data saver is on, so the map was not kept for offline.</span>}
           {keptTiles.reason === "no_tile_source" && <span>This basemap cannot be kept offline.</span>}
           {keptTiles.reason === "unavailable" && <span>Could not keep the map for offline; the walk still works online.</span>}
+          {keptTiles.removed && <span>Offline copy removed. Build the route again to keep it.</span>}
           {keptTiles.reason === null && (
-            <span>
-              {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
-              {" "}({corridorSizeLabel(keptTiles.kept)}) for this walk
-              {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched`}
-              {keptTiles.truncated && " — the route is long, so the start is kept"}
-            </span>
+            <>
+              <span>
+                {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
+                {" "}({bytesLabel(keptTiles.bytes) || corridorSizeLabel(keptTiles.kept)}) for this walk
+                {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched, so those squares need a signal`}
+                {keptTiles.truncated && " — the route is long, so the start is kept"}
+              </span>
+              {keptTiles.kept > 0 && (
+                <button type="button" className="kept-offline-remove" onClick={forgetKeptWalk}>
+                  Remove offline copy
+                </button>
+              )}
+            </>
           )}
         </p>
       )}

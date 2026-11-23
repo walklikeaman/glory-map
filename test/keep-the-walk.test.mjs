@@ -74,3 +74,86 @@ test("a style with no tile source, and a route that is not one, both say why", a
   const short = await keepTheWalk(map, [[51.5, -0.1]], { fetchImpl: async () => ({ ok: true }) });
   assert.equal(short.reason, "no_route");
 });
+
+// ---------- the walk's own copy (#70) ----------
+
+import { readFileSync } from "node:fs";
+import {
+  bytesLabel, forgetTheWalk, keptWalkSummary, openWalkCache, rememberKeptWalk, WALK_CACHE, WALK_META_KEY,
+} from "../app/lib/keep-the-walk.mjs";
+
+function fakeCaches() {
+  const stores = new Map();
+  return {
+    stores,
+    async open(name) {
+      if (!stores.has(name)) stores.set(name, new Map());
+      const store = stores.get(name);
+      return { put: async (url, response) => { store.set(url, response); } };
+    },
+    async delete(name) { return stores.delete(name); },
+    async has(name) { return stores.has(name); },
+  };
+}
+
+function memoryStorage() {
+  const data = new Map();
+  return {
+    getItem: (key) => (data.has(key) ? data.get(key) : null),
+    setItem: (key, value) => data.set(key, String(value)),
+    removeItem: (key) => data.delete(key),
+  };
+}
+
+test("a kept walk is written into its own cache, with its real size", async () => {
+  const cacheStorage = fakeCaches();
+  const map = mapWith({ sources: { v: { type: "vector", tiles: ["https://x/{z}/{x}/{y}.pbf"] } } });
+  const cache = await openWalkCache(cacheStorage);
+  const result = await keepTheWalk(map, WALK, {
+    cache,
+    fetchImpl: async () => new Response(new Uint8Array(1000)),
+  });
+  assert.equal(cacheStorage.stores.get(WALK_CACHE).size, result.kept);
+  assert.equal(result.bytes, result.kept * 1000);
+});
+
+test("a new walk replaces the old one, and removing it forgets both cache and summary", async () => {
+  const cacheStorage = fakeCaches();
+  const storage = memoryStorage();
+  (await openWalkCache(cacheStorage)).put("https://x/old", new Response("old"));
+  await openWalkCache(cacheStorage);
+  assert.equal(cacheStorage.stores.get(WALK_CACHE).size, 0);
+
+  rememberKeptWalk(storage, { kept: 12, failed: 1, bytes: 300_000, truncated: false, reason: null });
+  assert.deepEqual(await keptWalkSummary(cacheStorage, storage), { kept: 12, failed: 1, bytes: 300_000, truncated: false, reason: null });
+
+  await forgetTheWalk(cacheStorage, storage);
+  assert.equal(storage.getItem(WALK_META_KEY), null);
+  assert.equal(await keptWalkSummary(cacheStorage, storage), null);
+});
+
+test("a summary whose cache the browser cleared is not reported as kept", async () => {
+  const storage = memoryStorage();
+  rememberKeptWalk(storage, { kept: 3, failed: 0, bytes: 9000, truncated: false, reason: null });
+  assert.equal(await keptWalkSummary(fakeCaches(), storage), null);
+  // A new keep that stored nothing drops the old walk's summary: its cache is gone too.
+  rememberKeptWalk(storage, { kept: 0, failed: 4, bytes: 0, reason: null });
+  assert.equal(storage.getItem(WALK_META_KEY), null);
+  rememberKeptWalk(storage, { kept: 3, failed: 0, bytes: 9000, truncated: false, reason: null });
+  rememberKeptWalk(storage, { kept: 0, failed: 0, reason: "no_tile_source" });
+  assert.equal(storage.getItem(WALK_META_KEY), null);
+});
+
+test("sizes read as kB and MB", () => {
+  assert.equal(bytesLabel(0), "");
+  assert.equal(bytesLabel(300), "1 kB");
+  assert.equal(bytesLabel(250_000), "244 kB");
+  assert.equal(bytesLabel(3 * 1024 * 1024), "3.0 MB");
+});
+
+test("the service worker reads the same walk cache the page writes", () => {
+  const worker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+  assert.ok(worker.includes(`const WALK = "${WALK_CACHE}";`));
+  assert.match(worker, /new Set\(\[[^\]]*WALK\]\)/);
+  assert.match(worker, /caches\.match\(request, \{ cacheName: WALK \}\)/);
+});

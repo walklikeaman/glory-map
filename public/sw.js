@@ -33,6 +33,10 @@ const SHELL = `glorymap-shell-${VERSION}`;
 const STATIC = `glorymap-static-${VERSION}`;
 const TILES = `glorymap-tiles-${VERSION}`;
 const API = `glorymap-api-${VERSION}`;
+// A kept walk's tiles (#70), written by the page (app/lib/keep-the-walk.mjs WALK_CACHE) and
+// never trimmed here: the capped tile cache below used to evict them during an afternoon
+// of panning before the walk began.
+const WALK = "glorymap-walk-v1";
 
 // Roughly a walking afternoon: MapLibre holds ~40 tiles for one screen, and a route walked
 // across a city at z14–16 touches a few hundred. Beyond that the oldest go, because a cache
@@ -54,7 +58,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
-    const keep = new Set([SHELL, STATIC, TILES, API]);
+    const keep = new Set([SHELL, STATIC, TILES, API, WALK]);
     for (const name of await caches.keys()) {
       if (name.startsWith("glorymap-") && !keep.has(name)) await caches.delete(name);
     }
@@ -129,7 +133,10 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (TILE_HOSTS.has(url.hostname)) {
-    event.respondWith(cacheFirst(request, TILES, TILE_LIMIT));
+    event.respondWith((async () => {
+      const kept = await caches.match(request, { cacheName: WALK });
+      return kept ?? cacheFirst(request, TILES, TILE_LIMIT);
+    })());
     return;
   }
 
