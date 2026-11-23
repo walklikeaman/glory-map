@@ -16,6 +16,13 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-23] update | A kept walk has its own cache, a real size and a remove button (#70)
+
+**What**: since #161 a built route fetched its corridor tiles once, through the service worker into the shared tile cache. That cache is capped at 500 and trims oldest-first, so an afternoon of panning before the walk could evict the walk itself. Now the page writes the corridor into `glorymap-walk-v1` (Cache API, never trimmed, one walk at a time: a new walk replaces it), the service worker reads that cache first for tile hosts, and the card shows the bytes actually stored instead of an estimate, with **Remove offline copy**. The summary lives in localStorage (`glorymap.walk-offline`) and is shown after a reload only while the cache still exists.
+**Checked**: Playwright at 1440 and 390 with a mocked vector source and route: 21 and 6 tiles kept (42 kB / 12 kB), the same after a reload, gone after Remove (cache deleted). With the service worker live and the context offline, a tile put in the walk cache came back 200 from it.
+**Still open in #70**: the narration audio. A stop's telling is fetched at the stop (`/api/narration` is a POST keyed by text), so keeping it needs the texts decided when the route is built.
+**Also**: #47 (Wikipedia prose) was shipped 01.08; its TASKS line was stale and is closed.
+
 ## [2026-11-22] update | Small screens, a phone on its side, tablets, and "Add to Home Screen" (#114)
 
 **What**: the touch audit (`pointer: coarse`, every visible control, horizontal overflow, controls past the edge) at 320×568, 360×740, 844×390, 768×1024 and 1024×768. No overflow anywhere, but **44 controls under 44 px**, summed over the five sizes: Filters and My movies (34), the Works/Places tabs (34), the "Known for" rows (28), a film chip's "About" button (26), "Plan a walk" (42). They were all added after the 44 px rule of 04.10 and restyled later in `globals.css`, so the rule lost on order. A new coarse-pointer block at the end of the file restates them; after it, 0. On a phone on its side, "What the pins mean" sat on the layers button: in a window under 500 px tall it moves one column left and the map buttons close up so the last one clears the collapsed sheet.

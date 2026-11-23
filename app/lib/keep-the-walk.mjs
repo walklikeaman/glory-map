@@ -37,29 +37,40 @@ export function tileTemplates(map) {
 // Fetch politely: four at a time, and never let one failure stop the rest. A tile that does
 // not arrive is a tile the walk will ask for again on the day — which is exactly what
 // happened before this existed, so a failure here costs nothing that was not already lost.
-async function fetchAll(urls, { fetchImpl = fetch, concurrency = 4 } = {}) {
+//
+// With a `cache`, each tile is written into it and its bytes counted (#70): the walk's own
+// copy, which the service worker's capped tile cache can no longer evict, and a real size
+// for the card instead of an estimate.
+async function fetchAll(urls, { fetchImpl = fetch, concurrency = 4, cache = null } = {}) {
   let kept = 0;
   let failed = 0;
+  let bytes = 0;
 
   for (let index = 0; index < urls.length; index += concurrency) {
     const batch = urls.slice(index, index + concurrency);
     const results = await Promise.all(batch.map(async (url) => {
       try {
         const response = await fetchImpl(url, { mode: "cors", credentials: "omit" });
-        return response.ok;
+        if (!response.ok) return { ok: false, size: 0 };
+        if (!cache) return { ok: true, size: 0 };
+        const body = await response.clone().arrayBuffer();
+        await cache.put(url, response);
+        return { ok: true, size: body.byteLength };
       } catch {
-        return false;
+        return { ok: false, size: 0 };
       }
     }));
-    for (const ok of results) { if (ok) kept += 1; else failed += 1; }
+    for (const { ok, size } of results) {
+      if (ok) { kept += 1; bytes += size; } else failed += 1;
+    }
   }
 
-  return { kept, failed };
+  return { kept, failed, bytes };
 }
 
 // Keep the tiles along one route. Returns what happened, in numbers the UI can say out loud
 // — a prefetch that reports nothing is indistinguishable from one that did nothing.
-export async function keepTheWalk(map, positions, { fetchImpl, ...options } = {}) {
+export async function keepTheWalk(map, positions, { fetchImpl, cache = null, ...options } = {}) {
   const templates = tileTemplates(map);
   if (templates.length === 0) return { kept: 0, failed: 0, tiles: 0, truncated: false, reason: "no_tile_source" };
 
@@ -74,6 +85,60 @@ export async function keepTheWalk(map, positions, { fetchImpl, ...options } = {}
     }
   }
 
-  const { kept, failed } = await fetchAll(urls, { fetchImpl });
-  return { kept, failed, tiles: tiles.length, wanted, truncated, reason: null };
+  const { kept, failed, bytes } = await fetchAll(urls, { fetchImpl, cache });
+  return { kept, failed, bytes, tiles: tiles.length, wanted, truncated, reason: null };
+}
+
+// ---------- the walk's own copy (#70) ----------
+//
+// One walk at a time, in its own cache. The service worker's tile cache is capped at 500
+// and trims oldest-first, so a kept walk used to be evicted by an afternoon of panning
+// around the map before the walk began. This cache is never trimmed; it is replaced when a
+// new walk is kept and emptied when the reader says so. The name is repeated in
+// public/sw.js, which reads it first for tiles; a test holds the two together.
+export const WALK_CACHE = "glorymap-walk-v1";
+export const WALK_META_KEY = "glorymap.walk-offline";
+
+// A fresh, empty cache for a new walk: the old walk's tiles go first, or two walks would
+// share the space and neither card could say how much it holds.
+export async function openWalkCache(cacheStorage) {
+  if (!cacheStorage?.open) return null;
+  await cacheStorage.delete(WALK_CACHE);
+  return cacheStorage.open(WALK_CACHE);
+}
+
+export async function forgetTheWalk(cacheStorage, storage) {
+  try { storage?.removeItem(WALK_META_KEY); } catch { /* private mode */ }
+  return cacheStorage?.delete ? cacheStorage.delete(WALK_CACHE) : false;
+}
+
+// What the card says about a kept walk, read back after a reload. Only when the cache is
+// still there: a browser that cleared it under storage pressure must not be described as
+// holding a walk it no longer has.
+export async function keptWalkSummary(cacheStorage, storage) {
+  let meta = null;
+  try { meta = JSON.parse(storage?.getItem(WALK_META_KEY) ?? "null"); } catch { meta = null; }
+  if (!meta || !Number.isFinite(meta.kept)) return null;
+  if (!cacheStorage?.has || !(await cacheStorage.has(WALK_CACHE))) return null;
+  return { ...meta, reason: null };
+}
+
+// The previous walk's cache is already gone by the time this runs (openWalkCache), so a
+// keep that stored nothing must drop the old summary too, or a reload would describe the
+// old walk over an empty cache.
+export function rememberKeptWalk(storage, result) {
+  try {
+    if (!result || result.reason !== null || !(result.kept > 0)) {
+      storage?.removeItem(WALK_META_KEY);
+      return;
+    }
+    const { kept, failed, bytes, truncated } = result;
+    storage?.setItem(WALK_META_KEY, JSON.stringify({ kept, failed, bytes, truncated }));
+  } catch { /* private mode: the card just won't remember it */ }
+}
+
+export function bytesLabel(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} kB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
