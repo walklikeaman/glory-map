@@ -14,6 +14,7 @@ import { SHOTS_BUCKET, SHOTS_PER_USER_DAY, validateShotRequest, visibleShots } f
 import {
   dailyLimitFrom, dailyLimitReached, moderateShot, startOfUtcDay, statusForVerdict,
 } from "../../lib/shot-moderation.mjs";
+import { shotIdFromParam, shotPageModel } from "../../lib/shot-page.mjs";
 
 export const runtime = "nodejs";
 
@@ -65,6 +66,17 @@ export function defaultShotsStore(env = process.env) {
       if (error) throw new Error(`shot list failed: ${error.message}`);
       return data ?? [];
     },
+    // One shot for its public page: approved only, so a held-back photo has no page.
+    async getApprovedShot(id) {
+      const { data, error } = await service
+        .from("place_shots")
+        .select("id, kind, caption, reference_url, status, storage_path, place_name, created_at")
+        .eq("id", id)
+        .eq("status", "approved")
+        .maybeSingle();
+      if (error) throw new Error(`shot read failed: ${error.message}`);
+      return data ?? null;
+    },
     async signUrls(paths) {
       if (!paths.length) return {};
       const { data, error } = await service.storage.from(SHOTS_BUCKET).createSignedUrls(paths, SIGNED_URL_SECONDS);
@@ -101,6 +113,21 @@ export function defaultShotsStore(env = process.env) {
       return count ?? 0;
     },
   };
+}
+
+// The shot behind /shot/<id>, with a signed URL for its photo. null when there is nothing
+// to show (unknown id, not approved, shots not configured); throws when the read fails,
+// so the page answers 500 instead of a 404 that says the shot is gone.
+export async function loadSharedShot(id, { store = defaultShotsStore() } = {}) {
+  const shotId = shotIdFromParam(id);
+  if (!shotId || !store?.getApprovedShot) return null;
+  const model = shotPageModel(await store.getApprovedShot(shotId));
+  if (!model) return null;
+  const urls = await store.signUrls([model.storagePath]);
+  const url = urls[model.storagePath];
+  if (!url) throw new Error("shot url could not be signed");
+  const { storagePath, ...shot } = model;
+  return { ...shot, url };
 }
 
 export function createShotsHandlers({

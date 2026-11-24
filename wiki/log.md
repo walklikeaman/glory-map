@@ -16,6 +16,14 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-24] update | A visitor's shot has its own link and preview card (#54)
+
+- `/shot/<id>` is a server-rendered page for one **approved** shot; pending, rejected and unknown ids answer 404, so a link cannot reveal a held-back photo. A failed read answers 500 (same rule as the work page, 21.11).
+- `opengraph-image.jsx` beside it draws a 1200×630 card: the photo, or the film frame and the photo side by side for a recreation. The frame is fetched only from `image.tmdb.org`; a reference URL is a reader's text and the server must not fetch whatever was typed.
+- The place card's approved shots get "Share": the share sheet on a phone, the clipboard elsewhere.
+- No migration: `place_shots` already held everything. Production has 0 shots so far, so the check ran against a stand-in Supabase on localhost (`docs/media/shot-page/`).
+- Lib: `app/lib/shot-page.mjs`; loader `loadSharedShot` in `app/api/shots/route.js`. Tests: `test/shot-page.test.mjs`.
+
 ## [2026-11-23] update | A kept walk has its own cache, a real size and a remove button (#70)
 
 **What**: since #161 a built route fetched its corridor tiles once, through the service worker into the shared tile cache. That cache is capped at 500 and trims oldest-first, so an afternoon of panning before the walk could evict the walk itself. Now the page writes the corridor into `glorymap-walk-v1` (Cache API, never trimmed, one walk at a time: a new walk replaces it), the service worker reads that cache first for tile hosts, and the card shows the bytes actually stored instead of an estimate, with **Remove offline copy**. The summary lives in localStorage (`glorymap.walk-offline`) and is shown after a reload only while the cache still exists.
