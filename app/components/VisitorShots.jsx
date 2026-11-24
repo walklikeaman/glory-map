@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Camera, Clapperboard } from "lucide-react";
+import { Camera, Clapperboard, Share2 } from "lucide-react";
 
 import { getSupabaseBrowserClient } from "../lib/supabase-browser.mjs";
+import { shotPath } from "../lib/shot-page.mjs";
 import { SHOT_MAX_BYTES, SHOT_MIME, SHOTS_BUCKET, fitWithin, shotPathFor, shotStatusLabel } from "../lib/place-shots.mjs";
 
 async function accessToken() {
@@ -72,11 +73,34 @@ export function shareResultMessage(shot) {
   return "Saved. Only you can see it until the check is done.";
 }
 
+// A shared shot's own page, through the share sheet on a phone and the clipboard
+// elsewhere. Says what happened, for the line under the shot.
+async function shareShotLink(shot) {
+  const path = shotPath(shot.id);
+  if (!path) return null;
+  const url = new URL(path, window.location.origin).toString();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "A shot on GloryMap", url });
+      return null;
+    } catch (error) {
+      if (error?.name === "AbortError") return null;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    return "Link copied";
+  } catch {
+    return url;
+  }
+}
+
 // The strip of visitors' shots on a place card. Each one can be recreated in turn.
 // It renders nothing at all when shots are not configured, so a deployment without the
 // table looks exactly as it did.
 export function VisitorShots({ placeKey, signedIn, refreshKey = 0, onRecreate, onAdd }) {
   const [state, setState] = useState({ placeKey: null, shots: [], available: false });
+  const [shareNote, setShareNote] = useState({ id: null, text: null });
 
   useEffect(() => {
     if (!placeKey) return undefined;
@@ -127,6 +151,19 @@ export function VisitorShots({ placeKey, signedIn, refreshKey = 0, onRecreate, o
                   <Clapperboard size={14} aria-hidden="true" />
                   Recreate
                 </button>
+                {shot.status === "approved" && (
+                  <button
+                    className="visitor-shot-recreate visitor-shot-share"
+                    onClick={async () => setShareNote({ id: shot.id, text: await shareShotLink(shot) })}
+                    type="button"
+                  >
+                    <Share2 size={14} aria-hidden="true" />
+                    Share
+                  </button>
+                )}
+                {shareNote.id === shot.id && shareNote.text && (
+                  <span className="visitor-shot-status" role="status">{shareNote.text}</span>
+                )}
               </figcaption>
             </figure>
           ))}
