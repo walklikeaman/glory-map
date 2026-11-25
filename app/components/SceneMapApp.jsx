@@ -140,8 +140,9 @@ import {
 } from "../lib/library-view.mjs";
 import { describedFilms } from "../lib/place-note.mjs";
 import {
-  bytesLabel, forgetTheWalk, keepTheWalk, keptWalkSummary, openWalkCache, rememberKeptWalk,
+  bytesLabel, forgetTheWalk, keepTheWalk, keepWalkAudio, keptWalkSummary, openWalkCache, rememberKeptWalk,
 } from "../lib/keep-the-walk.mjs";
+import { trailStopText } from "../lib/ambient-walk.mjs";
 import { corridorSizeLabel } from "../lib/tile-corridor.mjs";
 import { clearWalk, freezeWalk, loadWalk, saveWalk, walkAgeLabel } from "../lib/walk-store.mjs";
 import { getSupabaseBrowserClient } from "../lib/supabase-browser.mjs";
@@ -2955,7 +2956,15 @@ export default function SceneMapApp() {
     // the walk cannot evict it; through the service worker's tile cache otherwise.
     const cacheStorage = typeof caches === "undefined" ? null : caches;
     (cacheStorage ? openWalkCache(cacheStorage).catch(() => null) : Promise.resolve(null))
-      .then((cache) => keepTheWalk(mapApi, positions, { cache }))
+      .then(async (cache) => {
+        const tiles = await keepTheWalk(mapApi, positions, { cache });
+        // The stops' spoken sentences go into the same cache (#70 rest), so the walk can be
+        // heard where it has no signal. Only with tiles kept: a summary of clips over a map
+        // that was not kept would describe an offline walk that does not exist.
+        if (!cache || tiles.reason !== null || !(tiles.kept > 0)) return tiles;
+        const audio = await keepWalkAudio(walkStops.map(trailStopText), { cache });
+        return { ...tiles, clips: audio.clips, clipsFailed: audio.clipsFailed, bytes: (tiles.bytes ?? 0) + audio.audioBytes };
+      })
       .then((result) => {
         rememberKeptWalk(window.localStorage, result);
         setKeptTiles(result);
@@ -3627,7 +3636,8 @@ export default function SceneMapApp() {
           {keptTiles.reason === null && (
             <>
               <span>
-                {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"} kept
+                {keptTiles.kept} map {keptTiles.kept === 1 ? "tile" : "tiles"}
+                {keptTiles.clips > 0 && ` and ${keptTiles.clips} spoken ${keptTiles.clips === 1 ? "stop" : "stops"}`} kept
                 {" "}({bytesLabel(keptTiles.bytes) || corridorSizeLabel(keptTiles.kept)}) for this walk
                 {keptTiles.failed > 0 && `, ${keptTiles.failed} could not be fetched, so those squares need a signal`}
                 {keptTiles.truncated && " — the route is long, so the start is kept"}

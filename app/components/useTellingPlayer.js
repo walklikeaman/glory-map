@@ -18,6 +18,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { keptWalkClip } from "../lib/keep-the-walk.mjs";
+
 const SILENCE = "/silence.mp3";
 
 export default function useTellingPlayer({ gapMs = 0 } = {}) {
@@ -58,14 +60,19 @@ export default function useTellingPlayer({ gapMs = 0 } = {}) {
     try {
       const spoken = text ?? (resolveText ? await resolveText(controller.signal) : null);
       if (!spoken) { finish(); return; }
-      const response = await fetch("/api/narration", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: spoken, profileId: "neutral" }),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`narration ${response.status}`);
-      const blob = await response.blob();
+      // A walk kept for offline holds its stops' clips (#70): played from the phone, with
+      // or without a signal, and the server is not asked again.
+      let blob = await keptWalkClip(typeof caches === "undefined" ? null : caches, spoken);
+      if (!blob) {
+        const response = await fetch("/api/narration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: spoken, profileId: "neutral" }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`narration ${response.status}`);
+        blob = await response.blob();
+      }
       const audio = audioRef.current;
       if (!audio || controller.signal.aborted) return;
       releaseClip();

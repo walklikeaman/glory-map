@@ -132,8 +132,8 @@ export function rememberKeptWalk(storage, result) {
       storage?.removeItem(WALK_META_KEY);
       return;
     }
-    const { kept, failed, bytes, truncated } = result;
-    storage?.setItem(WALK_META_KEY, JSON.stringify({ kept, failed, bytes, truncated }));
+    const { kept, failed, bytes, truncated, clips = 0 } = result;
+    storage?.setItem(WALK_META_KEY, JSON.stringify({ kept, failed, bytes, truncated, clips }));
   } catch { /* private mode: the card just won't remember it */ }
 }
 
@@ -141,4 +141,63 @@ export function bytesLabel(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "";
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} kB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// The walk's spoken stops, kept beside its tiles (#70 rest). What the trail says on
+// arrival is known before the walk starts (`trailStopText`), so its audio can be fetched
+// while there is a signal and played from the phone where there is none.
+//
+// /api/narration is a POST, which the Cache API cannot key on, so each clip is stored
+// under a made-up GET address of its own text. Nothing ever requests that address over
+// the network; the player looks it up in the walk's cache before asking the server.
+export const WALK_AUDIO_LIMIT = 12;
+export const WALK_AUDIO_PROFILE = "neutral";
+
+export function walkAudioUrl(text, profileId = WALK_AUDIO_PROFILE) {
+  const spoken = typeof text === "string" ? text.trim() : "";
+  if (!spoken) return null;
+  return `/walk-audio/${encodeURIComponent(profileId)}?t=${encodeURIComponent(spoken)}`;
+}
+
+// One request per stop, in turn: a dozen short clips, and the server caches each by text,
+// so a walk kept twice costs nothing the second time. A stop that fails is counted and
+// left to the network on the day, exactly as before.
+export async function keepWalkAudio(texts, {
+  cache, fetchImpl = fetch, profileId = WALK_AUDIO_PROFILE, limit = WALK_AUDIO_LIMIT,
+} = {}) {
+  const unique = [...new Set((Array.isArray(texts) ? texts : [])
+    .map((text) => (typeof text === "string" ? text.trim() : ""))
+    .filter(Boolean))];
+  const result = { clips: 0, clipsFailed: 0, audioBytes: 0, clipsTruncated: unique.length > limit };
+  if (!cache?.put) return result;
+  for (const text of unique.slice(0, limit)) {
+    try {
+      const response = await fetchImpl("/api/narration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, profileId }),
+      });
+      if (!response.ok) throw new Error(`narration ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("empty clip");
+      await cache.put(walkAudioUrl(text, profileId), new Response(blob, { headers: { "Content-Type": "audio/mpeg" } }));
+      result.clips += 1;
+      result.audioBytes += blob.size;
+    } catch {
+      result.clipsFailed += 1;
+    }
+  }
+  return result;
+}
+
+// A kept clip for this text, or null. Never throws: a missing cache is just a miss.
+export async function keptWalkClip(cacheStorage, text, profileId = WALK_AUDIO_PROFILE) {
+  const url = walkAudioUrl(text, profileId);
+  if (!url || !cacheStorage?.match) return null;
+  try {
+    const hit = await cacheStorage.match(url, { cacheName: WALK_CACHE });
+    return hit ? await hit.blob() : null;
+  } catch {
+    return null;
+  }
 }
