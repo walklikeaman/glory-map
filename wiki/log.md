@@ -16,6 +16,14 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-25] update | A kept walk can be heard offline: its spoken stops travel with it (#70)
+
+- What a trail says on arrival is known ahead (`trailStopText(stop)`), so when a route is built and its tiles are kept, the same keep fetches each stop's clip from `/api/narration` (up to 12, one at a time) and stores it in the walk cache `glorymap-walk-v1`.
+- The Cache API cannot key a POST, so each clip lives under a made-up GET address, `/walk-audio/neutral?t=<encoded text>`. Nothing requests it over the network; `useTellingPlayer` calls `keptWalkClip()` before it asks the server, so a kept stop plays with no signal and costs nothing a second time.
+- Clips are kept only when the tiles were: a summary of clips over a map that was not kept would describe an offline walk that does not exist. "Remove offline copy" drops both, as it is one cache.
+- Not kept: the "Listen as I walk" tellings. They come from the live nearby feed, so their words are not known before the walk.
+- Cost: each keep can be up to 12 TTS calls, but the server caches clips by text in Supabase, so only the first keep of a stop is paid for. Checked with Playwright at 1440 and 390 px (`docs/media/walk-audio/`).
+
 ## [2026-11-24] update | A visitor's shot has its own link and preview card (#54)
 
 - `/shot/<id>` is a server-rendered page for one **approved** shot; pending, rejected and unknown ids answer 404, so a link cannot reveal a held-back photo. A failed read answers 500 (same rule as the work page, 21.11).

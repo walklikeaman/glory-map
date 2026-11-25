@@ -124,8 +124,8 @@ test("a new walk replaces the old one, and removing it forgets both cache and su
   await openWalkCache(cacheStorage);
   assert.equal(cacheStorage.stores.get(WALK_CACHE).size, 0);
 
-  rememberKeptWalk(storage, { kept: 12, failed: 1, bytes: 300_000, truncated: false, reason: null });
-  assert.deepEqual(await keptWalkSummary(cacheStorage, storage), { kept: 12, failed: 1, bytes: 300_000, truncated: false, reason: null });
+  rememberKeptWalk(storage, { kept: 12, failed: 1, bytes: 300_000, truncated: false, clips: 0, reason: null });
+  assert.deepEqual(await keptWalkSummary(cacheStorage, storage), { kept: 12, failed: 1, bytes: 300_000, truncated: false, clips: 0, reason: null });
 
   await forgetTheWalk(cacheStorage, storage);
   assert.equal(storage.getItem(WALK_META_KEY), null);
@@ -156,4 +156,80 @@ test("the service worker reads the same walk cache the page writes", () => {
   assert.ok(worker.includes(`const WALK = "${WALK_CACHE}";`));
   assert.match(worker, /new Set\(\[[^\]]*WALK\]\)/);
   assert.match(worker, /caches\.match\(request, \{ cacheName: WALK \}\)/);
+});
+
+// #70 rest: the spoken stops travel with the walk.
+import { keepWalkAudio, keptWalkClip, walkAudioUrl, WALK_AUDIO_LIMIT } from "../app/lib/keep-the-walk.mjs";
+
+function withMatch(cacheStorage) {
+  return Object.assign(cacheStorage, {
+    async match(url, { cacheName } = {}) {
+      const store = cacheStorage.stores.get(cacheName);
+      return store?.get(url) ?? undefined;
+    },
+  });
+}
+
+test("a clip's address is its text, and an empty text has none", () => {
+  assert.equal(walkAudioUrl("  The bench.  "), "/walk-audio/neutral?t=The%20bench.");
+  assert.notEqual(walkAudioUrl("a?b&c"), walkAudioUrl("a?b"));
+  assert.equal(walkAudioUrl(""), null);
+  assert.equal(walkAudioUrl(null), null);
+});
+
+test("each spoken stop is fetched once and kept under its text", async () => {
+  const cacheStorage = withMatch(fakeCaches());
+  const cache = await openWalkCache(cacheStorage);
+  const asked = [];
+  const fetchImpl = async (url, init) => {
+    asked.push(JSON.parse(init.body).text);
+    return new Response(new Uint8Array(1000), { headers: { "Content-Type": "audio/mpeg" } });
+  };
+  const result = await keepWalkAudio(["First stop.", null, " First stop. ", "Second stop.", ""], { cache, fetchImpl });
+  assert.deepEqual(asked, ["First stop.", "Second stop."]);
+  assert.deepEqual(result, { clips: 2, clipsFailed: 0, audioBytes: 2000, clipsTruncated: false });
+  const blob = await keptWalkClip(cacheStorage, "Second stop.");
+  assert.equal(blob.size, 1000);
+  assert.equal(await keptWalkClip(cacheStorage, "Never kept."), null);
+});
+
+test("a stop the server cannot speak is counted, and the others are still kept", async () => {
+  const cacheStorage = withMatch(fakeCaches());
+  const cache = await openWalkCache(cacheStorage);
+  let call = 0;
+  const fetchImpl = async () => {
+    call += 1;
+    if (call === 1) return new Response("{}", { status: 503 });
+    if (call === 2) throw new Error("offline");
+    return new Response(new Uint8Array(10));
+  };
+  const result = await keepWalkAudio(["a", "b", "c"], { cache, fetchImpl });
+  assert.equal(result.clips, 1);
+  assert.equal(result.clipsFailed, 2);
+});
+
+test("a long trail keeps its first stops, and no cache keeps nothing", async () => {
+  const texts = Array.from({ length: WALK_AUDIO_LIMIT + 3 }, (_, i) => `Stop ${i}.`);
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return new Response(new Uint8Array(1)); };
+  const cache = await openWalkCache(fakeCaches());
+  const result = await keepWalkAudio(texts, { cache, fetchImpl });
+  assert.equal(calls, WALK_AUDIO_LIMIT);
+  assert.equal(result.clipsTruncated, true);
+  calls = 0;
+  assert.equal((await keepWalkAudio(texts, { cache: null, fetchImpl })).clips, 0);
+  assert.equal(calls, 0);
+  assert.equal(await keptWalkClip(null, "x"), null);
+});
+
+test("the summary remembers how many stops were kept to be heard", () => {
+  const storage = memoryStorage();
+  rememberKeptWalk(storage, { reason: null, kept: 4, failed: 0, bytes: 9000, truncated: false, clips: 3 });
+  assert.equal(JSON.parse(storage.getItem(WALK_META_KEY)).clips, 3);
+});
+
+test("the walk's voice looks in the kept walk before asking the server", () => {
+  const source = readFileSync(new URL("../app/components/useTellingPlayer.js", import.meta.url), "utf8");
+  assert.ok(source.indexOf("keptWalkClip(") > 0);
+  assert.ok(source.indexOf("keptWalkClip(") < source.indexOf('fetch("/api/narration"'));
 });
