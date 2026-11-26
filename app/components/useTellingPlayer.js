@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { keptWalkClip } from "../lib/keep-the-walk.mjs";
+import { narrationUrl, startStreamedAudio } from "../lib/narration-stream.mjs";
 
 const SILENCE = "/silence.mp3";
 
@@ -63,6 +64,26 @@ export default function useTellingPlayer({ gapMs = 0 } = {}) {
       // A walk kept for offline holds its stops' clips (#70): played from the phone, with
       // or without a signal, and the server is not asked again.
       let blob = await keptWalkClip(typeof caches === "undefined" ? null : caches, spoken);
+      // Otherwise streamed (#65): the walker hears the first words while the rest is still
+      // being spoken. A stream that does not start falls through to the whole clip.
+      const streamUrl = blob ? null : narrationUrl({ text: spoken, profileId: "neutral" });
+      if (streamUrl && audioRef.current) {
+        const audio = audioRef.current;
+        releaseClip();
+        audio.onended = finish;
+        audio.onerror = null;
+        try {
+          await startStreamedAudio(audio, streamUrl);
+          if (controller.signal.aborted) return;
+          audio.onerror = finish;
+          setState("speaking");
+          return;
+        } catch {
+          if (controller.signal.aborted) return;
+          audio.onended = null;
+          audio.pause();
+        }
+      }
       if (!blob) {
         const response = await fetch("/api/narration", {
           method: "POST",

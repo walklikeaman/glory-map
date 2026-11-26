@@ -125,6 +125,9 @@ test("a miss generates once and stores the bytes for next time", async () => {
   const response = await handler(narrationRequest({ text: "Hello there.", profileId: "neutral" }));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("X-TTS-Cache"), "miss");
+  // The clip is streamed to the listener (#65) and stored once the stream has ended.
+  assert.equal((await response.arrayBuffer()).byteLength, speechBytes.length);
+  await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(stored.size, speechBytes.length);
   assert.match(stored.path, /\/.+\.mp3$/);
 });

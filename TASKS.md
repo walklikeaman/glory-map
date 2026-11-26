@@ -62,7 +62,7 @@ Take the first unchecked line that has no open PR. One line = one PR, checked on
 - [ ] #53 rest: a persistent coach counter (in-memory caps reset per server instance; a table needs a prod migration)
 - [x] #114 rest (22.11): measured at 320, 360, 844×390, 768 and 1024 with the touch audit; 44 small controls (summed over the five sizes) → 0, the pin key no longer covers the layers button on its side, iPhone home-screen icon + standalone tags; Chromium reports the app installable. Still device-only: sheet swipe, soft keyboard, notch
 - [x] #70 rest (25.11): a kept walk also keeps its spoken stops. The trail's arrival sentences (`trailStopText`, up to 12) are fetched through /api/narration when the route is built and stored in the walk's cache under `/walk-audio/neutral?t=<text>`; the walk's voice looks there first, so a stop is heard without a signal. The card says "N map tiles and M spoken stops kept". 23.11: tiles in their own cache, real size, "Remove offline copy". Not kept: "Listen as I walk" tellings, which depend on the live nearby feed
-- [ ] #65 streaming narration
+- [x] #65 streaming narration (26.11): /api/narration also answers a GET, streamed as OpenAI speaks (`speech.body.tee()`, one copy to the listener, one to the TTS cache once the stream ends). The voice guide and the walk's voice point an `<audio>` element at it, so sound starts at the first bytes; a stream that errors or stays silent 12 s falls back to the whole-clip POST
 
 ## QA findings (routine check, 2026-11-03)
 
