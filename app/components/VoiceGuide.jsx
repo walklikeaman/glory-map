@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Pause, Play, Volume2 } from "lucide-react";
 import { NARRATOR_PROFILES, narrationText, resolveNarrator, voiceToggle } from "../lib/voice-guide.mjs";
+import { narrationUrl, startStreamedAudio } from "../lib/narration-stream.mjs";
 
 // Genres by work, for the visit: the tone of a film does not change while it is open.
 const genresByWork = new Map();
@@ -110,6 +111,41 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
     setSpeechState("loading");
     setMessage("Generating high-quality narration…");
 
+    const onEnded = () => {
+      if (requestId !== requestIdRef.current) return;
+      releaseAudio();
+      setSpeechState("idle");
+      setMessage("Narration finished.");
+    };
+    const onFailed = () => {
+      if (requestId !== requestIdRef.current) return;
+      releaseAudio();
+      setSpeechState("idle");
+      setMessage("Audio playback failed. You can still read the story above.");
+    };
+
+    // Streamed first (#65): the element is made inside the tap, and it plays the clip as
+    // the server speaks it instead of after the last byte. The whole-clip POST below is
+    // the fallback for a stream that does not start.
+    const streamUrl = narrationUrl({ text, profileId: narratorId, language });
+    if (streamUrl) {
+      const audio = new Audio();
+      audioRef.current = audio;
+      audio.onended = onEnded;
+      try {
+        await startStreamedAudio(audio, streamUrl);
+        if (requestId !== requestIdRef.current) return;
+        abortRef.current = null;
+        audio.onerror = onFailed;
+        setSpeechState("playing");
+        setMessage("");
+        return;
+      } catch {
+        if (requestId !== requestIdRef.current) return;
+        releaseAudio();
+      }
+    }
+
     try {
       const response = await fetch("/api/narration", {
         method: "POST",
@@ -132,18 +168,8 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
       audioRef.current = audio;
       abortRef.current = null;
 
-      audio.onended = () => {
-        if (requestId !== requestIdRef.current) return;
-        releaseAudio();
-        setSpeechState("idle");
-        setMessage("Narration finished.");
-      };
-      audio.onerror = () => {
-        if (requestId !== requestIdRef.current) return;
-        releaseAudio();
-        setSpeechState("idle");
-        setMessage("Audio playback failed. You can still read the story above.");
-      };
+      audio.onended = onEnded;
+      audio.onerror = onFailed;
 
       await audio.play();
       if (requestId !== requestIdRef.current) return;

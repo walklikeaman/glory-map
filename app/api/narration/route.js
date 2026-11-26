@@ -5,6 +5,7 @@ import { modelFailed, notConfigured, readJsonBody } from "../../lib/ai-route.mjs
 import { createSpeechRequest } from "../../lib/voice-guide.mjs";
 import { ttsCacheTarget, TTS_BUCKET } from "../../lib/tts-cache.mjs";
 import { guideLanguage } from "../../lib/guide-language.mjs";
+import { narrationBodyFromUrl } from "../../lib/narration-stream.mjs";
 
 export const runtime = "nodejs";
 
@@ -53,8 +54,10 @@ export function createNarrationHandler({
 } = {}) {
   const makeCache = createCache ?? (() => defaultCreateCache(env));
 
-  return async function POST(request) {
-    const body = await readJsonBody(request);
+  // GET carries the same fields in its query (#65): an <audio> element can only stream a
+  // GET, and it starts playing at the first bytes instead of after the last.
+  return async function narration(request) {
+    const body = request.method === "GET" ? narrationBodyFromUrl(request.url) : await readJsonBody(request);
 
     const language = guideLanguage(body?.language).code;
     let speechRequest;
@@ -103,8 +106,22 @@ export function createNarrationHandler({
       const openai = createOpenAIClient(env.OPENAI_API_KEY);
       const speech = await openai.audio.speech.create(speechRequest);
 
-      // Buffered once so the same bytes are both stored and returned; streaming
-      // straight through would leave nothing to cache.
+      // Streamed through as OpenAI speaks it (#65), with a second copy of the same bytes
+      // collected for the cache. Only a stream that ENDS is stored: one that breaks off
+      // must not become the clip every later replay gets.
+      if (speech?.body && typeof speech.body.tee === "function") {
+        const [toListener, toCache] = speech.body.tee();
+        if (target && cache?.canWrite) {
+          new Response(toCache).arrayBuffer()
+            .then((buffer) => cache.save(target.path, new Uint8Array(buffer)))
+            .catch((error) => logError("TTS cache write failed", { message: error?.message }));
+        } else {
+          toCache.cancel().catch(() => {});
+        }
+        return new Response(toListener, { status: 200, headers: audioHeaders("miss") });
+      }
+
+      // A client without a body stream: buffered once, stored and returned.
       const bytes = new Uint8Array(await speech.arrayBuffer());
 
       if (target && cache?.canWrite) {
@@ -124,4 +141,6 @@ export function createNarrationHandler({
   };
 }
 
-export const POST = createNarrationHandler();
+const handler = createNarrationHandler();
+export const POST = handler;
+export const GET = handler;

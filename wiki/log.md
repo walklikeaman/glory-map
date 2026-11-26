@@ -16,6 +16,14 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-26] decision | Narration streams through a GET, not MediaSource (#65)
+
+- `/api/narration` keeps its POST (whole clip; used to keep a walk offline) and now also answers a GET with the same fields in the query (`narrationUrl()` in `app/lib/narration-stream.mjs`).
+- On a miss the route passes OpenAI's `speech.body` through with `tee()`: one branch goes to the listener, the other is read to the end and only then saved to the `tts-cache` bucket. A stream that breaks off is never cached.
+- **Why a GET and not MediaSource:** an `<audio>` element pointed at a GET plays MP3 as it arrives in every browser, iPhone Safari included. iPhone Safari has no classic MediaSource, so MediaSource code would have needed a second path there anyway.
+- Players (`VoiceGuide.jsx`, `useTellingPlayer.js`): kept walk clip first (#70), then the stream (`startStreamedAudio` resolves on `playing`), then the old POST if the stream errors, is blocked or stays silent for 12 s.
+- Checked with Playwright at 1440 and 390 px with a mocked route: the stream plays on GET alone, and a failing GET falls back to POST and still plays. The cloud has no OpenAI key, so time-to-first-sound on real TTS is still to be measured on production.
+
 ## [2026-11-25] update | A kept walk can be heard offline: its spoken stops travel with it (#70)
 
 - What a trail says on arrival is known ahead (`trailStopText(stop)`), so when a route is built and its tiles are kept, the same keep fetches each stop's clip from `/api/narration` (up to 12, one at a time) and stores it in the walk cache `glorymap-walk-v1`.
