@@ -33,6 +33,7 @@ Everything is **ranked by importance** in [`PRIORITIES.md`](PRIORITIES.md) — s
 
 Live map · Letterboxd/IMDb import · vision-verified film stills · then/now
 imagery · recreate-the-shot · OSRM walking routes · timed tours (30/60/120) ·
+film trips by car and ferry, shaped like the paid tours (2026-11-27) ·
 AI voice guide · "what's nearby" · Google sign-in + cloud libraries.
 See [Releases](https://github.com/walklikeaman/glory-map/releases).
 

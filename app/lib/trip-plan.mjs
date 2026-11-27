@@ -163,7 +163,7 @@ export function attachPlaceFilms(places, links) {
 // `distance` is the fact's degree of separation ([[fact-architecture]]). It defaults to
 // DISTANCE_SELF because a queue row is always a claim about the work itself; a distance-2
 // row can only arrive from the graph, and `ROUTE_BLOCK_DISTANCES` refuses it below.
-function toStop(row, { verified }) {
+export function toStop(row, { verified }) {
   const position = positionOf(row);
   const lot = position ? studioLotAt(position[0], position[1]) : null;
   const { films, lead } = normalizeRow(row);

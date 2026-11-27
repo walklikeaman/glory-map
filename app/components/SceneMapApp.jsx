@@ -53,6 +53,7 @@ import {
   zoomForRadius,
 } from "../lib/nearby.mjs";
 import StoryTrail from "./StoryTrail.jsx";
+import FilmTripPlanner, { FilmTripLayer } from "./FilmTrip.jsx";
 import { AppNav, SectionSheet } from "./AppSections.jsx";
 import Onboarding from "./Onboarding.jsx";
 import HereSheet from "./HereSheet.jsx";
@@ -1326,6 +1327,8 @@ export default function SceneMapApp() {
   const [aiTourError, setAiTourError] = useState("");
   const [tourBudget, setTourBudget] = useState(60);
   const [timedTour, setTimedTour] = useState(null);
+  // The film trip on the map (FilmTrip.jsx): its own legs and numbered stops.
+  const [filmTrip, setFilmTrip] = useState(null);
   const [timedTourStatus, setTimedTourStatus] = useState("idle");
   const [timedTourMessage, setTimedTourMessage] = useState("");
   // The language the tour guide writes and speaks in (#67). English until the browser
@@ -3156,6 +3159,29 @@ export default function SceneMapApp() {
     await buildRoute(timedTour.stops);
   }
 
+  // "Show on the map": close the panel and frame the whole trip, legs and stops.
+  function showFilmTrip(trip) {
+    setFilmTrip(trip);
+    setSection("map");
+    setPanelOpen(false);
+    const bounds = boundsOfPositions([
+      trip.origin,
+      ...trip.stops.map((stop) => stop.position),
+      ...(trip.paths ?? []).flatMap((path) => path.positions),
+    ], { keepShare: 1 });
+    if (mapApi && bounds) {
+      window.requestAnimationFrame(() => {
+        // On a wide screen the panel stays open over the map's left side: frame beside it.
+        const canvas = mapApi.getContainer().getBoundingClientRect();
+        const panel = document.querySelector(".command-panel")?.getBoundingClientRect();
+        const left = panel && panel.width > 0 && panel.right - canvas.left < canvas.width * 0.6
+          ? Math.max(48, panel.right - canvas.left + 24)
+          : 48;
+        mapApi.fitBounds(bounds, { maxZoom: 15, padding: { top: 48, bottom: 72, right: 72, left }, animate: false });
+      });
+    }
+  }
+
   async function buildAiTour() {
     const film = films.find((item) => item.id === tourFilmId);
     const filmLocations = sourceLocations
@@ -3601,6 +3627,13 @@ export default function SceneMapApp() {
           </div>
         )}
       </section>
+
+      <FilmTripPlanner
+        mapLocations={visibleLocations}
+        mapCenter={browseCenter}
+        onShow={showFilmTrip}
+        onClear={() => setFilmTrip(null)}
+      />
 
       {/* "Tour by work" was removed. There were THREE ways to build a walk — by time,
           by work, and by hand — at 2,024 px, 2,202 px and 2,529 px, with no guidance on
@@ -4079,6 +4112,8 @@ export default function SceneMapApp() {
             positions={routePositions}
             dashed={routeResult?.source === "fallback"}
           />
+
+          <FilmTripLayer trip={filmTrip} onSelect={(stop) => setMapCenter(stop.position)} />
 
           <StoryTrail
             stops={trailStopList}
