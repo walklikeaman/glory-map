@@ -16,6 +16,19 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-27] decision | Build a film trip: paid-tour shapes, measured legs, a car that stays where you parked it
+**Object**: `app/lib/film-tour.mjs`, `app/lib/film-tour-templates.mjs`, `app/api/trip/tour/route.js` (`POST /api/trip/tour`), `app/components/FilmTrip.jsx` (Routes section + map layer), `test/film-tour.test.mjs`.
+**Scenario**: Nikita (27.11): look at which films get commercial tours, and let people build their own around where they are and how much time they have, not only on foot: drive there, take a ferry to an island. Model-estimated distances keep coming out wrong, so the numbers must be computed.
+**Research (operators' listings, 27.11)**: Belfast Game of Thrones coach days run 9–11 h (Dark Hedges, Ballintoy, the Causeway); Dubrovnik is a ~2 h walk, often with the 15-min boat to Lokrum; Edinburgh → Glenfinnan/Glencoe is a ~12 h coach day; the Salzburg Sound of Music bus ~4 h; Wellington Lord of the Rings half-day minibus ~4–5 h; the Albuquerque Breaking Bad trolley ~3.5 h; Hollywood bus tours 2–5 h; Harry Potter London walks 2.5–3 h. The pattern: a hub, a fixed length, one way of moving (walk, or coach with short walks), 5–10 stops of 15–45 min, back to the hub. 13 templates keep that shape; hubs are Wikidata P625, the stops are always ours.
+**Decisions**:
+- **No model anywhere in a tour.** Straight lines are haversine; a leg's time is the OpenStreetMap router's (`routing.openstreetmap.de`, `routed-foot` / `routed-car`, the host the walking route already uses). A router that fails leaves the leg `estimate`, shown as "≈ estimate, N km straight" and drawn dashed. Parking (5 min) and a ferry queue (30 min) are added on top and named: the router knows neither.
+- **Ferries come from the router's own steps** (`mode: "ferry"` in the car and foot profiles), so an island hop is measured, not assumed. There is no free transit router, so "transit" is not offered.
+- **The car is tracked.** The first version picked walk or drive per leg and drove from places the car had never been. Now a short hop is walked only near the parked car, the next drive starts with "walk back to the car", and the tour ends with the car.
+- **Picking stops:** greedy value-first from each of the top 5 stops plus a value-per-minute pass, two-opt, richest day wins. Value = verified 3 / checked source 2 / unread row 1, + 0.5 per extra film and source. Nearest-only kept Belfast's suburban estates and never reached the Dark Hedges; a single value-first seed sent the Edinburgh day to Durham instead of Glenfinnan.
+- **Left out of the pool:** a stop named after the hub ("Dubrovnik"), working sound stages (Titanic Studios, Stone Street; a "Studio Tour" is kept), influences (`inspiration_for`), places not `verified` in the graph, and queue rows already promoted (`place_id` set).
+- Measured over budget → drop the stop costing most per value and re-measure (≤3 rounds).
+**Outcome**: ✅ 30 tests; checked live against the DB with the router offline (cloud): Belfast 10 h by car = Gosford, Dark Hedges, Larrybane, Ballintoy, Clandeboye, Castle Ward; Edinburgh 12 h = Corrour, Glen Coe, Loch Eilt, Glenfinnan; Dubrovnik 3 h on foot = 7 Old Town stops. Playwright at 1440 and 390 px. The cloud cannot reach the router, so the first measured legs will be seen on production.
+
 ## [2026-11-27] update | A shared film or trail link unfurls with its poster (#77 rest)
 **Object**: `app/lib/work-share-card.mjs`, `app/work/load-work.js`, `app/work/[slug]/opengraph-image.jsx`, `app/page.jsx` + `app/HomeClient.jsx`.
 **Scenario**: feature (#77, the open "OG preview for a trail")

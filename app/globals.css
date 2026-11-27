@@ -6459,3 +6459,97 @@ figcaption a {
   .shot-pair { grid-template-columns: 1fr; }
   .shot-page .shot-pair figure img { aspect-ratio: 4 / 3; }
 }
+
+/* Build a film trip (FilmTrip.jsx) */
+.film-trip-card .budget-options.film-trip-budgets {
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+}
+
+.film-trip-card .budget-options.film-trip-modes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.film-trip-modes button,
+.film-trip-start button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.film-trip-start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.film-trip-start button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  background: rgba(8, 9, 9, 0.62);
+  font: inherit;
+  cursor: pointer;
+}
+
+.film-trip-like {
+  color: var(--muted);
+}
+
+.film-trip-result ol.film-trip-steps {
+  padding-left: 0;
+  list-style: none;
+}
+
+.film-trip-legs {
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.film-trip-leg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.film-trip-leg.is-car svg {
+  color: #5aa9ff;
+}
+
+.film-trip-leg.is-walk svg {
+  color: var(--gold-strong);
+}
+
+.film-trip-leg em {
+  font-style: normal;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.film-trip-leg em.is-measured {
+  color: #9fe3bd;
+  border-color: rgba(114, 212, 156, 0.4);
+}
+
+.film-trip-leg em.is-estimate {
+  color: #ffd38a;
+  border-color: rgba(247, 183, 51, 0.4);
+}
+
+.film-trip-google {
+  color: var(--gold-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
