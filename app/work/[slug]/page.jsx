@@ -18,51 +18,39 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { GET as workRoute } from "../../api/work/route.js";
 import WorkMiniMap from "../../components/WorkMiniMap.jsx";
 import {
   candidatesNote, coverageLine, firstAndRest, mapLinkFor, miniMapPoints, placeBlocks, stillsCaption, workLinks,
 } from "../../lib/work-card.mjs";
 import { placePath } from "../../lib/place-url.mjs";
 import { workIdFromSlug, workPath } from "../../lib/work-url.mjs";
-import { readRoute } from "../../lib/page-load.mjs";
+import { SITE_URL } from "../../lib/site-url.mjs";
+import { workShareModel } from "../../lib/work-share-card.mjs";
+import { loadWorkById } from "../load-work.js";
 
 export const dynamic = "force-dynamic";
 
-async function loadWork(slug) {
-  const id = workIdFromSlug(slug);
-  if (!id) return null;
-  const response = await workRoute(
-    new Request(`https://glorymap.local/api/work?id=${encodeURIComponent(id)}`),
-  );
-  // Only the route's own "missing" is a 404; a failed read throws, and the error boundary
-  // answers 500 so a crawler comes back (see page-load.mjs).
-  const payload = await readRoute(response, "The work page");
-  // `/api/work` ALWAYS returns a `work` object — for a work we do not hold it is that
-  // object with every field null and `in_graph: false`, because the route is built to
-  // still show a poster and links for a film reached live from Wikidata. Keying the page
-  // on its presence therefore rendered a blank card under HTTP 200 for any stale or
-  // mistyped uuid. A page needs something to print, and the title is the minimum.
-  return payload?.work?.title ? payload : null;
+// The read itself lives in ../load-work.js, shared with the preview card and with a
+// shared map link's metadata.
+function loadWork(slug) {
+  return loadWorkById(workIdFromSlug(slug));
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const data = await loadWork(slug);
-  if (!data) return { title: "Not found · GloryMap" };
-  const { work, places, candidates, candidates_total: candidatesTotal } = data;
-  const count = Array.isArray(places) ? places.length : 0;
-  const waiting = Number(candidatesTotal) || (Array.isArray(candidates) ? candidates.length : 0);
+  const model = workShareModel(await loadWork(slug));
+  if (!model) return { title: "Not found · GloryMap" };
+  // The description states the count rather than selling the page. A film we hold one
+  // place for should not be advertised as a tour, and one whose places are all still
+  // candidates must not be described as though somebody had checked them.
+  const title = `${model.name} · GloryMap`;
+  // The picture is opengraph-image.jsx beside this file; Next adds it to both cards.
   return {
-    title: `${work.title}${work.year ? ` (${work.year})` : ""} · GloryMap`,
-    // The description states the count rather than selling the page. A film we hold one
-    // place for should not be advertised as a tour, and one whose places are all still
-    // candidates must not be described as though somebody had checked them.
-    description: count > 0
-      ? `${count} place${count === 1 ? "" : "s"} recorded for ${work.title}, each with the source that stated it.`
-      : waiting > 0
-        ? `${waiting} unconfirmed place${waiting === 1 ? "" : "s"} for ${work.title}, each with the guide that reported it.`
-        : `No places recorded for ${work.title} yet.`,
+    metadataBase: new URL(SITE_URL),
+    title,
+    description: model.description,
+    openGraph: { title, description: model.description, url: model.path, type: "website", siteName: "GloryMap" },
+    twitter: { card: "summary_large_image", title, description: model.description },
   };
 }
 
