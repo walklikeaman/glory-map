@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-27] update | A shared film or trail link unfurls with its poster (#77 rest)
+**Object**: `app/lib/work-share-card.mjs`, `app/work/load-work.js`, `app/work/[slug]/opengraph-image.jsx`, `app/page.jsx` + `app/HomeClient.jsx`.
+**Scenario**: feature (#77, the open "OG preview for a trail")
+**Outcome**: ✅ success
+**What happened**: a link to `/work/<slug>` and the map link "Share trail" sends (`/?work=<uuid>[&trail=walk]`) used to unfurl as a bare "GloryMap". Both now carry a 1200×630 card: the TMDB poster (w500), the title and year, "N places on the map" (or "N unconfirmed places"), the first three place names. The map link's title is "Notting Hill (1999) on the map", or "Walk Notting Hill (1999)" in walking order. Checked against the live DB: Notting Hill, 6 places; an unknown id draws the plain fallback card.
+
+Decisions worth keeping: **the card names places, never scenes or stops in story order**, so a shared trail spoils nothing (same rule as trail-share.mjs). **The map page became a server shell** (`page.jsx` exports `generateMetadata`, the app moved to `HomeClient.jsx`), so `/` is now rendered per request instead of static. Without `?work=` it reads nothing. With it, the preview read races a 2.5 s timer and any failure is the plain preview: the map must open whatever the DB does. **One read per request**: `loadWorkById` is wrapped in React `cache`, shared by the work page, its metadata and its card.
+**Updated**: `app/work/[slug]/page.jsx` (metadata with openGraph/twitter), `test/work-share-card.test.mjs`, `docs/media/work-share/`.
+
 ## [2026-11-26] decision | Narration streams through a GET, not MediaSource (#65)
 
 - `/api/narration` keeps its POST (whole clip; used to keep a walk offline) and now also answers a GET with the same fields in the query (`narrationUrl()` in `app/lib/narration-stream.mjs`).
