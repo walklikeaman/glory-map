@@ -219,6 +219,8 @@ export function createFallbackGuide({ city, budgetMinutes, stops }) {
     stops: stops.map((location) => ({
       locationId: location.id,
       narration: location.description,
+      // Our own words, not the model's: the voice guide says so (#69).
+      factCheck: "scripted",
     })),
   };
 }
