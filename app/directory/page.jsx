@@ -18,6 +18,7 @@ import {
   groupByCountry,
   letterToSlug,
 } from "../lib/directory.mjs";
+import { retryOn502 } from "../lib/page-load.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,11 @@ export const metadata = {
 };
 
 async function loadIndex() {
-  const response = await citiesRoute(new Request("https://glorymap.local/api/directory/cities"));
+  // The city totals query can hit the DB statement timeout once after a quiet spell
+  // (QA 27.11); the letter pages already retry that, the index did not.
+  const response = await retryOn502(() =>
+    citiesRoute(new Request("https://glorymap.local/api/directory/cities")),
+  );
   if (!response.ok) return null;
   return response.json();
 }
