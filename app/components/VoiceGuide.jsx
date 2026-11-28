@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Pause, Play, Volume2 } from "lucide-react";
 import { NARRATOR_PROFILES, narrationText, resolveNarrator, voiceToggle } from "../lib/voice-guide.mjs";
 import { narrationUrl, startStreamedAudio } from "../lib/narration-stream.mjs";
+import { guideSourceNote } from "../lib/narration-check.mjs";
 
 // Genres by work, for the visit: the tone of a film does not change while it is open.
 const genresByWork = new Map();
 
-export default function VoiceGuide({ location, story, storyLanguage }) {
+export default function VoiceGuide({ location, story, storyLanguage, storyCheck = null }) {
   const audioRef = useRef(null);
   const audioUrlRef = useRef("");
   const abortRef = useRef(null);
@@ -31,7 +32,10 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
   // Only the tour's own story is in the tour's language; the spoiler-free line and the
   // place description are our English data, and an English text read "in French" is
   // English with an accent.
-  const language = story?.trim() && text === story.trim() ? storyLanguage ?? "en" : "en";
+  const spokenIsStory = Boolean(story?.trim() && text === story.trim());
+  const language = spokenIsStory ? storyLanguage ?? "en" : "en";
+  // #69: under the controls, where the words come from and whether the AI's were trimmed.
+  const sourceNote = guideSourceNote({ location, spokenIsStory, factCheck: storyCheck });
 
   function releaseAudio() {
     const audio = audioRef.current;
@@ -252,7 +256,16 @@ export default function VoiceGuide({ location, story, storyLanguage }) {
         </button>
       </div>
       <p className="voice-status" aria-live="polite">
-        {message || (speechState === "playing" ? `Playing as ${NARRATOR_PROFILES[narratorId].label.toLowerCase()}.` : "Press play for a short AI-narrated story of this place.")}
+        {message || (speechState === "playing" ? `Playing as ${NARRATOR_PROFILES[narratorId].label.toLowerCase()}.` : "Press play to hear this place.")}
+      </p>
+      <p className="voice-source">
+        {sourceNote.note}
+        {sourceNote.link && (
+          <>
+            {" "}Source:{" "}
+            <a href={sourceNote.link.url} target="_blank" rel="noopener noreferrer">{sourceNote.link.label}</a>
+          </>
+        )}
       </p>
     </section>
   );

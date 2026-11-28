@@ -1554,6 +1554,18 @@ h2 {
   line-height: 1.35;
 }
 
+.voice-source {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.voice-source a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .voice-guide.is-unavailable {
   grid-template-columns: auto 1fr;
   align-items: center;

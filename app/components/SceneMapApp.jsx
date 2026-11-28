@@ -2536,9 +2536,10 @@ export default function SceneMapApp() {
       status: "error",
     });
   };
-  const activeNarration = aiTour?.stops?.find(
+  const activeStoryStop = aiTour?.stops?.find(
     (stop) => stop.locationId === activeLocation?.id,
-  )?.narration;
+  );
+  const activeNarration = activeStoryStop?.narration;
 
   const nearby = useMemo(
     () => (userPosition ? findNearby(userPosition, visibleLocations, nearbyRadius) : null),
@@ -5219,7 +5220,7 @@ export default function SceneMapApp() {
               </p>
             ))}
             <p>{activeLocation.description}</p>
-            <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} />
+            <VoiceGuide location={activeLocation} story={activeNarration} storyLanguage={aiTour?.language} storyCheck={activeStoryStop?.factCheck ?? null} />
             {wipeMode({ thenUrl: activeFilmImage, nowUrl: activeLocation.now, broken: brokenImages }) === "wipe" ? (
               <figure className="then-now-figure">
                 <ThenNowWipe

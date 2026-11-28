@@ -16,6 +16,15 @@ Tip: `grep "^## \[" log.md | head -20` shows recent activity.
 
 ---
 
+## [2026-11-28] update | The guide says only what our record says (#69)
+**Object**: `app/lib/narration-check.mjs`, `/api/tour`, `VoiceGuide.jsx`, the scripted guide in `timed-tour.mjs`.
+**Scenario**: feature (#69)
+**Outcome**: ✅ success
+**What happened**: `/api/tour` now runs `checkTour` on the model's answer before returning it. Every number, and in English every capitalised name that does not open a sentence, must appear in the facts the model was given: place, scene, description, work, city, the work's year, the asked-for length. A stop that fails is replaced by "<place>: <scene>." from our data and marked `factCheck: "replaced"` with the dropped claims. The intro and title are checked the same way (a title only for numbers, since Title Case capitalises every word). The response carries `factCheck: {stops, replaced, …}`. The prompt also says not to add dates, numbers or names. Under the voice guide's controls a line says where the words come from ("Read from our record", "AI-written … and checked against it", or "… replaced"), with a link to the place's source.
+
+Decisions worth keeping: **strict on purpose.** A false alarm costs one plainer sentence; a miss is a made-up fact read aloud at the place it is about. **Names are not checked in other languages**, because a French or Hebrew guide translates and transliterates names, and the check would replace every stop; numbers still are. **The scripted guide is marked `factCheck: "scripted"`** so the voice guide does not call our own words AI-written. Untested live: the cloud has no model key, so the route was checked with a stubbed model and the UI with a mocked `/api/tour`. Also found: `buildAiTour` in SceneMapApp has no caller; the timed tour is the only AI tour path.
+**Updated**: `app/globals.css`, `test/narration-check.test.mjs`, `docs/media/fact-check/`.
+
 ## [2026-11-27] decision | Build a film trip: paid-tour shapes, measured legs, a car that stays where you parked it
 **Object**: `app/lib/film-tour.mjs`, `app/lib/film-tour-templates.mjs`, `app/api/trip/tour/route.js` (`POST /api/trip/tour`), `app/components/FilmTrip.jsx` (Routes section + map layer), `test/film-tour.test.mjs`.
 **Scenario**: Nikita (27.11): look at which films get commercial tours, and let people build their own around where they are and how much time they have, not only on foot: drive there, take a ferry to an island. Model-estimated distances keep coming out wrong, so the numbers must be computed.
